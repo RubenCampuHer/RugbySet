@@ -4,6 +4,7 @@ import { httpsCallable } from "firebase/functions";
 import Link from "next/link";
 import { useState } from "react";
 import { toast } from "sonner";
+import { Logo } from "@/components/Brand";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -40,9 +41,7 @@ export default function ForgotPasswordPage() {
     <main className="flex min-h-screen items-center justify-center bg-[radial-gradient(ellipse_at_top,rgba(99,102,241,0.15),transparent_60%)] p-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="items-center text-center">
-          <div className="mx-auto mb-2 flex size-16 items-center justify-center rounded-2xl bg-gradient-to-br from-[#6366F1] to-[#818CF8] text-3xl shadow-lg shadow-indigo-500/25">
-            🏉
-          </div>
+          <Logo className="mx-auto mb-2 size-16 shadow-lg shadow-indigo-500/25" />
           <CardTitle className="text-2xl tracking-tight">
             Recuperar contraseña
           </CardTitle>

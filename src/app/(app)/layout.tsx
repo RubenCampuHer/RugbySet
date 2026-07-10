@@ -12,6 +12,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { BrandMark } from "@/components/Brand";
 import { BrandLoader } from "@/components/BrandLoader";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -56,9 +57,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-2 px-4 py-2">
           <Link
             href="/exercises"
-            className="shrink-0 text-lg font-bold tracking-tight text-[#818CF8] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            aria-label="RugbySet — inicio"
+            className="shrink-0 rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
           >
-            RugbySet <span aria-hidden>🏉</span>
+            <BrandMark />
           </Link>
 
           {/* Nav superior solo en escritorio */}

@@ -1,16 +1,25 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { ExerciseCard } from "@/components/exercises/ExerciseCard";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useExercises } from "@/hooks/useExercises";
 
 export default function ExercisesPage() {
   const { exercises, loading } = useExercises();
+  const { profile } = useAuth();
   const [search, setSearch] = useState("");
   const [activeTags, setActiveTags] = useState<string[]>([]);
+  const [tab, setTab] = useState<"all" | "favs">("all");
+
+  const favNames = useMemo(
+    () => new Set(profile?.favExercises ?? []),
+    [profile],
+  );
 
   // Tags derivadas del contenido visible (el nodo Etiquetas no se usa —
   // misma decisión que el plan v2 §F3).
@@ -27,7 +36,8 @@ export default function ExercisesPage() {
       search === "" ||
       (e.name ?? "").toLowerCase().includes(search.toLowerCase());
     const matchesTags = activeTags.every((tag) => e.etiquetas.includes(tag));
-    return matchesSearch && matchesTags;
+    const matchesTab = tab === "all" || favNames.has(e.name ?? "");
+    return matchesSearch && matchesTags && matchesTab;
   });
 
   const toggleTag = (tag: string) =>
@@ -48,6 +58,12 @@ export default function ExercisesPage() {
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-bold">Ejercicios</h1>
+      <Tabs value={tab} onValueChange={(v) => setTab(v as "all" | "favs")}>
+        <TabsList>
+          <TabsTrigger value="all">Todos</TabsTrigger>
+          <TabsTrigger value="favs">Favoritos ({favNames.size})</TabsTrigger>
+        </TabsList>
+      </Tabs>
       <Input
         placeholder="Buscar por nombre…"
         value={search}

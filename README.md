@@ -1,36 +1,47 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# RugbySet Web
 
-## Getting Started
+Web companion (solo lectura, MVP) de la app Android **RugbySet**
+(`RugbyApplication`). Comparte el proyecto Firebase `rugbyapp-fbb38`:
+Auth, Realtime Database (europe-west1), Storage y Cloud Functions.
 
-First, run the development server:
+- **Producción:** https://rugbyset.web.app
+- **Plan:** `WEB_APP_PLAN.md` en el repo Android (plan v2, 2026-07-10)
+
+## Stack
+
+Next.js (App Router, `output: 'export'` — SPA estática) + TypeScript +
+Tailwind v4 + shadcn/ui + Firebase Web SDK + Zod.
+
+## Desarrollo
 
 ```bash
+npm install
+cp .env.local.example .env.local   # config pública del SDK, ya rellena
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Deploy
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm run build
+firebase deploy --only hosting     # → rugbyset.web.app (site "rugbyset")
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Contrato de datos (anti-drift)
 
-## Learn More
+- Los schemas Zod de `src/lib/schemas/` son espejo 1:1 de los data class
+  Kotlin del repo Android (`_User.kt`, `_Exercise.kt`, `_Training.kt`,
+  `_Team.kt`, `_Club.kt`, `_Notification.kt`). Cada fichero indica su fuente.
+- `src/lib/permissions.ts` es un port literal de `PermissionsManager.kt`
+  (visibilidad privacy × approvalStatus). Si cambia allí, cambia aquí.
+- `src/lib/constants.ts` espeja `FirebasePaths.kt`.
+- Claves RTDB por NOMBRE (Exercises/Trainings/Teams); solo Clubs usa push id.
+  Los detalles usan query param (`/exercises/detail?name=X`) por eso.
+- Datos de otros usuarios: SIEMPRE desde `publicProfiles/{uid}` (proyección
+  sin mail/fcmToken mantenida por la Cloud Function `mirrorPublicProfile`),
+  nunca desde `Users/{uid}`.
 
-To learn more about Next.js, take a look at the following resources:
+## Sin registro web
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Las cuentas se crean en la app Android (wizard de rol/club/equipo). La web
+solo inicia sesión (email+password verificado, o Google).

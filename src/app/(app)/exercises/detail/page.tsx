@@ -64,7 +64,7 @@ function ExerciseDetail() {
     <article className="mx-auto max-w-2xl space-y-4">
       <Link
         href="/exercises"
-        className="text-sm text-muted-foreground underline underline-offset-4"
+        className="inline-flex min-h-9 items-center gap-1 text-sm font-medium text-[#818CF8] underline-offset-4 hover:underline"
       >
         ← Ejercicios
       </Link>

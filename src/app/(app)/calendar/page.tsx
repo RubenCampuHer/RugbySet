@@ -6,6 +6,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { EmptyState } from "@/components/EmptyState";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTeam } from "@/hooks/useTeam";
 import { cn } from "@/lib/utils";
@@ -45,11 +46,13 @@ export default function CalendarPage() {
   if (loading) return <Skeleton className="h-96 w-full" />;
   if (!hasTeam || team === null) {
     return (
-      <div className="space-y-2 py-12 text-center">
+      <div className="space-y-2">
         <h1 className="text-2xl font-bold">Calendario</h1>
-        <p className="text-muted-foreground">
-          Únete a un equipo desde la app Android para ver su calendario.
-        </p>
+        <EmptyState
+          emoji="📅"
+          title="Sin calendario de equipo"
+          hint="Únete a un equipo desde la app Android para ver sus entrenos."
+        />
       </div>
     );
   }
@@ -76,9 +79,9 @@ export default function CalendarPage() {
       <h1 className="text-2xl font-bold">Calendario</h1>
 
       <div className="flex items-center justify-between">
-        <Button variant="outline" size="sm" onClick={prevMonth}>←</Button>
+        <Button variant="outline" size="icon" className="size-10" aria-label="Mes anterior" onClick={prevMonth}>←</Button>
         <p className="font-medium">{MONTHS[month]} {year}</p>
-        <Button variant="outline" size="sm" onClick={nextMonth}>→</Button>
+        <Button variant="outline" size="icon" className="size-10" aria-label="Mes siguiente" onClick={nextMonth}>→</Button>
       </div>
 
       <div className="grid grid-cols-7 gap-1 text-center">
@@ -103,10 +106,10 @@ export default function CalendarPage() {
               className={cn(
                 "aspect-square rounded-md text-sm",
                 hasTraining
-                  ? "bg-primary font-semibold text-primary-foreground hover:opacity-80"
+                  ? "bg-primary font-semibold text-primary-foreground hover:bg-[#4F46E5]"
                   : "hover:bg-muted",
-                wasAttended && "ring-2 ring-green-500",
-                selected === key && "outline outline-2 outline-offset-1",
+                wasAttended && "ring-2 ring-accent",
+                selected === key && "outline-2 outline-offset-2 outline-ring",
               )}
             >
               {day}
@@ -144,7 +147,9 @@ export default function CalendarPage() {
             )}
             <div className="flex flex-wrap gap-1">
               {selectedDay.accepted_players.includes(myName) && (
-                <Badge className="bg-green-600">Confirmaste asistencia</Badge>
+                <Badge className="bg-accent text-accent-foreground">
+                  Confirmaste asistencia
+                </Badge>
               )}
               {selectedDay.declined_players.includes(myName) && (
                 <Badge variant="destructive">Rechazaste asistencia</Badge>

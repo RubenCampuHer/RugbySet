@@ -3,6 +3,7 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { EmptyState } from "@/components/EmptyState";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTeam } from "@/hooks/useTeam";
 
@@ -25,12 +26,13 @@ export default function TeamPage() {
   }
   if (!hasTeam || team === null) {
     return (
-      <div className="space-y-2 py-12 text-center">
+      <div className="space-y-2">
         <h1 className="text-2xl font-bold">Equipo</h1>
-        <p className="text-muted-foreground">
-          No perteneces a ningún equipo. Únete desde la app Android con el
-          código de tu equipo.
-        </p>
+        <EmptyState
+          emoji="👥"
+          title="No perteneces a ningún equipo"
+          hint="Únete desde la app Android con el código de tu equipo."
+        />
       </div>
     );
   }

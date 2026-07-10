@@ -9,6 +9,9 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTrainings } from "@/hooks/useTrainings";
+import { EmptyState } from "@/components/EmptyState";
+import { gradientFor } from "@/lib/brand";
+import { cn } from "@/lib/utils";
 import type { Training } from "@/lib/types";
 
 function TrainingCard({ training }: { training: Training }) {
@@ -19,7 +22,14 @@ function TrainingCard({ training }: { training: Training }) {
   );
   return (
     <Link href={`/trainings/detail?name=${encodeURIComponent(name)}`}>
-      <Card className="h-full transition-colors hover:bg-muted/50">
+      <Card className="relative h-full overflow-hidden transition-colors hover:bg-muted/50">
+        {/* Franja lateral con gradiente de marca (paleta de cards Android) */}
+        <div
+          className={cn(
+            "absolute inset-y-0 left-0 w-1.5 bg-gradient-to-b",
+            gradientFor(name),
+          )}
+        />
         <CardHeader>
           <CardTitle className="line-clamp-1 text-base">{name}</CardTitle>
         </CardHeader>
@@ -68,10 +78,15 @@ export default function TrainingsPage() {
 
   if (loading) {
     return (
-      <div className="grid gap-4 md:grid-cols-2">
-        {Array.from({ length: 4 }, (_, i) => (
-          <Skeleton key={i} className="h-44 w-full" />
-        ))}
+      <div className="space-y-4">
+        <Skeleton className="h-8 w-40" />
+        <Skeleton className="h-9 w-56" />
+        <Skeleton className="h-9 w-full" />
+        <div className="grid gap-4 md:grid-cols-2">
+          {Array.from({ length: 4 }, (_, i) => (
+            <Skeleton key={i} className="h-44 w-full rounded-xl" />
+          ))}
+        </div>
       </div>
     );
   }
@@ -91,11 +106,19 @@ export default function TrainingsPage() {
         onChange={(e) => setSearch(e.target.value)}
       />
       {shown.length === 0 ? (
-        <p className="py-12 text-center text-muted-foreground">
-          {tab === "favs"
-            ? "No tienes entrenos favoritos."
-            : "No hay entrenos que coincidan."}
-        </p>
+        <EmptyState
+          emoji={tab === "favs" ? "⭐" : "📋"}
+          title={
+            tab === "favs"
+              ? "No tienes entrenos favoritos"
+              : "No hay entrenos que coincidan"
+          }
+          hint={
+            tab === "favs"
+              ? "Marca favoritos desde la app Android."
+              : undefined
+          }
+        />
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
           {shown.map((t) => (

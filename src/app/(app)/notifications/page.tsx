@@ -3,6 +3,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { EmptyState } from "@/components/EmptyState";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useNotifications } from "@/hooks/useNotifications";
 import { cn } from "@/lib/utils";
@@ -48,16 +49,32 @@ export default function NotificationsPage() {
       </div>
 
       {notifications.length === 0 ? (
-        <p className="py-12 text-center text-muted-foreground">
-          No tienes avisos.
-        </p>
+        <EmptyState
+          emoji="🔔"
+          title="No tienes avisos"
+          hint="Aquí verás convocatorias, recordatorios y mensajes del equipo."
+        />
       ) : (
         <div className="space-y-2">
           {notifications.map((n) => (
-            <Card key={n.id} className={cn(!n.read && "border-primary")}>
+            <Card
+              key={n.id}
+              className={cn(!n.read && "border-primary/40 bg-primary/5")}
+            >
               <CardContent className="space-y-1 py-3">
                 <div className="flex items-center justify-between gap-2">
-                  <p className={cn("font-medium", !n.read && "font-semibold")}>
+                  <p
+                    className={cn(
+                      "flex items-center gap-2 font-medium",
+                      !n.read && "font-semibold",
+                    )}
+                  >
+                    {!n.read && (
+                      <span
+                        className="size-2 shrink-0 rounded-full bg-primary"
+                        aria-label="No leído"
+                      />
+                    )}
                     {n.title}
                   </p>
                   <Badge variant="outline" className="shrink-0">

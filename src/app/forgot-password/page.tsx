@@ -37,10 +37,15 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center p-4">
+    <main className="flex min-h-screen items-center justify-center bg-[radial-gradient(ellipse_at_top,rgba(99,102,241,0.15),transparent_60%)] p-4">
       <Card className="w-full max-w-sm">
-        <CardHeader>
-          <CardTitle className="text-2xl">Recuperar contraseña</CardTitle>
+        <CardHeader className="items-center text-center">
+          <div className="mx-auto mb-2 flex size-16 items-center justify-center rounded-2xl bg-gradient-to-br from-[#6366F1] to-[#818CF8] text-3xl shadow-lg shadow-indigo-500/25">
+            🏉
+          </div>
+          <CardTitle className="text-2xl tracking-tight">
+            Recuperar contraseña
+          </CardTitle>
           <CardDescription>
             Te enviaremos un enlace para restablecerla.
           </CardDescription>
@@ -63,7 +68,7 @@ export default function ForgotPasswordPage() {
                   onChange={(e) => setEmail(e.target.value)}
                 />
               </div>
-              <Button type="submit" className="w-full" disabled={busy}>
+              <Button type="submit" size="lg" className="h-11 w-full" disabled={busy}>
                 {busy ? "Enviando…" : "Enviar enlace"}
               </Button>
             </form>

@@ -1,14 +1,18 @@
 "use client";
 
+import { LogOut } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { getRoleDisplayName } from "@/lib/permissions";
 
 export default function ProfilePage() {
-  const { profile } = useAuth();
+  const { profile, logout } = useAuth();
+  const router = useRouter();
 
   if (profile === null) {
     return <Skeleton className="h-64 w-full" />;
@@ -39,6 +43,18 @@ export default function ProfilePage() {
           <p>Entrenos asistidos: {profile.assistedTrainingDays.length}</p>
         </CardContent>
       </Card>
+
+      <Button
+        variant="outline"
+        size="lg"
+        className="h-11 w-full text-destructive hover:text-destructive"
+        onClick={async () => {
+          await logout();
+          router.replace("/login");
+        }}
+      >
+        <LogOut className="size-4" /> Cerrar sesión
+      </Button>
     </div>
   );
 }

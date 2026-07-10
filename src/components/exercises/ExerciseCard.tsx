@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { gradientFor } from "@/lib/brand";
+import { cn } from "@/lib/utils";
 import type { Exercise } from "@/lib/types";
 
 const PRIVACY_LABEL: Record<string, string> = {
@@ -25,7 +27,13 @@ export function ExerciseCard({ exercise }: { exercise: Exercise }) {
             loading="lazy"
           />
         ) : (
-          <div className="flex h-36 w-full items-center justify-center rounded-t-xl bg-muted text-4xl">
+          // Gradiente de marca (como los cards de la app Android) cuando no hay imagen
+          <div
+            className={cn(
+              "flex h-36 w-full items-center justify-center rounded-t-xl bg-gradient-to-br text-4xl",
+              gradientFor(name),
+            )}
+          >
             🏉
           </div>
         )}

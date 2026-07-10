@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { EmptyState } from "@/components/EmptyState";
 import { ExerciseCard } from "@/components/exercises/ExerciseCard";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -47,10 +48,15 @@ export default function ExercisesPage() {
 
   if (loading) {
     return (
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
-        {Array.from({ length: 6 }, (_, i) => (
-          <Skeleton key={i} className="h-64 w-full" />
-        ))}
+      <div className="space-y-4">
+        <Skeleton className="h-8 w-40" />
+        <Skeleton className="h-9 w-56" />
+        <Skeleton className="h-9 w-full" />
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
+          {Array.from({ length: 6 }, (_, i) => (
+            <Skeleton key={i} className="h-64 w-full rounded-xl" />
+          ))}
+        </div>
       </div>
     );
   }
@@ -72,8 +78,16 @@ export default function ExercisesPage() {
       {allTags.length > 0 && (
         <div className="flex flex-wrap gap-1">
           {allTags.slice(0, 15).map((tag) => (
-            <button key={tag} type="button" onClick={() => toggleTag(tag)}>
-              <Badge variant={activeTags.includes(tag) ? "default" : "outline"}>
+            <button
+              key={tag}
+              type="button"
+              onClick={() => toggleTag(tag)}
+              className="rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            >
+              <Badge
+                className="px-3 py-1.5"
+                variant={activeTags.includes(tag) ? "default" : "outline"}
+              >
                 {tag}
               </Badge>
             </button>
@@ -81,9 +95,17 @@ export default function ExercisesPage() {
         </div>
       )}
       {filtered.length === 0 ? (
-        <p className="py-12 text-center text-muted-foreground">
-          No hay ejercicios que coincidan.
-        </p>
+        <EmptyState
+          emoji={tab === "favs" ? "⭐" : "🔍"}
+          title={
+            tab === "favs"
+              ? "No tienes ejercicios favoritos"
+              : "No hay ejercicios que coincidan"
+          }
+          hint={
+            tab === "favs" ? "Marca favoritos desde la app Android." : undefined
+          }
+        />
       ) : (
         <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
           {filtered.map((e) => (

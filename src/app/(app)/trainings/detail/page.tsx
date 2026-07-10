@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { PrivacyBadge, ApprovalBadge } from "@/components/PrivacyBadge";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -68,7 +69,8 @@ function TrainingDetail() {
       </Link>
       <h1 className="text-3xl font-bold">{training.name}</h1>
       <div className="flex flex-wrap gap-1">
-        {training.privacy && <Badge variant="outline">{training.privacy}</Badge>}
+        <PrivacyBadge privacy={training.privacy} />
+        <ApprovalBadge status={training.approvalStatus} />
         <Badge variant="secondary">⏱ {training.tiempoTotal ?? "?"} min</Badge>
         {training.etiquetas.map((tag) => (
           <Badge key={tag} variant="secondary">

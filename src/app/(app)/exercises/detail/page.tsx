@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { PrivacyBadge, ApprovalBadge } from "@/components/PrivacyBadge";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PATHS } from "@/lib/constants";
@@ -70,10 +71,8 @@ function ExerciseDetail() {
       </Link>
       <h1 className="text-3xl font-bold">{exercise.name}</h1>
       <div className="flex flex-wrap gap-1">
-        {exercise.privacy && <Badge variant="outline">{exercise.privacy}</Badge>}
-        {exercise.approvalStatus && (
-          <Badge variant="secondary">{exercise.approvalStatus}</Badge>
-        )}
+        <PrivacyBadge privacy={exercise.privacy} />
+        <ApprovalBadge status={exercise.approvalStatus} />
         {exercise.etiquetas.map((tag) => (
           <Badge key={tag} variant="secondary">
             {tag}

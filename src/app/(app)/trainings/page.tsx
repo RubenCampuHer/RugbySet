@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTrainings } from "@/hooks/useTrainings";
 import { EmptyState } from "@/components/EmptyState";
+import { PrivacyBadge, ApprovalBadge } from "@/components/PrivacyBadge";
 import { gradientFor } from "@/lib/brand";
 import { cn } from "@/lib/utils";
 import type { Training } from "@/lib/types";
@@ -44,7 +45,8 @@ function TrainingCard({ training }: { training: Training }) {
             secciones · {exerciseCount} ejercicios
           </p>
           <div className="flex flex-wrap gap-1">
-            {training.privacy && <Badge variant="outline">{training.privacy}</Badge>}
+            <PrivacyBadge privacy={training.privacy} />
+            <ApprovalBadge status={training.approvalStatus} />
             {training.etiquetas.slice(0, 3).map((tag) => (
               <Badge key={tag} variant="secondary">
                 {tag}

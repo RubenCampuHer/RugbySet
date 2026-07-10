@@ -1,17 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { PrivacyBadge, ApprovalBadge } from "@/components/PrivacyBadge";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { gradientFor } from "@/lib/brand";
 import { cn } from "@/lib/utils";
 import type { Exercise } from "@/lib/types";
-
-const PRIVACY_LABEL: Record<string, string> = {
-  Publico: "Público",
-  Privado: "Privado",
-  Equipo: "Equipo",
-};
 
 export function ExerciseCard({ exercise }: { exercise: Exercise }) {
   const name = exercise.name ?? "(sin nombre)";
@@ -47,11 +42,8 @@ export function ExerciseCard({ exercise }: { exercise: Exercise }) {
             </p>
           )}
           <div className="flex flex-wrap gap-1">
-            {exercise.privacy && (
-              <Badge variant="outline">
-                {PRIVACY_LABEL[exercise.privacy] ?? exercise.privacy}
-              </Badge>
-            )}
+            <PrivacyBadge privacy={exercise.privacy} />
+            <ApprovalBadge status={exercise.approvalStatus} />
             {exercise.etiquetas.slice(0, 3).map((tag) => (
               <Badge key={tag} variant="secondary">
                 {tag}

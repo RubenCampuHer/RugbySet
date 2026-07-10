@@ -1,7 +1,8 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/components/auth/AuthProvider";
+import { RegisterSW } from "@/components/RegisterSW";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -17,6 +18,15 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "RugbySet",
   description: "Gestión de equipos, entrenamientos y ejercicios de rugby",
+  manifest: "/manifest.webmanifest",
+  icons: {
+    icon: "/icons/icon-192.png",
+    apple: "/icons/icon-192.png",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0f172a",
 };
 
 export default function RootLayout({
@@ -32,6 +42,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         <AuthProvider>{children}</AuthProvider>
         <Toaster />
+        <RegisterSW />
       </body>
     </html>
   );

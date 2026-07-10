@@ -1,14 +1,16 @@
 "use client";
 
-import { LogOut } from "lucide-react";
+import { ClipboardCheck, LogOut } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { getRoleDisplayName } from "@/lib/permissions";
+import { getRoleDisplayName, isAdmin } from "@/lib/permissions";
+import { cn } from "@/lib/utils";
 
 export default function ProfilePage() {
   const { profile, logout } = useAuth();
@@ -43,6 +45,19 @@ export default function ProfilePage() {
           <p>Entrenos asistidos: {profile.assistedTrainingDays.length}</p>
         </CardContent>
       </Card>
+
+      {/* Como en Android (ReadUser): la cola de aprobación solo para ADMIN */}
+      {isAdmin(profile) && (
+        <Link
+          href="/admin/approvals"
+          className={cn(
+            buttonVariants({ variant: "outline", size: "lg" }),
+            "h-11 w-full",
+          )}
+        >
+          <ClipboardCheck className="size-4" /> Cola de aprobación
+        </Link>
+      )}
 
       <Button
         variant="outline"

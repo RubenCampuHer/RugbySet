@@ -1,25 +1,112 @@
 "use client";
 
+import { Check, Trash2, X } from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { EmptyState } from "@/components/EmptyState";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { EmptyState } from "@/components/EmptyState";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTeam } from "@/hooks/useTeam";
+import {
+  acceptPendingPlayer,
+  rejectPendingPlayer,
+  removePlayer,
+} from "@/lib/actions/team";
+import type { Team } from "@/lib/types";
 
-function PlayerChip({ name }: { name: string }) {
+function PlayerChip({
+  name,
+  action,
+}: {
+  name: string;
+  action?: React.ReactNode;
+}) {
   return (
     <div className="flex items-center gap-2 rounded-full border px-3 py-1">
       <span className="flex size-6 items-center justify-center rounded-full bg-muted text-xs font-medium">
         {name.slice(0, 1).toUpperCase()}
       </span>
       <span className="text-sm">{name}</span>
+      {action}
     </div>
   );
 }
 
+// Gestión visible solo para el coach — mismo discriminador que Android
+// (ReadTeam: usercoach == uid), no el rol.
+function PendingSection({ team, isCoach }: { team: Team; isCoach: boolean }) {
+  const [busy, setBusy] = useState<string | null>(null);
+  if (team.pendingplayers.length === 0) return null;
+
+  const act = async (name: string, accept: boolean) => {
+    setBusy(name);
+    try {
+      if (accept) {
+        await acceptPendingPlayer(team, name);
+        toast.success(`${name} aceptado en el equipo`);
+      } else {
+        await rejectPendingPlayer(team, name);
+        toast.success(`Solicitud de ${name} rechazada`);
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo completar");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-lg">
+          Solicitudes pendientes ({team.pendingplayers.length})
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="flex flex-wrap gap-2">
+        {team.pendingplayers.map((name) => (
+          <PlayerChip
+            key={name}
+            name={name}
+            action={
+              isCoach ? (
+                <span className="flex gap-1">
+                  <Button
+                    size="icon"
+                    className="size-7 rounded-full bg-accent text-accent-foreground hover:bg-accent/80"
+                    aria-label={`Aceptar a ${name}`}
+                    disabled={busy === name}
+                    onClick={() => void act(name, true)}
+                  >
+                    <Check className="size-4" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="destructive"
+                    className="size-7 rounded-full"
+                    aria-label={`Rechazar a ${name}`}
+                    disabled={busy === name}
+                    onClick={() => void act(name, false)}
+                  >
+                    <X className="size-4" />
+                  </Button>
+                </span>
+              ) : undefined
+            }
+          />
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function TeamPage() {
+  const { firebaseUser } = useAuth();
   const { team, coach, hasTeam, loading } = useTeam();
+  const [kicking, setKicking] = useState<string | null>(null);
 
   if (loading) {
     return <Skeleton className="h-96 w-full" />;
@@ -37,6 +124,21 @@ export default function TeamPage() {
     );
   }
 
+  const isCoach = team.usercoach === firebaseUser?.uid;
+
+  const kick = async (name: string) => {
+    if (!window.confirm(`¿Expulsar a ${name} del equipo?`)) return;
+    setKicking(name);
+    try {
+      await removePlayer(team, name);
+      toast.success(`${name} expulsado del equipo`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo expulsar");
+    } finally {
+      setKicking(null);
+    }
+  };
+
   return (
     <div className="mx-auto max-w-2xl space-y-4">
       <div className="flex items-center gap-4">
@@ -50,6 +152,11 @@ export default function TeamPage() {
             {team.category && <Badge variant="outline">{team.category}</Badge>}
             {team.teamcode && (
               <Badge variant="secondary">Código: {team.teamcode}</Badge>
+            )}
+            {isCoach && (
+              <Badge className="border-transparent bg-primary/15 text-[#818CF8]">
+                Eres el entrenador
+              </Badge>
             )}
           </div>
         </div>
@@ -75,6 +182,8 @@ export default function TeamPage() {
         </CardContent>
       </Card>
 
+      <PendingSection team={team} isCoach={isCoach} />
+
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">
@@ -85,25 +194,29 @@ export default function TeamPage() {
           {team.userplayers.length === 0 ? (
             <p className="text-sm text-muted-foreground">Sin jugadores.</p>
           ) : (
-            team.userplayers.map((name) => <PlayerChip key={name} name={name} />)
+            team.userplayers.map((name) => (
+              <PlayerChip
+                key={name}
+                name={name}
+                action={
+                  isCoach ? (
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="size-7 rounded-full text-destructive hover:text-destructive"
+                      aria-label={`Expulsar a ${name}`}
+                      disabled={kicking === name}
+                      onClick={() => void kick(name)}
+                    >
+                      <Trash2 className="size-4" />
+                    </Button>
+                  ) : undefined
+                }
+              />
+            ))
           )}
         </CardContent>
       </Card>
-
-      {team.pendingplayers.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">
-              Pendientes ({team.pendingplayers.length})
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-wrap gap-2">
-            {team.pendingplayers.map((name) => (
-              <PlayerChip key={name} name={name} />
-            ))}
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }

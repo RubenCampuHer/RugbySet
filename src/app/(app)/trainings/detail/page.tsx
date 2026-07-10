@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { FavoriteButton } from "@/components/FavoriteButton";
 import { PrivacyBadge, ApprovalBadge } from "@/components/PrivacyBadge";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -67,7 +68,10 @@ function TrainingDetail() {
       >
         ← Entrenos
       </Link>
-      <h1 className="text-3xl font-bold">{training.name}</h1>
+      <div className="flex items-start justify-between gap-2">
+        <h1 className="text-3xl font-bold">{training.name}</h1>
+        {training.name && <FavoriteButton kind="training" name={training.name} />}
+      </div>
       <div className="flex flex-wrap gap-1">
         <PrivacyBadge privacy={training.privacy} />
         <ApprovalBadge status={training.approvalStatus} />

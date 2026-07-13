@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarClock, MapPin } from "lucide-react";
+import { CalendarClock, Check, MapPin, X } from "lucide-react";
 import { AttendanceToggle } from "@/components/AttendanceToggle";
 import { Badge } from "@/components/ui/badge";
 import { WEEKDAY_SHORT, parseKey } from "@/lib/calendar";
@@ -108,8 +108,14 @@ export function UpcomingEvents({
               </div>
 
               {isCoach ? (
-                <span className="shrink-0 text-xs text-muted-foreground">
-                  {day.accepted_players.length}✓ · {day.declined_players.length}✗ · {noAnswer}—
+                <span className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
+                  <span className="flex items-center gap-0.5">
+                    <Check className="size-3" /> {day.accepted_players.length}
+                  </span>
+                  <span className="flex items-center gap-0.5">
+                    <X className="size-3" /> {day.declined_players.length}
+                  </span>
+                  <span>{noAnswer}—</span>
                 </span>
               ) : (
                 <span onClick={(e) => e.stopPropagation()} className="shrink-0">

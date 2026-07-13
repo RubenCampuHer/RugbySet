@@ -42,6 +42,16 @@ callables en **us-central1**). Producción: https://rugbyset.web.app
    `/Teams` ni escrituras seguras sin transacción desde cliente puro).
 8. `useSearchParams` exige envolver el componente en `<Suspense>` (export
    estático).
+9. **Sistema de diseño**: tokens en `src/app/globals.css` (`--primary`
+   #6366F1 = fondo de botón; `--brand` #818CF8 = texto/acentos; `--warning`
+   #F59E0B = partidos/pendiente). Dark-only, sin `next-themes`. Nunca hex
+   hardcodeado en `className` — usar los tokens. Nada de `window.confirm`
+   (usar `ConfirmDialog`), `<select>` nativo (usar `Select` de shadcn) ni
+   emojis como iconos funcionales (usar `lucide-react`). Primitivas
+   compartidas en `src/components/`: `PageHeader`, `BackLink`,
+   `AvatarInitials`, `AttendanceToggle`, `ConfirmDialog`, `SearchInput`,
+   `EmptyState` (prop `icon: LucideIcon`), skeletons en `skeletons.tsx`.
+   Objetivo táctil mínimo 44px (`size="xl"`/`"icon-xl"` en `Button`).
 
 ## Comandos
 
@@ -54,8 +64,11 @@ callables en **us-central1**). Producción: https://rugbyset.web.app
 completo (F0-F5) en producción + fase de escrituras por rol** (gestión de
 equipo, calendario con creación/edición/borrado de sesiones, asistencia
 propia y pasar lista del coach, favoritos, cola de aprobación de contenido,
-unirse/salir de equipo por código vía callables). `TrainingDay` soporta
-`eventType` (TRAINING/MATCH) y `location`, espejo de los campos aditivos que
-Android incorporó el mismo día. Pendiente: eliminar equipo (self-service),
-crear/editar contenido (ejercicios/entrenos) desde la web — sigue solo en
-Android.
+unirse/salir de equipo por código vía callables) **+ rediseño UX/UI
+profesional completo** (tokens de marca, sistema de componentes shadcn,
+calendario rediseñado con Sheet/Select/AttendanceToggle, notificaciones
+accionables, skeletons por pantalla, aviso de sin-conexión, error
+boundaries). `TrainingDay` soporta `eventType` (TRAINING/MATCH) y
+`location`, espejo de los campos aditivos que Android incorporó el mismo
+día. Pendiente: eliminar equipo (self-service), crear/editar contenido
+(ejercicios/entrenos) desde la web — sigue solo en Android.

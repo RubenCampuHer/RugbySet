@@ -14,6 +14,9 @@ export const TrainingDaySchema = z.object({
   training: TrainingSchema.nullish(),
   accepted_players: rtdbList(z.string()).default([]), // nameSurname
   declined_players: rtdbList(z.string()).default([]),
+  // Campos aditivos (2026-07-13): null/"TRAINING" = entrenamiento, "MATCH" = partido.
+  eventType: z.enum(["TRAINING", "MATCH"]).nullish(),
+  location: z.string().nullish(),
 });
 
 export const TeamSchema = z.object({

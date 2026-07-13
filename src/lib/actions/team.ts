@@ -10,8 +10,9 @@ import {
   ref,
   update,
 } from "firebase/database";
+import { httpsCallable } from "firebase/functions";
 import { PATHS } from "@/lib/constants";
-import { db } from "@/lib/firebase";
+import { db, functions } from "@/lib/firebase";
 import type { Team, Training, TrainingDay } from "@/lib/types";
 
 /** nameSurname → uid, vía publicProfiles (indexOn nameSurname). */
@@ -143,6 +144,10 @@ export async function setAttendance(opts: {
  * Coach crea/edita el día de entreno: upsert por fecha reescribiendo SOLO
  * Teams/{t}/trainingdays (espejo de TeamRepository.upsertTrainingDay).
  * El training va EMBEBIDO completo, como hace Android.
+ *
+ * nameTrainingDay/eventType/location son aditivos (2026-07-13, ver
+ * TrainingDay.kt): antes nameTrainingDay siempre se guardaba "" — ahora se
+ * persiste el valor real si se pasa.
  */
 export async function upsertTrainingDay(
   teamname: string,
@@ -151,6 +156,9 @@ export async function upsertTrainingDay(
     horaInicio: string;
     horaFin: string;
     training: Training;
+    nameTrainingDay?: string;
+    eventType?: "TRAINING" | "MATCH";
+    location?: string | null;
   },
   existing: TrainingDay[],
 ) {
@@ -158,8 +166,10 @@ export async function upsertTrainingDay(
     fecha: day.fecha,
     horaInicio: day.horaInicio,
     horaFin: day.horaFin,
-    nameTrainingDay: "",
+    nameTrainingDay: day.nameTrainingDay ?? "",
     training: day.training,
+    eventType: day.eventType ?? "TRAINING",
+    location: day.location?.trim() ? day.location.trim() : null,
     accepted_players:
       existing.find((d) => d.fecha === day.fecha)?.accepted_players ?? [],
     declined_players:
@@ -198,15 +208,41 @@ export async function deleteTrainingDay(
   }
 }
 
-/** Unirse a un equipo por código — escribe SOLO pendingplayers (auth ✓). */
-export async function requestJoinTeam(teamname: string, playerName: string) {
-  const snap = await get(ref(db, `${PATHS.TEAMS}/${teamname}/pendingplayers`));
-  const v = snap.val();
-  const pending = (
-    v == null ? [] : Array.isArray(v) ? v : Object.values(v)
-  ).filter(Boolean) as string[];
-  if (!pending.includes(playerName)) pending.push(playerName);
-  await update(ref(db, `${PATHS.TEAMS}/${teamname}`), {
-    pendingplayers: pending,
-  });
+export type JoinByCodeResult = {
+  found: boolean;
+  /** "pending" | "joined" | "already_member" | undefined (dryRun) */
+  status?: "pending" | "joined" | "already_member";
+  teamname?: string;
+  teamicon?: string | null;
+};
+
+/**
+ * Busca un equipo por código y (si dryRun=false) solicita el ingreso, vía la
+ * Cloud Function joinTeamByCode (Android functions/index.js, desplegada en
+ * el mismo proyecto Firebase — cualquier cliente autenticado puede llamarla).
+ * Necesaria porque las reglas RTDB no permiten a un no-miembro leer /Teams:
+ * ni buscar por código ni añadirse a pendingplayers de forma segura
+ * (transacción, sin pisar solicitudes concurrentes) son posibles con una
+ * query+update de cliente puro — la vía anterior (`requestJoinTeam`, ya
+ * eliminada) tenía justo esa carrera.
+ */
+export async function joinTeamByCode(
+  teamcode: string,
+  dryRun = false,
+): Promise<JoinByCodeResult> {
+  const result = await httpsCallable(
+    functions,
+    "joinTeamByCode",
+  )({ teamcode, dryRun });
+  return result.data as JoinByCodeResult;
+}
+
+/**
+ * El propio usuario abandona su equipo, vía la Cloud Function leaveTeam: un
+ * PLAYER no tiene permiso para escribir su propio Teams/{t}/userplayers. El
+ * coach no puede abandonar (debe eliminar el equipo — no implementado aún en
+ * la web).
+ */
+export async function leaveTeam(): Promise<void> {
+  await httpsCallable(functions, "leaveTeam")();
 }

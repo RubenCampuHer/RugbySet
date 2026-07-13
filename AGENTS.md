@@ -28,9 +28,19 @@ callables en **us-central1**). Producción: https://rugbyset.web.app
    `parseOr`/`parseMapOr` (hay datos legacy reales).
 5. **Sin rutas dinámicas** (`[id]`): output export + claves-por-nombre →
    detalles con query param (`/exercises/detail?name=X`).
-6. **MVP solo lectura**: no añadir escrituras a RTDB salvo el nodo propio
-   (p.ej. marcar notificación leída). Las creaciones van en la app Android.
-7. `useSearchParams` exige envolver el componente en `<Suspense>` (export
+6. **Escrituras multi-path, nunca `set()` del nodo completo**: la web YA
+   escribe (equipo, calendario, asistencia, favoritos, aprobaciones — ver
+   `src/lib/actions/`). Todo `update(ref(db), {...})` con paths concretos,
+   igual que `TeamRepository.kt`/`NotificationManager.kt` en Android. Nunca
+   reescribir `Teams/{t}` o `Users/{uid}` enteros.
+7. **Callables compartidas con Android**: `joinTeamByCode`, `leaveTeam`,
+   `sendPushNotification`, `sendCustomPasswordResetEmail` viven en
+   `functions/index.js` del repo Android y están desplegadas una sola vez —
+   cualquier cliente autenticado (web o Android) puede llamarlas. No
+   dupliques esa lógica con updates directos si ya existe una callable (p.ej.
+   unirse/salir de equipo: las reglas no permiten a un no-miembro leer
+   `/Teams` ni escrituras seguras sin transacción desde cliente puro).
+8. `useSearchParams` exige envolver el componente en `<Suspense>` (export
    estático).
 
 ## Comandos
@@ -40,6 +50,12 @@ callables en **us-central1**). Producción: https://rugbyset.web.app
 
 ## Plan
 
-`WEB_APP_PLAN.md` en el repo Android (v2). Estado actual: F2 (bootstrap +
-auth + /exercises). Pendiente: F3 completo, F4 (trainings/calendar/team/club),
-F5 (notifications/profile/PWA).
+`WEB_APP_PLAN.md` en el repo Android (v2). **Estado actual (2026-07-13): MVP
+completo (F0-F5) en producción + fase de escrituras por rol** (gestión de
+equipo, calendario con creación/edición/borrado de sesiones, asistencia
+propia y pasar lista del coach, favoritos, cola de aprobación de contenido,
+unirse/salir de equipo por código vía callables). `TrainingDay` soporta
+`eventType` (TRAINING/MATCH) y `location`, espejo de los campos aditivos que
+Android incorporó el mismo día. Pendiente: eliminar equipo (self-service),
+crear/editar contenido (ejercicios/entrenos) desde la web — sigue solo en
+Android.

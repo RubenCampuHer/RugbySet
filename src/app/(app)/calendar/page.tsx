@@ -228,6 +228,11 @@ function CoachDayEditor({
   const [horaInicio, setHoraInicio] = useState(day?.horaInicio ?? "18:00");
   const [horaFin, setHoraFin] = useState(day?.horaFin ?? "19:30");
   const [trainingName, setTrainingName] = useState(day?.training?.name ?? "");
+  const [eventType, setEventType] = useState<"TRAINING" | "MATCH">(
+    day?.eventType === "MATCH" ? "MATCH" : "TRAINING",
+  );
+  const [eventName, setEventName] = useState(day?.nameTrainingDay ?? "");
+  const [location, setLocation] = useState(day?.location ?? "");
   const [busy, setBusy] = useState(false);
 
   const save = async () => {
@@ -248,7 +253,15 @@ function CoachDayEditor({
     try {
       await upsertTrainingDay(
         team.teamname!,
-        { fecha, horaInicio, horaFin, training },
+        {
+          fecha,
+          horaInicio,
+          horaFin,
+          training,
+          nameTrainingDay: eventName,
+          eventType,
+          location,
+        },
         team.trainingdays,
       );
       toast.success(day ? "Entreno actualizado" : "Entreno creado");
@@ -278,6 +291,31 @@ function CoachDayEditor({
       <p className="text-sm font-medium">
         {day ? "Editar entreno (entrenador)" : "Añadir entreno (entrenador)"}
       </p>
+      <div className="flex gap-2">
+        <Button
+          type="button"
+          size="sm"
+          variant={eventType === "TRAINING" ? "default" : "outline"}
+          className="flex-1"
+          onClick={() => setEventType("TRAINING")}
+        >
+          🏉 Entreno
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant={eventType === "MATCH" ? "default" : "outline"}
+          className={cn("flex-1", eventType === "MATCH" && "bg-amber-500 text-white hover:bg-amber-500/90")}
+          onClick={() => setEventType("MATCH")}
+        >
+          🏆 Partido
+        </Button>
+      </div>
+      <div className="space-y-1">
+        <Label htmlFor="eventName" className="text-xs">Nombre del evento (opcional)</Label>
+        <Input id="eventName" value={eventName} placeholder="p.ej. Vs. Leones RC"
+          onChange={(e) => setEventName(e.target.value)} />
+      </div>
       <div className="grid grid-cols-2 gap-2">
         <div className="space-y-1">
           <Label htmlFor="horaInicio" className="text-xs">Inicio</Label>
@@ -289,6 +327,11 @@ function CoachDayEditor({
           <Input id="horaFin" value={horaFin} placeholder="19:30"
             onChange={(e) => setHoraFin(e.target.value)} />
         </div>
+      </div>
+      <div className="space-y-1">
+        <Label htmlFor="location" className="text-xs">Ubicación (opcional)</Label>
+        <Input id="location" value={location} placeholder="p.ej. Campo Municipal"
+          onChange={(e) => setLocation(e.target.value)} />
       </div>
       <div className="space-y-1">
         <Label htmlFor="training" className="text-xs">Entreno</Label>
@@ -394,7 +437,9 @@ export default function CalendarPage() {
         {Array.from({ length: daysInMonth }, (_, i) => {
           const day = i + 1;
           const key = toKey(year, month, day);
-          const hasTraining = daysByFecha.has(key);
+          const daySession = daysByFecha.get(key);
+          const hasTraining = daySession !== undefined;
+          const isMatch = daySession?.eventType === "MATCH";
           const wasAttended = attended.has(key);
           return (
             <button
@@ -405,9 +450,11 @@ export default function CalendarPage() {
               onClick={() => setSelected(hasTraining || isCoach ? key : null)}
               className={cn(
                 "aspect-square rounded-md text-sm",
-                hasTraining
-                  ? "bg-primary font-semibold text-primary-foreground hover:bg-[#4F46E5]"
-                  : "hover:bg-muted",
+                isMatch
+                  ? "bg-amber-500 font-semibold text-white hover:bg-amber-500/90"
+                  : hasTraining
+                    ? "bg-primary font-semibold text-primary-foreground hover:bg-[#4F46E5]"
+                    : "hover:bg-muted",
                 wasAttended && "ring-2 ring-accent",
                 selected === key && "outline-2 outline-offset-2 outline-ring",
               )}
@@ -418,7 +465,7 @@ export default function CalendarPage() {
         })}
       </div>
       <p className="text-xs text-muted-foreground">
-        ■ día con entreno · anillo verde = asististe
+        ■ entreno · ■ partido · anillo verde = asististe
         {isCoach && " · toca cualquier día para añadir entreno"}
       </p>
 
@@ -426,10 +473,15 @@ export default function CalendarPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-baseline justify-between text-lg">
-              <span>
-                {selectedDay
+              <span className="flex items-center gap-2">
+                {selectedDay?.eventType === "MATCH" && (
+                  <Badge className="border-transparent bg-amber-500/15 text-amber-500">
+                    🏆 Partido
+                  </Badge>
+                )}
+                {selectedDay?.nameTrainingDay || (selectedDay
                   ? selectedDay.training?.name || "Entreno"
-                  : `Sin entreno el ${selected}`}
+                  : `Sin entreno el ${selected}`)}
               </span>
               {selectedDay && (
                 <span className="text-sm font-normal text-muted-foreground">
@@ -439,6 +491,9 @@ export default function CalendarPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
+            {selectedDay?.location && (
+              <p className="text-muted-foreground">📍 {selectedDay.location}</p>
+            )}
             {selectedDay?.training?.name && (
               <p>
                 Entreno:{" "}

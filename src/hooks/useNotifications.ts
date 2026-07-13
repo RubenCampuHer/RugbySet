@@ -51,10 +51,19 @@ export function useNotifications() {
     await update(ref(db, `${PATHS.USERS}/${uid}/${PATHS.NOTIFICATIONS}`), updates);
   };
 
+  /** Marca una única notificación como leída (nodo propio, permitido). */
+  const markAsRead = async (id: string) => {
+    if (!uid) return;
+    await update(ref(db, `${PATHS.USERS}/${uid}/${PATHS.NOTIFICATIONS}/${id}`), {
+      read: true,
+    });
+  };
+
   return {
     notifications: notifications ?? [],
     loading: notifications === null,
     unreadCount,
     markAllAsRead,
+    markAsRead,
   };
 }

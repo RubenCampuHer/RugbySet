@@ -1,9 +1,10 @@
 "use client";
 
-import { ClipboardCheck, LogOut } from "lucide-react";
+import { ClipboardCheck, LogOut, Smartphone } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { AvatarInitials } from "@/components/AvatarInitials";
+import { PageHeader } from "@/components/PageHeader";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,15 +23,15 @@ export default function ProfilePage() {
 
   return (
     <div className="mx-auto max-w-lg space-y-4">
-      <h1 className="text-2xl font-bold">Perfil</h1>
+      <PageHeader title="Perfil" />
       <Card>
         <CardHeader className="flex flex-row items-center gap-4">
-          <Avatar className="size-16">
-            <AvatarImage src={profile.usericon ?? undefined} />
-            <AvatarFallback>
-              {(profile.nameSurname ?? "?").slice(0, 2).toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
+          <AvatarInitials
+            name={profile.nameSurname}
+            src={profile.usericon}
+            className="size-16"
+            fallbackClassName="text-lg"
+          />
           <div>
             <CardTitle>{profile.nameSurname ?? "Sin nombre"}</CardTitle>
             <p className="text-sm text-muted-foreground">@{profile.username}</p>
@@ -46,14 +47,16 @@ export default function ProfilePage() {
         </CardContent>
       </Card>
 
+      <p className="flex items-center gap-2 text-xs text-muted-foreground">
+        <Smartphone className="size-3.5 shrink-0" />
+        Tu nombre, foto y equipo se editan desde la app Android.
+      </p>
+
       {/* Como en Android (ReadUser): la cola de aprobación solo para ADMIN */}
       {isAdmin(profile) && (
         <Link
           href="/admin/approvals"
-          className={cn(
-            buttonVariants({ variant: "outline", size: "lg" }),
-            "h-11 w-full",
-          )}
+          className={cn(buttonVariants({ variant: "outline", size: "xl" }), "w-full")}
         >
           <ClipboardCheck className="size-4" /> Cola de aprobación
         </Link>
@@ -61,8 +64,8 @@ export default function ProfilePage() {
 
       <Button
         variant="outline"
-        size="lg"
-        className="h-11 w-full text-destructive hover:text-destructive"
+        size="xl"
+        className="w-full text-destructive hover:text-destructive"
         onClick={async () => {
           await logout();
           router.replace("/login");

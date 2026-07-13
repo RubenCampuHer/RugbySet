@@ -1,5 +1,6 @@
 "use client";
 
+import { Dumbbell } from "lucide-react";
 import Link from "next/link";
 import { PrivacyBadge, ApprovalBadge } from "@/components/PrivacyBadge";
 import { Badge } from "@/components/ui/badge";
@@ -12,7 +13,7 @@ export function ExerciseCard({ exercise }: { exercise: Exercise }) {
   const name = exercise.name ?? "(sin nombre)";
   return (
     <Link href={`/exercises/detail?name=${encodeURIComponent(name)}`}>
-      <Card className="h-full transition-colors hover:bg-muted/50">
+      <Card className="h-full overflow-hidden transition-all hover:border-border/80 hover:bg-muted/50 active:scale-[0.98]">
         {exercise.image ? (
           // eslint-disable-next-line @next/next/no-img-element -- URL de Storage con token, sin optimizador (output: export)
           <img
@@ -25,11 +26,11 @@ export function ExerciseCard({ exercise }: { exercise: Exercise }) {
           // Gradiente de marca (como los cards de la app Android) cuando no hay imagen
           <div
             className={cn(
-              "flex h-36 w-full items-center justify-center rounded-t-xl bg-gradient-to-br text-4xl",
+              "flex h-36 w-full items-center justify-center rounded-t-xl bg-gradient-to-br",
               gradientFor(name),
             )}
           >
-            🏉
+            <Dumbbell className="size-10 text-white/40" />
           </div>
         )}
         <CardHeader>

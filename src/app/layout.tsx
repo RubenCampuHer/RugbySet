@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist_Mono, Inter } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/components/auth/AuthProvider";
 import { RegisterSW } from "@/components/RegisterSW";
 import "./globals.css";
@@ -42,7 +43,9 @@ export default function RootLayout({
       className={`dark ${inter.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <AuthProvider>{children}</AuthProvider>
+        <TooltipProvider delay={200}>
+          <AuthProvider>{children}</AuthProvider>
+        </TooltipProvider>
         <Toaster />
         <RegisterSW />
       </body>

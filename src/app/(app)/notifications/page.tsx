@@ -1,9 +1,11 @@
 "use client";
 
+import { BellOff, CalendarDays } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/EmptyState";
+import { PageHeader } from "@/components/PageHeader";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useNotifications } from "@/hooks/useNotifications";
 import { cn } from "@/lib/utils";
@@ -36,21 +38,21 @@ export default function NotificationsPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">
-          Avisos{" "}
-          {unreadCount > 0 && <Badge className="align-middle">{unreadCount}</Badge>}
-        </h1>
-        {unreadCount > 0 && (
-          <Button variant="outline" size="sm" onClick={() => void markAllAsRead()}>
-            Marcar todo leído
-          </Button>
-        )}
-      </div>
+      <PageHeader
+        title="Avisos"
+        count={unreadCount > 0 ? unreadCount : undefined}
+        action={
+          unreadCount > 0 && (
+            <Button variant="outline" size="sm" onClick={() => void markAllAsRead()}>
+              Marcar todo leído
+            </Button>
+          )
+        }
+      />
 
       {notifications.length === 0 ? (
         <EmptyState
-          emoji="🔔"
+          icon={BellOff}
           title="No tienes avisos"
           hint="Aquí verás convocatorias, recordatorios y mensajes del equipo."
         />
@@ -85,8 +87,9 @@ export default function NotificationsPage() {
                 <div className="flex flex-wrap gap-x-3 text-xs text-muted-foreground">
                   {n.senderUsername && <span>De: {n.senderUsername}</span>}
                   {n.trainingDate && (
-                    <span>
-                      📅 {n.trainingDate}
+                    <span className="inline-flex items-center gap-1">
+                      <CalendarDays className="size-3" />
+                      {n.trainingDate}
                       {n.trainingTime ? ` · ${n.trainingTime}` : ""}
                     </span>
                   )}

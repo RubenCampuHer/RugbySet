@@ -1,12 +1,13 @@
 "use client";
 
-import { Check, X } from "lucide-react";
+import { Check, CheckCheck, Lock, X } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
-import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -29,7 +30,7 @@ export default function ApprovalsPage() {
   if (!isAdmin(profile)) {
     return (
       <EmptyState
-        emoji="🔒"
+        icon={Lock}
         title="Solo administradores"
         hint="No tienes permisos para ver la cola de aprobación."
       />
@@ -50,8 +51,6 @@ export default function ApprovalsPage() {
     name: string,
     status: "APPROVED" | "REJECTED",
   ) => {
-    const verb = status === "APPROVED" ? "aprobar" : "rechazar";
-    if (!window.confirm(`¿Seguro que quieres ${verb} "${name}"?`)) return;
     setBusy(name);
     try {
       await updateApprovalStatus(kind, name, status);
@@ -65,13 +64,10 @@ export default function ApprovalsPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-4">
-      <h1 className="text-2xl font-bold">
-        Cola de aprobación{" "}
-        {pending.length > 0 && <Badge className="align-middle">{pending.length}</Badge>}
-      </h1>
+      <PageHeader title="Cola de aprobación" count={pending.length || undefined} />
 
       {pending.length === 0 ? (
-        <EmptyState emoji="✅" title="Todo revisado" hint="No hay contenido pendiente de aprobación." />
+        <EmptyState icon={CheckCheck} title="Todo revisado" hint="No hay contenido pendiente de aprobación." />
       ) : (
         <div className="space-y-2">
           {pending.map((item) => (
@@ -80,7 +76,7 @@ export default function ApprovalsPage() {
                 <div className="min-w-0">
                   <Link
                     href={`/${item.kind === "exercise" ? "exercises" : "trainings"}/detail?name=${encodeURIComponent(item.name)}`}
-                    className="font-medium text-[#818CF8] underline-offset-4 hover:underline"
+                    className="font-medium text-brand underline-offset-4 hover:underline"
                   >
                     {item.name}
                   </Link>
@@ -91,25 +87,38 @@ export default function ApprovalsPage() {
                   </p>
                 </div>
                 <span className="flex shrink-0 gap-1">
-                  <Button
-                    size="icon"
-                    aria-label={`Aprobar ${item.name}`}
-                    disabled={busy === item.name}
-                    className="size-9 rounded-full bg-accent text-accent-foreground hover:bg-accent/80"
-                    onClick={() => void decide(item.kind, item.name, "APPROVED")}
-                  >
-                    <Check className="size-4" />
-                  </Button>
-                  <Button
-                    size="icon"
-                    variant="destructive"
-                    aria-label={`Rechazar ${item.name}`}
-                    disabled={busy === item.name}
-                    className="size-9 rounded-full"
-                    onClick={() => void decide(item.kind, item.name, "REJECTED")}
-                  >
-                    <X className="size-4" />
-                  </Button>
+                  <ConfirmDialog
+                    trigger={
+                      <Button
+                        size="icon-xl"
+                        aria-label={`Aprobar ${item.name}`}
+                        disabled={busy === item.name}
+                        className="rounded-full bg-accent text-accent-foreground hover:bg-accent/80"
+                      >
+                        <Check className="size-4" />
+                      </Button>
+                    }
+                    title={`¿Aprobar "${item.name}"?`}
+                    confirmLabel="Aprobar"
+                    onConfirm={() => decide(item.kind, item.name, "APPROVED")}
+                  />
+                  <ConfirmDialog
+                    trigger={
+                      <Button
+                        size="icon-xl"
+                        variant="destructive"
+                        aria-label={`Rechazar ${item.name}`}
+                        disabled={busy === item.name}
+                        className="rounded-full"
+                      >
+                        <X className="size-4" />
+                      </Button>
+                    }
+                    title={`¿Rechazar "${item.name}"?`}
+                    confirmLabel="Rechazar"
+                    destructive
+                    onConfirm={() => decide(item.kind, item.name, "REJECTED")}
+                  />
                 </span>
               </CardContent>
             </Card>

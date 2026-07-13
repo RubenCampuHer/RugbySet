@@ -1,11 +1,13 @@
 "use client";
 
-import { Check, LogOut, Trash2, X } from "lucide-react";
+import { Check, Copy, LogOut, Trash2, Users, X } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { AvatarInitials } from "@/components/AvatarInitials";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { PageHeader } from "@/components/PageHeader";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -89,10 +91,7 @@ function JoinTeamForm() {
       {preview && (
         <div className="flex items-center justify-between gap-2 rounded-md bg-muted p-3">
           <div className="flex items-center gap-2">
-            <Avatar className="size-8">
-              <AvatarImage src={preview.teamicon ?? undefined} />
-              <AvatarFallback>🏉</AvatarFallback>
-            </Avatar>
+            <AvatarInitials name={preview.teamname} src={preview.teamicon} size="sm" />
             <span className="text-sm font-medium">{preview.teamname}</span>
           </div>
           <Button size="sm" disabled={busy} onClick={() => void join()}>
@@ -104,7 +103,8 @@ function JoinTeamForm() {
   );
 }
 
-function PlayerChip({
+/** Fila de jugador en la lista del equipo — objetivo táctil 44px en las acciones. */
+function PlayerRow({
   name,
   action,
 }: {
@@ -112,11 +112,9 @@ function PlayerChip({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center gap-2 rounded-full border px-3 py-1">
-      <span className="flex size-6 items-center justify-center rounded-full bg-muted text-xs font-medium">
-        {name.slice(0, 1).toUpperCase()}
-      </span>
-      <span className="text-sm">{name}</span>
+    <div className="flex items-center gap-3 rounded-lg py-2 pr-1 pl-2 hover:bg-muted/50">
+      <AvatarInitials name={name} size="sm" />
+      <span className="flex-1 truncate text-sm">{name}</span>
       {action}
     </div>
   );
@@ -152,17 +150,17 @@ function PendingSection({ team, isCoach }: { team: Team; isCoach: boolean }) {
           Solicitudes pendientes ({team.pendingplayers.length})
         </CardTitle>
       </CardHeader>
-      <CardContent className="flex flex-wrap gap-2">
+      <CardContent className="divide-y divide-border">
         {team.pendingplayers.map((name) => (
-          <PlayerChip
+          <PlayerRow
             key={name}
             name={name}
             action={
               isCoach ? (
                 <span className="flex gap-1">
                   <Button
-                    size="icon"
-                    className="size-7 rounded-full bg-accent text-accent-foreground hover:bg-accent/80"
+                    size="icon-xl"
+                    className="rounded-full bg-accent text-accent-foreground hover:bg-accent/80"
                     aria-label={`Aceptar a ${name}`}
                     disabled={busy === name}
                     onClick={() => void act(name, true)}
@@ -170,9 +168,9 @@ function PendingSection({ team, isCoach }: { team: Team; isCoach: boolean }) {
                     <Check className="size-4" />
                   </Button>
                   <Button
-                    size="icon"
+                    size="icon-xl"
                     variant="destructive"
-                    className="size-7 rounded-full"
+                    className="rounded-full"
                     aria-label={`Rechazar a ${name}`}
                     disabled={busy === name}
                     onClick={() => void act(name, false)}
@@ -201,9 +199,9 @@ export default function TeamPage() {
   if (!hasTeam || team === null) {
     return (
       <div className="space-y-4">
-        <h1 className="text-2xl font-bold">Equipo</h1>
+        <PageHeader title="Equipo" />
         <EmptyState
-          emoji="👥"
+          icon={Users}
           title="No perteneces a ningún equipo"
           hint="Introduce el código que te haya dado tu entrenador."
         />
@@ -215,7 +213,6 @@ export default function TeamPage() {
   const isCoach = team.usercoach === firebaseUser?.uid;
 
   const kick = async (name: string) => {
-    if (!window.confirm(`¿Expulsar a ${name} del equipo?`)) return;
     setKicking(name);
     try {
       await removePlayer(team, name);
@@ -228,7 +225,6 @@ export default function TeamPage() {
   };
 
   const leave = async () => {
-    if (!window.confirm(`¿Salir de ${team.teamname}?`)) return;
     setLeaving(true);
     try {
       await leaveTeam();
@@ -240,22 +236,37 @@ export default function TeamPage() {
     }
   };
 
+  const copyCode = async () => {
+    if (!team.teamcode) return;
+    try {
+      await navigator.clipboard.writeText(team.teamcode);
+      toast.success("Código copiado");
+    } catch {
+      toast.error("No se pudo copiar el código");
+    }
+  };
+
   return (
     <div className="mx-auto max-w-2xl space-y-4">
       <div className="flex items-center gap-4">
-        <Avatar className="size-16">
-          <AvatarImage src={team.teamicon ?? undefined} />
-          <AvatarFallback>🏉</AvatarFallback>
-        </Avatar>
+        <AvatarInitials name={team.teamname} src={team.teamicon} className="size-16" fallbackClassName="text-lg" />
         <div>
           <h1 className="text-2xl font-bold">{team.teamname}</h1>
-          <div className="flex flex-wrap gap-1">
+          <div className="flex flex-wrap items-center gap-1">
             {team.category && <Badge variant="outline">{team.category}</Badge>}
             {team.teamcode && (
-              <Badge variant="secondary">Código: {team.teamcode}</Badge>
+              <button
+                type="button"
+                onClick={() => void copyCode()}
+                className="inline-flex min-h-8 items-center gap-1 rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-secondary-foreground hover:bg-secondary/80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                aria-label="Copiar código de equipo"
+              >
+                Código: {team.teamcode}
+                <Copy className="size-3" />
+              </button>
             )}
             {isCoach && (
-              <Badge className="border-transparent bg-primary/15 text-[#818CF8]">
+              <Badge className="border-transparent bg-primary/15 text-brand">
                 Eres el entrenador
               </Badge>
             )}
@@ -268,12 +279,7 @@ export default function TeamPage() {
           <CardTitle className="text-lg">Entrenador</CardTitle>
         </CardHeader>
         <CardContent className="flex items-center gap-3">
-          <Avatar>
-            <AvatarImage src={coach?.usericon ?? undefined} />
-            <AvatarFallback>
-              {(coach?.nameSurname ?? "E").slice(0, 1).toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
+          <AvatarInitials name={coach?.nameSurname} src={coach?.usericon} />
           <div>
             <p className="font-medium">{coach?.nameSurname ?? "Entrenador"}</p>
             {coach?.username && (
@@ -291,26 +297,34 @@ export default function TeamPage() {
             Jugadores ({team.userplayers.length})
           </CardTitle>
         </CardHeader>
-        <CardContent className="flex flex-wrap gap-2">
+        <CardContent className="divide-y divide-border">
           {team.userplayers.length === 0 ? (
             <p className="text-sm text-muted-foreground">Sin jugadores.</p>
           ) : (
             team.userplayers.map((name) => (
-              <PlayerChip
+              <PlayerRow
                 key={name}
                 name={name}
                 action={
                   isCoach ? (
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="size-7 rounded-full text-destructive hover:text-destructive"
-                      aria-label={`Expulsar a ${name}`}
-                      disabled={kicking === name}
-                      onClick={() => void kick(name)}
-                    >
-                      <Trash2 className="size-4" />
-                    </Button>
+                    <ConfirmDialog
+                      trigger={
+                        <Button
+                          size="icon-xl"
+                          variant="ghost"
+                          className="rounded-full text-destructive hover:text-destructive"
+                          aria-label={`Expulsar a ${name}`}
+                          disabled={kicking === name}
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      }
+                      title={`¿Expulsar a ${name}?`}
+                      description="Perderá el acceso al equipo y su historial de asistencia."
+                      confirmLabel="Expulsar"
+                      destructive
+                      onConfirm={() => kick(name)}
+                    />
                   ) : undefined
                 }
               />
@@ -320,14 +334,22 @@ export default function TeamPage() {
       </Card>
 
       {!isCoach && (
-        <Button
-          variant="ghost"
-          className="w-full text-destructive hover:text-destructive"
-          disabled={leaving}
-          onClick={() => void leave()}
-        >
-          <LogOut className="size-4" /> Salir del equipo
-        </Button>
+        <ConfirmDialog
+          trigger={
+            <Button
+              variant="ghost"
+              className="w-full text-destructive hover:text-destructive"
+              disabled={leaving}
+            >
+              <LogOut className="size-4" /> Salir del equipo
+            </Button>
+          }
+          title={`¿Salir de ${team.teamname}?`}
+          description="Tendrás que volver a unirte con el código del equipo si cambias de opinión."
+          confirmLabel="Salir del equipo"
+          destructive
+          onConfirm={leave}
+        />
       )}
     </div>
   );

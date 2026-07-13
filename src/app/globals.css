@@ -35,6 +35,9 @@
   --color-secondary: var(--secondary);
   --color-primary-foreground: var(--primary-foreground);
   --color-primary: var(--primary);
+  --color-brand: var(--brand);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
   --color-popover-foreground: var(--popover-foreground);
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
@@ -65,6 +68,13 @@
   --popover-foreground: #f8fafc;
   --primary: #6366f1;
   --primary-foreground: #ffffff;
+  /* Indigo claro de marca — SOLO texto/acentos sobre fondo oscuro (nunca
+     fondo de botón: no da contraste suficiente con texto blanco). Espejo de
+     @color/primary en Android. */
+  --brand: #818cf8;
+  /* Partidos / estados de aviso — espejo de @color/warning en Android. */
+  --warning: #f59e0b;
+  --warning-foreground: #0f172a;
   --secondary: #334155;
   --secondary-foreground: #f8fafc;
   --muted: #334155;
@@ -101,5 +111,13 @@
   }
   html {
     @apply font-sans;
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+@layer components {
+  /* Fondo de las pantallas de auth (login/forgot-password) */
+  .auth-bg {
+    background: radial-gradient(ellipse at top, color-mix(in oklab, var(--primary) 15%, transparent), transparent 60%);
   }
 }

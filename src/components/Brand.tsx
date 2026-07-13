@@ -30,7 +30,7 @@ export function BrandMark({
       <Logo className={cn("size-8 rounded-lg", logoClassName)} />
       <span
         className={cn(
-          "text-lg font-bold tracking-tight text-[#818CF8]",
+          "text-lg font-bold tracking-tight text-brand",
           textClassName,
         )}
       >

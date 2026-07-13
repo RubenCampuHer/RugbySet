@@ -3,20 +3,29 @@
 import {
   Bell,
   CalendarDays,
+  ClipboardCheck,
   ClipboardList,
   Dumbbell,
   LogOut,
+  User,
   Users,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { AvatarInitials } from "@/components/AvatarInitials";
 import { BrandMark } from "@/components/Brand";
 import { BrandLoader } from "@/components/BrandLoader";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useNotifications } from "@/hooks/useNotifications";
+import { isAdmin } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 
 // 5 destinos como la bottom navigation Material de la app Android;
@@ -82,32 +91,39 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             ))}
           </nav>
 
-          <div className="flex shrink-0 items-center gap-1">
-            <Link
-              href="/profile"
-              aria-label="Perfil"
-              className="rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              aria-label="Cuenta"
+              className="shrink-0 rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
             >
-              <Avatar className="size-9 border border-border">
-                <AvatarImage src={profile?.usericon ?? undefined} />
-                <AvatarFallback className="text-xs">
-                  {(profile?.nameSurname ?? "?").slice(0, 2).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-            </Link>
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label="Cerrar sesión"
-              className="hidden md:inline-flex"
-              onClick={async () => {
-                await logout();
-                router.replace("/login");
-              }}
-            >
-              <LogOut className="size-4" />
-            </Button>
-          </div>
+              <AvatarInitials
+                name={profile?.nameSurname}
+                src={profile?.usericon}
+                className="size-9"
+                fallbackClassName="text-xs"
+              />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem render={<Link href="/profile" />}>
+                <User /> Perfil
+              </DropdownMenuItem>
+              {isAdmin(profile) && (
+                <DropdownMenuItem render={<Link href="/admin/approvals" />}>
+                  <ClipboardCheck /> Cola de aprobación
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                variant="destructive"
+                onClick={async () => {
+                  await logout();
+                  router.replace("/login");
+                }}
+              >
+                <LogOut /> Cerrar sesión
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </header>
 

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { BackLink } from "@/components/BackLink";
 import { FavoriteButton } from "@/components/FavoriteButton";
 import { PrivacyBadge, ApprovalBadge } from "@/components/PrivacyBadge";
 import { Badge } from "@/components/ui/badge";
@@ -64,12 +65,7 @@ function ExerciseDetail() {
 
   return (
     <article className="mx-auto max-w-2xl space-y-4">
-      <Link
-        href="/exercises"
-        className="inline-flex min-h-9 items-center gap-1 text-sm font-medium text-[#818CF8] underline-offset-4 hover:underline"
-      >
-        ← Ejercicios
-      </Link>
+      <BackLink href="/exercises" label="Ejercicios" />
       <div className="flex items-start justify-between gap-2">
         <h1 className="text-3xl font-bold">{exercise.name}</h1>
         {exercise.name && <FavoriteButton kind="exercise" name={exercise.name} />}

@@ -10,13 +10,13 @@ export function PrivacyBadge({ privacy }: { privacy: string | null | undefined }
   switch (privacy) {
     case "Privado":
       return (
-        <Badge className="gap-1 border-transparent bg-amber-500/15 text-amber-400">
+        <Badge className="gap-1 border-transparent bg-warning/15 text-warning">
           <Lock className="size-3" /> Privado
         </Badge>
       );
     case "Equipo":
       return (
-        <Badge className="gap-1 border-transparent bg-primary/15 text-[#818CF8]">
+        <Badge className="gap-1 border-transparent bg-primary/15 text-brand">
           <Users className="size-3" /> Equipo
         </Badge>
       );
@@ -36,7 +36,7 @@ export function ApprovalBadge({ status }: { status: string | null | undefined })
   switch (status) {
     case "PENDING":
       return (
-        <Badge className="border-transparent bg-amber-500/15 text-amber-400">
+        <Badge className="border-transparent bg-warning/15 text-warning">
           Pendiente de aprobación
         </Badge>
       );

@@ -26,7 +26,7 @@ export function FavoriteButton({
     setBusy(true);
     try {
       const inserted = await toggleFavorite(kind, name);
-      toast.success(inserted ? "Añadido a favoritos ⭐" : "Quitado de favoritos");
+      toast.success(inserted ? "Añadido a favoritos" : "Quitado de favoritos");
     } catch {
       toast.error("No se pudo actualizar el favorito");
     } finally {
@@ -47,7 +47,7 @@ export function FavoriteButton({
       <Star
         className={cn(
           "size-5",
-          isFav ? "fill-amber-400 text-amber-400" : "text-muted-foreground",
+          isFav ? "fill-warning text-warning" : "text-muted-foreground",
         )}
       />
     </Button>

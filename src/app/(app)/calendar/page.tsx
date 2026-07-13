@@ -1,6 +1,6 @@
 "use client";
 
-import { Send, Trash2 } from "lucide-react";
+import { CalendarDays, Send, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -390,7 +390,7 @@ export default function CalendarPage() {
       <div className="space-y-2">
         <h1 className="text-2xl font-bold">Calendario</h1>
         <EmptyState
-          emoji="📅"
+          icon={CalendarDays}
           title="Sin calendario de equipo"
           hint="Únete a un equipo desde la app Android para ver sus entrenos."
         />

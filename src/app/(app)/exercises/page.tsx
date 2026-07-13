@@ -1,11 +1,13 @@
 "use client";
 
+import { SearchX, Star } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { EmptyState } from "@/components/EmptyState";
 import { ExerciseCard } from "@/components/exercises/ExerciseCard";
+import { PageHeader } from "@/components/PageHeader";
+import { SearchInput } from "@/components/SearchInput";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useExercises } from "@/hooks/useExercises";
@@ -63,18 +65,23 @@ export default function ExercisesPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-bold">Ejercicios</h1>
+      <PageHeader title="Ejercicios" count={exercises.length} />
       <Tabs value={tab} onValueChange={(v) => setTab(v as "all" | "favs")}>
         <TabsList>
           <TabsTrigger value="all">Todos</TabsTrigger>
           <TabsTrigger value="favs">Favoritos ({favNames.size})</TabsTrigger>
         </TabsList>
       </Tabs>
-      <Input
+      <SearchInput
         placeholder="Buscar por nombre…"
         value={search}
-        onChange={(e) => setSearch(e.target.value)}
+        onChange={setSearch}
       />
+      {(search || activeTags.length > 0) && (
+        <p className="text-xs text-muted-foreground">
+          {filtered.length} de {exercises.length} ejercicios
+        </p>
+      )}
       {allTags.length > 0 && (
         <div className="flex flex-wrap gap-1">
           {allTags.slice(0, 15).map((tag) => (
@@ -96,14 +103,16 @@ export default function ExercisesPage() {
       )}
       {filtered.length === 0 ? (
         <EmptyState
-          emoji={tab === "favs" ? "⭐" : "🔍"}
+          icon={tab === "favs" ? Star : SearchX}
           title={
             tab === "favs"
               ? "No tienes ejercicios favoritos"
               : "No hay ejercicios que coincidan"
           }
           hint={
-            tab === "favs" ? "Marca favoritos desde la app Android." : undefined
+            tab === "favs"
+              ? "Toca la estrella en un ejercicio para guardarlo aquí."
+              : undefined
           }
         />
       ) : (

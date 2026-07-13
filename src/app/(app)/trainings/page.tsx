@@ -1,63 +1,15 @@
 "use client";
 
-import Link from "next/link";
+import { ClipboardList, Star } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { PageHeader } from "@/components/PageHeader";
+import { SearchInput } from "@/components/SearchInput";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTrainings } from "@/hooks/useTrainings";
 import { EmptyState } from "@/components/EmptyState";
-import { PrivacyBadge, ApprovalBadge } from "@/components/PrivacyBadge";
-import { gradientFor } from "@/lib/brand";
-import { cn } from "@/lib/utils";
-import type { Training } from "@/lib/types";
-
-function TrainingCard({ training }: { training: Training }) {
-  const name = training.name ?? "(sin nombre)";
-  const exerciseCount = training.sections.reduce(
-    (sum, s) => sum + s.exercises.length,
-    0,
-  );
-  return (
-    <Link href={`/trainings/detail?name=${encodeURIComponent(name)}`}>
-      <Card className="relative h-full overflow-hidden transition-colors hover:bg-muted/50">
-        {/* Franja lateral con gradiente de marca (paleta de cards Android) */}
-        <div
-          className={cn(
-            "absolute inset-y-0 left-0 w-1.5 bg-gradient-to-b",
-            gradientFor(name),
-          )}
-        />
-        <CardHeader>
-          <CardTitle className="line-clamp-1 text-base">{name}</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {training.descCorta && (
-            <p className="line-clamp-2 text-sm text-muted-foreground">
-              {training.descCorta}
-            </p>
-          )}
-          <p className="text-sm text-muted-foreground">
-            ⏱ {training.tiempoTotal ?? "?"} min · {training.sections.length}{" "}
-            secciones · {exerciseCount} ejercicios
-          </p>
-          <div className="flex flex-wrap gap-1">
-            <PrivacyBadge privacy={training.privacy} />
-            <ApprovalBadge status={training.approvalStatus} />
-            {training.etiquetas.slice(0, 3).map((tag) => (
-              <Badge key={tag} variant="secondary">
-                {tag}
-              </Badge>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-    </Link>
-  );
-}
+import { TrainingCard } from "@/components/trainings/TrainingCard";
 
 export default function TrainingsPage() {
   const { trainings, loading } = useTrainings();
@@ -95,21 +47,26 @@ export default function TrainingsPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-bold">Entrenos</h1>
+      <PageHeader title="Entrenos" count={trainings.length} />
       <Tabs value={tab} onValueChange={(v) => setTab(v as "all" | "favs")}>
         <TabsList>
           <TabsTrigger value="all">Todos</TabsTrigger>
           <TabsTrigger value="favs">Favoritos ({favNames.size})</TabsTrigger>
         </TabsList>
       </Tabs>
-      <Input
+      <SearchInput
         placeholder="Buscar por nombre…"
         value={search}
-        onChange={(e) => setSearch(e.target.value)}
+        onChange={setSearch}
       />
+      {search && (
+        <p className="text-xs text-muted-foreground">
+          {shown.length} de {trainings.length} entrenos
+        </p>
+      )}
       {shown.length === 0 ? (
         <EmptyState
-          emoji={tab === "favs" ? "⭐" : "📋"}
+          icon={tab === "favs" ? Star : ClipboardList}
           title={
             tab === "favs"
               ? "No tienes entrenos favoritos"
@@ -117,7 +74,7 @@ export default function TrainingsPage() {
           }
           hint={
             tab === "favs"
-              ? "Marca favoritos desde la app Android."
+              ? "Toca la estrella en un entreno para guardarlo aquí."
               : undefined
           }
         />

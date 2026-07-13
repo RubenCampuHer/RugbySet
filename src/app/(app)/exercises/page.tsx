@@ -7,8 +7,8 @@ import { EmptyState } from "@/components/EmptyState";
 import { ExerciseCard } from "@/components/exercises/ExerciseCard";
 import { PageHeader } from "@/components/PageHeader";
 import { SearchInput } from "@/components/SearchInput";
+import { ListSkeleton } from "@/components/skeletons";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useExercises } from "@/hooks/useExercises";
 
@@ -49,18 +49,7 @@ export default function ExercisesPage() {
     );
 
   if (loading) {
-    return (
-      <div className="space-y-4">
-        <Skeleton className="h-8 w-40" />
-        <Skeleton className="h-9 w-56" />
-        <Skeleton className="h-9 w-full" />
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
-          {Array.from({ length: 6 }, (_, i) => (
-            <Skeleton key={i} className="h-64 w-full rounded-xl" />
-          ))}
-        </div>
-      </div>
-    );
+    return <ListSkeleton />;
   }
 
   return (

@@ -10,8 +10,8 @@ import { MonthGrid } from "@/components/calendar/MonthGrid";
 import { UpcomingEvents } from "@/components/calendar/UpcomingEvents";
 import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/PageHeader";
+import { CalendarSkeleton } from "@/components/skeletons";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
 import { useTeam } from "@/hooks/useTeam";
 import { setAttendance } from "@/lib/actions/team";
 import { paramToKey, todayKey } from "@/lib/calendar";
@@ -53,7 +53,7 @@ function CalendarContent() {
     [profile],
   );
 
-  if (loading) return <Skeleton className="h-96 w-full" />;
+  if (loading) return <CalendarSkeleton />;
   if (!hasTeam || team === null) {
     return (
       <div className="space-y-2">
@@ -148,7 +148,7 @@ function CalendarContent() {
 
 export default function CalendarPage() {
   return (
-    <Suspense fallback={<Skeleton className="h-96 w-full" />}>
+    <Suspense fallback={<CalendarSkeleton />}>
       <CalendarContent />
     </Suspense>
   );

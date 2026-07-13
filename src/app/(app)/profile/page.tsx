@@ -5,10 +5,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AvatarInitials } from "@/components/AvatarInitials";
 import { PageHeader } from "@/components/PageHeader";
+import { ProfileSkeleton } from "@/components/skeletons";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { getRoleDisplayName, isAdmin } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
@@ -18,7 +18,7 @@ export default function ProfilePage() {
   const router = useRouter();
 
   if (profile === null) {
-    return <Skeleton className="h-64 w-full" />;
+    return <ProfileSkeleton />;
   }
 
   return (

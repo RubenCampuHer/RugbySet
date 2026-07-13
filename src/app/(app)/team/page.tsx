@@ -8,11 +8,11 @@ import { AvatarInitials } from "@/components/AvatarInitials";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/PageHeader";
+import { TeamSkeleton } from "@/components/skeletons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
 import { useTeam } from "@/hooks/useTeam";
 import {
   acceptPendingPlayer,
@@ -194,7 +194,7 @@ export default function TeamPage() {
   const [leaving, setLeaving] = useState(false);
 
   if (loading) {
-    return <Skeleton className="h-96 w-full" />;
+    return <TeamSkeleton />;
   }
   if (!hasTeam || team === null) {
     return (

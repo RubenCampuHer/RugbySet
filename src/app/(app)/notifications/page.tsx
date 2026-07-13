@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/PageHeader";
-import { Skeleton } from "@/components/ui/skeleton";
+import { ListRowsSkeleton } from "@/components/skeletons";
 import { useNotifications } from "@/hooks/useNotifications";
 import { keyToParam } from "@/lib/calendar";
 import { cn } from "@/lib/utils";
@@ -40,7 +40,7 @@ export default function NotificationsPage() {
   const router = useRouter();
 
   if (loading) {
-    return <Skeleton className="h-96 w-full" />;
+    return <ListRowsSkeleton />;
   }
 
   const openNotification = (n: Notification) => {
@@ -82,7 +82,7 @@ export default function NotificationsPage() {
                 <button
                   type="button"
                   onClick={() => openNotification(n)}
-                  className="w-full text-left focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+                  className="w-full text-left transition-colors hover:bg-muted/30 active:bg-muted/50 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
                 >
                   <CardContent className="flex items-start gap-2 py-3">
                     <div className="min-w-0 flex-1 space-y-1">

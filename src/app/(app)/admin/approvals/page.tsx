@@ -8,9 +8,9 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/PageHeader";
+import { ListRowsSkeleton } from "@/components/skeletons";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import { useExercises } from "@/hooks/useExercises";
 import { useTrainings } from "@/hooks/useTrainings";
 import { updateApprovalStatus } from "@/lib/actions/admin";
@@ -25,7 +25,7 @@ export default function ApprovalsPage() {
   const [busy, setBusy] = useState<string | null>(null);
 
   if (profile === null || loadingEx || loadingTr) {
-    return <Skeleton className="h-96 w-full" />;
+    return <ListRowsSkeleton />;
   }
   if (!isAdmin(profile)) {
     return (

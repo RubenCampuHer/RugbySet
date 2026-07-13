@@ -12,7 +12,7 @@ import { PrivacyBadge, ApprovalBadge } from "@/components/PrivacyBadge";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Skeleton } from "@/components/ui/skeleton";
+import { DetailSkeleton } from "@/components/skeletons";
 import { PATHS } from "@/lib/constants";
 import { db } from "@/lib/firebase";
 import { canViewTraining } from "@/lib/permissions";
@@ -49,7 +49,7 @@ function TrainingDetail() {
       : undefined;
 
   if (training === undefined || profile === null) {
-    return <Skeleton className="h-96 w-full" />;
+    return <DetailSkeleton />;
   }
   if (training === null || !canViewTraining(profile, training)) {
     return (
@@ -147,7 +147,7 @@ function TrainingDetail() {
 
 export default function TrainingDetailPage() {
   return (
-    <Suspense fallback={<Skeleton className="h-96 w-full" />}>
+    <Suspense fallback={<DetailSkeleton />}>
       <TrainingDetail />
     </Suspense>
   );

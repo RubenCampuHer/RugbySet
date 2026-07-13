@@ -9,7 +9,7 @@ import { BackLink } from "@/components/BackLink";
 import { FavoriteButton } from "@/components/FavoriteButton";
 import { PrivacyBadge, ApprovalBadge } from "@/components/PrivacyBadge";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
+import { DetailSkeleton } from "@/components/skeletons";
 import { PATHS } from "@/lib/constants";
 import { db } from "@/lib/firebase";
 import { canViewExercise } from "@/lib/permissions";
@@ -50,7 +50,7 @@ function ExerciseDetail() {
       : undefined;
 
   if (exercise === undefined || profile === null) {
-    return <Skeleton className="h-96 w-full" />;
+    return <DetailSkeleton />;
   }
   if (exercise === null || !canViewExercise(profile, exercise)) {
     return (
@@ -104,7 +104,7 @@ function ExerciseDetail() {
 
 export default function ExerciseDetailPage() {
   return (
-    <Suspense fallback={<Skeleton className="h-96 w-full" />}>
+    <Suspense fallback={<DetailSkeleton />}>
       <ExerciseDetail />
     </Suspense>
   );

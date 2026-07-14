@@ -1,7 +1,7 @@
 "use client";
 
 import { get, ref } from "firebase/database";
-import { ChevronRight, Clock } from "lucide-react";
+import { ChevronRight, Clock, Pencil } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
@@ -10,12 +10,13 @@ import { BackLink } from "@/components/BackLink";
 import { FavoriteButton } from "@/components/FavoriteButton";
 import { PrivacyBadge, ApprovalBadge } from "@/components/PrivacyBadge";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { DetailSkeleton } from "@/components/skeletons";
 import { PATHS } from "@/lib/constants";
 import { db } from "@/lib/firebase";
-import { canViewTraining } from "@/lib/permissions";
+import { canEditTraining, canViewTraining } from "@/lib/permissions";
 import { parseOr } from "@/lib/schemas/common";
 import { TrainingSchema } from "@/lib/schemas/training";
 import type { Training } from "@/lib/types";
@@ -67,7 +68,23 @@ function TrainingDetail() {
       <BackLink href="/trainings" label="Entrenos" />
       <div className="flex items-start justify-between gap-2">
         <h1 className="text-3xl font-bold">{training.name}</h1>
-        {training.name && <FavoriteButton kind="training" name={training.name} />}
+        <div className="flex shrink-0 gap-1">
+          {canEditTraining(profile, training) && training.name && (
+            <Button
+              variant="outline"
+              size="icon"
+              render={
+                <Link
+                  href={`/trainings/edit?name=${encodeURIComponent(training.name)}`}
+                  aria-label="Editar entreno"
+                />
+              }
+            >
+              <Pencil />
+            </Button>
+          )}
+          {training.name && <FavoriteButton kind="training" name={training.name} />}
+        </div>
       </div>
       <div className="flex flex-wrap gap-1">
         <PrivacyBadge privacy={training.privacy} />

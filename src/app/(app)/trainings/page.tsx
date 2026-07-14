@@ -1,13 +1,16 @@
 "use client";
 
-import { ClipboardList, FilePlus2, Star } from "lucide-react";
+import { ClipboardList, FilePlus2, Plus, Star } from "lucide-react";
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { PageHeader } from "@/components/PageHeader";
 import { SearchInput } from "@/components/SearchInput";
 import { ListSkeleton } from "@/components/skeletons";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTrainings } from "@/hooks/useTrainings";
+import { canCreateContent } from "@/lib/permissions";
 import { EmptyState } from "@/components/EmptyState";
 import { TrainingCard } from "@/components/trainings/TrainingCard";
 
@@ -50,7 +53,17 @@ export default function TrainingsPage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Entrenos" count={trainings.length} />
+      <PageHeader
+        title="Entrenos"
+        count={trainings.length}
+        action={
+          canCreateContent(profile) && (
+            <Button size="icon-lg" render={<Link href="/trainings/edit" />}>
+              <Plus />
+            </Button>
+          )
+        }
+      />
       <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
         <TabsList>
           <TabsTrigger value="all">Todos</TabsTrigger>

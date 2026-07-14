@@ -1,7 +1,6 @@
 "use client";
 
 import { get, ref } from "firebase/database";
-import { X } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -9,7 +8,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { BackLink } from "@/components/BackLink";
 import { ImageUploadInput } from "@/components/exercises/ImageUploadInput";
 import { DetailSkeleton } from "@/components/skeletons";
-import { Badge } from "@/components/ui/badge";
+import { TagInput } from "@/components/TagInput";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -50,7 +49,6 @@ function ExerciseForm({
     original?.privacy === "Privado" ? "Privado" : "Publico",
   );
   const [etiquetas, setEtiquetas] = useState<string[]>(original?.etiquetas ?? []);
-  const [tagInput, setTagInput] = useState("");
   const [imagePreview, setImagePreview] = useState<string | null>(original?.image ?? null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
@@ -59,14 +57,6 @@ function ExerciseForm({
   const isDescCortaValid =
     descCorta.length >= DESC_CORTA_MIN && descCorta.length <= DESC_CORTA_MAX;
   const canSave = isNameValid && isDescCortaValid && !saving;
-
-  const addTag = () => {
-    const tag = tagInput.trim();
-    if (tag && !etiquetas.includes(tag)) setEtiquetas([...etiquetas, tag]);
-    setTagInput("");
-  };
-
-  const removeTag = (tag: string) => setEtiquetas(etiquetas.filter((t) => t !== tag));
 
   const save = async () => {
     setSaving(true);
@@ -176,43 +166,7 @@ function ExerciseForm({
         </div>
       </div>
 
-      <div className="space-y-1.5">
-        <Label htmlFor="tagInput">Etiquetas</Label>
-        <div className="flex gap-2">
-          <Input
-            id="tagInput"
-            value={tagInput}
-            onChange={(e) => setTagInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                addTag();
-              }
-            }}
-            placeholder="Escribe y pulsa Enter"
-          />
-          <Button type="button" variant="outline" onClick={addTag}>
-            Añadir
-          </Button>
-        </div>
-        {etiquetas.length > 0 && (
-          <div className="flex flex-wrap gap-1 pt-1">
-            {etiquetas.map((tag) => (
-              <Badge key={tag} variant="secondary" className="gap-1 pr-1">
-                {tag}
-                <button
-                  type="button"
-                  onClick={() => removeTag(tag)}
-                  aria-label={`Quitar etiqueta ${tag}`}
-                  className="rounded-full hover:bg-foreground/10"
-                >
-                  <X className="size-3" />
-                </button>
-              </Badge>
-            ))}
-          </div>
-        )}
-      </div>
+      <TagInput value={etiquetas} onChange={setEtiquetas} />
 
       <Button className="w-full" size="xl" disabled={!canSave} onClick={() => void save()}>
         {saving ? "Guardando…" : isEdit ? "Guardar cambios" : "Crear ejercicio"}

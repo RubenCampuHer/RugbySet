@@ -64,7 +64,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-10 border-b bg-card/95 backdrop-blur">
+      <header className="sticky top-0 z-10 border-b bg-card/95 backdrop-blur print:hidden">
         <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-2 px-4 py-2">
           <Link
             href="/exercises"
@@ -135,12 +135,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <OfflineBanner />
       </header>
 
-      <main className="mx-auto w-full max-w-5xl flex-1 p-4 pb-24 md:pb-4">
+      <main className="mx-auto w-full max-w-5xl flex-1 p-4 pb-24 md:pb-4 print:p-0">
         {children}
       </main>
 
       {/* Bottom navigation en móvil — como la app Android */}
-      <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-card pb-[env(safe-area-inset-bottom)] md:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-card pb-[env(safe-area-inset-bottom)] md:hidden print:hidden">
         <div className="mx-auto grid max-w-lg grid-cols-5">
           {NAV.map(({ href, label, icon: Icon }) => {
             const active = pathname.startsWith(href);

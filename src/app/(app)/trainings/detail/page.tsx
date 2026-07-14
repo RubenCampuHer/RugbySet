@@ -1,7 +1,7 @@
 "use client";
 
 import { get, ref } from "firebase/database";
-import { ChevronRight, Clock } from "lucide-react";
+import { ChevronRight, Clock, Printer } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
@@ -12,6 +12,7 @@ import { CardActionsMenu } from "@/components/CardActionsMenu";
 import { FavoriteButton } from "@/components/FavoriteButton";
 import { PrivacyBadge, ApprovalBadge } from "@/components/PrivacyBadge";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { DetailSkeleton } from "@/components/skeletons";
@@ -68,10 +69,20 @@ function TrainingDetail() {
 
   return (
     <article className="mx-auto max-w-2xl space-y-4">
-      <BackLink href="/trainings" label="Entrenos" />
+      <div className="print:hidden">
+        <BackLink href="/trainings" label="Entrenos" />
+      </div>
       <div className="flex items-start justify-between gap-2">
         <h1 className="text-3xl font-bold">{training.name}</h1>
-        <div className="flex shrink-0 gap-1">
+        <div className="flex shrink-0 gap-1 print:hidden">
+          <Button
+            variant="outline"
+            size="icon"
+            aria-label="Exportar a PDF"
+            onClick={() => window.print()}
+          >
+            <Printer />
+          </Button>
           {training.name &&
             (canEditTraining(profile, training) || canDeleteTraining(profile, training)) && (
               <CardActionsMenu
@@ -108,7 +119,7 @@ function TrainingDetail() {
       {training.descCorta && <p>{training.descCorta}</p>}
 
       {training.sections.map((section, i) => (
-        <Card key={section.uid ?? i}>
+        <Card key={section.uid ?? i} className="break-inside-avoid">
           <CardHeader>
             <CardTitle className="flex items-baseline justify-between text-lg">
               <span>{section.sectionName || `Sección ${i + 1}`}</span>
@@ -124,28 +135,38 @@ function TrainingDetail() {
               .map((et, j) => {
                 const name = et.exercise?.name;
                 const row = (
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
+                  <div className="flex items-start gap-2">
+                    {et.exercise?.image && (
+                      // eslint-disable-next-line @next/next/no-img-element -- URL de Storage con token, sin optimizador (output: export)
+                      <img
+                        src={et.exercise.image}
+                        alt=""
+                        className="size-14 shrink-0 rounded-md bg-muted object-contain print:size-28"
+                      />
+                    )}
+                    <div className="min-w-0 flex-1">
                       <p className="font-medium">{name ?? "(ejercicio)"}</p>
                       {et.exercise?.descCorta && (
-                        <p className="line-clamp-2 text-sm text-muted-foreground">
+                        <p className="line-clamp-2 text-sm text-muted-foreground print:line-clamp-none">
                           {et.exercise.descCorta}
                         </p>
                       )}
                     </div>
                     <span className="flex shrink-0 items-center gap-1">
                       <Badge variant="outline">{et.tiempoExercise} min</Badge>
-                      {name && <ChevronRight className="size-4 text-muted-foreground" />}
+                      {name && (
+                        <ChevronRight className="size-4 text-muted-foreground print:hidden" />
+                      )}
                     </span>
                   </div>
                 );
                 return (
-                  <div key={j}>
+                  <div key={j} className="break-inside-avoid">
                     {j > 0 && <Separator className="mb-3" />}
                     {name ? (
                       <Link
                         href={`/exercises/detail?name=${encodeURIComponent(name)}`}
-                        className="-m-2 block rounded-lg p-2 transition-colors hover:bg-muted/50 active:bg-muted"
+                        className="-m-2 block rounded-lg p-2 transition-colors hover:bg-muted/50 active:bg-muted print:pointer-events-none print:m-0 print:p-0"
                       >
                         {row}
                       </Link>

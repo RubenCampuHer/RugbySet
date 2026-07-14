@@ -115,6 +115,26 @@
   }
 }
 
+/*
+ * La app es siempre oscura (ver paleta arriba) — pero imprimir fondo oscuro
+ * desperdicia tinta y es ilegible en papel. Solo para @media print, forzar
+ * una paleta clara (usada por el "Exportar PDF" de trainings/detail).
+ */
+@media print {
+  :root {
+    --background: #ffffff;
+    --foreground: #0f172a;
+    --card: #ffffff;
+    --card-foreground: #0f172a;
+    --border: #cbd5e1;
+    --muted: #f1f5f9;
+    --muted-foreground: #475569;
+    --secondary: #f1f5f9;
+    --secondary-foreground: #0f172a;
+    color-scheme: light;
+  }
+}
+
 @layer components {
   /* Fondo de las pantallas de auth (login/forgot-password) */
   .auth-bg {

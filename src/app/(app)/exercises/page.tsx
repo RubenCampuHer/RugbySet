@@ -1,6 +1,6 @@
 "use client";
 
-import { SearchX, Star } from "lucide-react";
+import { FilePlus2, SearchX, Star } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { EmptyState } from "@/components/EmptyState";
@@ -12,16 +12,25 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useExercises } from "@/hooks/useExercises";
 
+type Tab = "all" | "favs" | "own";
+
 export default function ExercisesPage() {
   const { exercises, loading } = useExercises();
   const { profile } = useAuth();
   const [search, setSearch] = useState("");
   const [activeTags, setActiveTags] = useState<string[]>([]);
-  const [tab, setTab] = useState<"all" | "favs">("all");
+  const [tab, setTab] = useState<Tab>("all");
 
   const favNames = useMemo(
     () => new Set(profile?.favExercises ?? []),
     [profile],
+  );
+
+  // Cuenta de ejercicios propios — mismo criterio que Android
+  // (ReadExercisesViewModel: filtered.filter { it.author == user.username }).
+  const ownCount = useMemo(
+    () => exercises.filter((e) => e.author === profile?.username).length,
+    [exercises, profile],
   );
 
   // Tags derivadas del contenido visible (el nodo Etiquetas no se usa —
@@ -39,7 +48,12 @@ export default function ExercisesPage() {
       search === "" ||
       (e.name ?? "").toLowerCase().includes(search.toLowerCase());
     const matchesTags = activeTags.every((tag) => e.etiquetas.includes(tag));
-    const matchesTab = tab === "all" || favNames.has(e.name ?? "");
+    const matchesTab =
+      tab === "all"
+        ? true
+        : tab === "favs"
+          ? favNames.has(e.name ?? "")
+          : e.author === profile?.username;
     return matchesSearch && matchesTags && matchesTab;
   });
 
@@ -55,10 +69,11 @@ export default function ExercisesPage() {
   return (
     <div className="space-y-4">
       <PageHeader title="Ejercicios" count={exercises.length} />
-      <Tabs value={tab} onValueChange={(v) => setTab(v as "all" | "favs")}>
+      <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
         <TabsList>
           <TabsTrigger value="all">Todos</TabsTrigger>
           <TabsTrigger value="favs">Favoritos ({favNames.size})</TabsTrigger>
+          <TabsTrigger value="own">Propios ({ownCount})</TabsTrigger>
         </TabsList>
       </Tabs>
       <SearchInput
@@ -92,11 +107,13 @@ export default function ExercisesPage() {
       )}
       {filtered.length === 0 ? (
         <EmptyState
-          icon={tab === "favs" ? Star : SearchX}
+          icon={tab === "favs" ? Star : tab === "own" ? FilePlus2 : SearchX}
           title={
             tab === "favs"
               ? "No tienes ejercicios favoritos"
-              : "No hay ejercicios que coincidan"
+              : tab === "own"
+                ? "No has creado ningún ejercicio todavía"
+                : "No hay ejercicios que coincidan"
           }
           hint={
             tab === "favs"

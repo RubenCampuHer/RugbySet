@@ -1,7 +1,7 @@
 "use client";
 
-import { Check, Copy, LogOut, Trash2, Users, X } from "lucide-react";
-import { useState } from "react";
+import { Camera, Check, Copy, LogOut, Trash2, Users, X } from "lucide-react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { AvatarInitials } from "@/components/AvatarInitials";
@@ -16,11 +16,14 @@ import { Input } from "@/components/ui/input";
 import { useTeam } from "@/hooks/useTeam";
 import {
   acceptPendingPlayer,
+  deleteTeam,
   joinTeamByCode,
   leaveTeam,
   rejectPendingPlayer,
   removePlayer,
+  updateTeamIcon,
 } from "@/lib/actions/team";
+import { resizeAndUpload } from "@/lib/storage";
 import type { Team } from "@/lib/types";
 
 /**
@@ -192,6 +195,8 @@ export default function TeamPage() {
   const { team, coach, hasTeam, loading } = useTeam();
   const [kicking, setKicking] = useState<string | null>(null);
   const [leaving, setLeaving] = useState(false);
+  const [uploadingIcon, setUploadingIcon] = useState(false);
+  const iconInputRef = useRef<HTMLInputElement>(null);
 
   if (loading) {
     return <TeamSkeleton />;
@@ -246,10 +251,56 @@ export default function TeamPage() {
     }
   };
 
+  const uploadIcon = async (file: File) => {
+    setUploadingIcon(true);
+    try {
+      const url = await resizeAndUpload(`team_images/${team.teamname}`, file);
+      await updateTeamIcon(team.teamname!, url);
+      toast.success("Icono actualizado");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo subir el icono");
+    } finally {
+      setUploadingIcon(false);
+    }
+  };
+
+  const removeTeam = async () => {
+    await deleteTeam(team);
+    toast.success(`Equipo "${team.teamname}" eliminado`);
+  };
+
   return (
     <div className="mx-auto max-w-2xl space-y-4">
       <div className="flex items-center gap-4">
-        <AvatarInitials name={team.teamname} src={team.teamicon} className="size-16" fallbackClassName="text-lg" />
+        <div className="relative">
+          <AvatarInitials name={team.teamname} src={team.teamicon} className="size-16" fallbackClassName="text-lg" />
+          {isCoach && (
+            <>
+              <input
+                ref={iconInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  e.target.value = "";
+                  if (file) void uploadIcon(file);
+                }}
+              />
+              <Button
+                type="button"
+                size="icon-sm"
+                variant="secondary"
+                className="absolute -right-1 -bottom-1 rounded-full"
+                aria-label="Cambiar icono del equipo"
+                disabled={uploadingIcon}
+                onClick={() => iconInputRef.current?.click()}
+              >
+                <Camera className="size-3.5" />
+              </Button>
+            </>
+          )}
+        </div>
         <div>
           <h1 className="text-2xl font-bold">{team.teamname}</h1>
           <div className="flex flex-wrap items-center gap-1">
@@ -349,6 +400,21 @@ export default function TeamPage() {
           confirmLabel="Salir del equipo"
           destructive
           onConfirm={leave}
+        />
+      )}
+
+      {isCoach && (
+        <ConfirmDialog
+          trigger={
+            <Button variant="ghost" className="w-full text-destructive hover:text-destructive">
+              <Trash2 className="size-4" /> Eliminar equipo
+            </Button>
+          }
+          title={`¿Eliminar ${team.teamname}?`}
+          description="Se eliminará el equipo permanentemente y todos los jugadores quedarán sin equipo."
+          confirmLabel="Eliminar equipo"
+          destructive
+          onConfirm={removeTeam}
         />
       )}
     </div>

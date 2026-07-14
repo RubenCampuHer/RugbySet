@@ -240,9 +240,38 @@ export async function joinTeamByCode(
 /**
  * El propio usuario abandona su equipo, vía la Cloud Function leaveTeam: un
  * PLAYER no tiene permiso para escribir su propio Teams/{t}/userplayers. El
- * coach no puede abandonar (debe eliminar el equipo — no implementado aún en
- * la web).
+ * coach no puede abandonar (debe eliminar el equipo, ver deleteTeam).
  */
 export async function leaveTeam(): Promise<void> {
   await httpsCallable(functions, "leaveTeam")();
+}
+
+/**
+ * El coach elimina el equipo — escritura multi-path atómica (espejo de
+ * TeamRepository.deleteTeam / ReadTeam.deleteTeamViaRepository): borra
+ * Teams/{teamname} y desvincula a todos los jugadores Y al propio coach
+ * (su teamname también apunta al equipo) en la misma operación.
+ */
+export async function deleteTeam(team: Team): Promise<void> {
+  const teamname = team.teamname!;
+  const resolvedUids = await Promise.all(
+    team.userplayers.map((name) => resolveUidByName(name)),
+  );
+  const uids = Array.from(
+    new Set(
+      [...resolvedUids, team.usercoach].filter((uid): uid is string => Boolean(uid)),
+    ),
+  );
+
+  const updates: Record<string, unknown> = { [`${PATHS.TEAMS}/${teamname}`]: null };
+  for (const uid of uids) {
+    updates[`${PATHS.USERS}/${uid}/teamname`] = null;
+    updates[`${PATHS.USERS}/${uid}/assistedTrainingDays`] = null;
+  }
+  await update(ref(db), updates);
+}
+
+/** Icono de equipo — sube a team_images/{teamname}/... (ver storage.rules). */
+export async function updateTeamIcon(teamname: string, iconUrl: string): Promise<void> {
+  await update(ref(db, `${PATHS.TEAMS}/${teamname}`), { teamicon: iconUrl });
 }

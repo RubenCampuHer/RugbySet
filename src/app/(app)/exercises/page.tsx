@@ -1,6 +1,7 @@
 "use client";
 
-import { FilePlus2, SearchX, Star } from "lucide-react";
+import { FilePlus2, Plus, SearchX, Star } from "lucide-react";
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { EmptyState } from "@/components/EmptyState";
@@ -9,8 +10,10 @@ import { PageHeader } from "@/components/PageHeader";
 import { SearchInput } from "@/components/SearchInput";
 import { ListSkeleton } from "@/components/skeletons";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useExercises } from "@/hooks/useExercises";
+import { canCreateContent } from "@/lib/permissions";
 
 type Tab = "all" | "favs" | "own";
 
@@ -68,7 +71,17 @@ export default function ExercisesPage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Ejercicios" count={exercises.length} />
+      <PageHeader
+        title="Ejercicios"
+        count={exercises.length}
+        action={
+          canCreateContent(profile) && (
+            <Button size="icon-lg" render={<Link href="/exercises/edit" />}>
+              <Plus />
+            </Button>
+          )
+        }
+      />
       <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
         <TabsList>
           <TabsTrigger value="all">Todos</TabsTrigger>

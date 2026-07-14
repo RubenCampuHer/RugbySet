@@ -1,6 +1,7 @@
 "use client";
 
 import { get, ref } from "firebase/database";
+import { Pencil } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
@@ -9,10 +10,11 @@ import { BackLink } from "@/components/BackLink";
 import { FavoriteButton } from "@/components/FavoriteButton";
 import { PrivacyBadge, ApprovalBadge } from "@/components/PrivacyBadge";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { DetailSkeleton } from "@/components/skeletons";
 import { PATHS } from "@/lib/constants";
 import { db } from "@/lib/firebase";
-import { canViewExercise } from "@/lib/permissions";
+import { canEditExercise, canViewExercise } from "@/lib/permissions";
 import { parseOr } from "@/lib/schemas/common";
 import { ExerciseSchema } from "@/lib/schemas/exercise";
 import type { Exercise } from "@/lib/types";
@@ -68,7 +70,23 @@ function ExerciseDetail() {
       <BackLink href="/exercises" label="Ejercicios" />
       <div className="flex items-start justify-between gap-2">
         <h1 className="text-3xl font-bold">{exercise.name}</h1>
-        {exercise.name && <FavoriteButton kind="exercise" name={exercise.name} />}
+        <div className="flex shrink-0 gap-1">
+          {canEditExercise(profile, exercise) && exercise.name && (
+            <Button
+              variant="outline"
+              size="icon"
+              render={
+                <Link
+                  href={`/exercises/edit?name=${encodeURIComponent(exercise.name)}`}
+                  aria-label="Editar ejercicio"
+                />
+              }
+            >
+              <Pencil />
+            </Button>
+          )}
+          {exercise.name && <FavoriteButton kind="exercise" name={exercise.name} />}
+        </div>
       </div>
       <div className="flex flex-wrap gap-1">
         <PrivacyBadge privacy={exercise.privacy} />

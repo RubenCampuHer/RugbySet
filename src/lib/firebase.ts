@@ -2,6 +2,7 @@ import { getApps, initializeApp } from "firebase/app";
 import { browserLocalPersistence, getAuth, setPersistence } from "firebase/auth";
 import { getDatabase } from "firebase/database";
 import { getFunctions } from "firebase/functions";
+import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY!,
@@ -21,6 +22,10 @@ if (typeof window !== "undefined") {
 }
 
 export const db = getDatabase(app);
+
+// Storage: imágenes de ejercicios (exercises_images/{uid}/...) e iconos de
+// equipo (team_images/{teamname}/...) — ver storage.rules en el repo Android.
+export const storage = getStorage(app);
 
 // Las callables (sendCustomPasswordResetEmail, sendPushNotification…) viven
 // en us-central1 — la región por defecto de functions, NO la de la RTDB

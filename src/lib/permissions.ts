@@ -86,6 +86,28 @@ export function canViewTraining(user: User | null, training: Training): boolean 
   }
 }
 
+/**
+ * Espejo de PermissionsManager.canEditExercise/canDeleteExercise (misma
+ * lógica para ambas en Android): ADMIN cualquiera, COACH solo lo propio,
+ * PLAYER nada.
+ */
+export function canEditExercise(user: User | null, exercise: Exercise): boolean {
+  if (user == null) return false;
+  if (isAdmin(user)) return true;
+  if (isCoach(user)) return exercise.author === user.username;
+  return false;
+}
+export const canDeleteExercise = canEditExercise;
+
+/** Espejo de PermissionsManager.canEditTraining/canDeleteTraining. */
+export function canEditTraining(user: User | null, training: Training): boolean {
+  if (user == null) return false;
+  if (isAdmin(user)) return true;
+  if (isCoach(user)) return training.author === user.username;
+  return false;
+}
+export const canDeleteTraining = canEditTraining;
+
 /** Espejo de PermissionsManager.getRoleDisplayName. */
 export function getRoleDisplayName(role: string | null | undefined): string {
   switch (role) {

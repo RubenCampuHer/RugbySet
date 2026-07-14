@@ -32,14 +32,14 @@ export function ExerciseCard({ exercise }: { exercise: Exercise }) {
           <img
             src={exercise.image}
             alt=""
-            className="h-36 w-full rounded-t-xl object-cover"
+            className="aspect-video w-full rounded-t-xl object-cover"
             loading="lazy"
           />
         ) : (
           // Gradiente de marca (como los cards de la app Android) cuando no hay imagen
           <div
             className={cn(
-              "flex h-36 w-full items-center justify-center rounded-t-xl bg-gradient-to-br",
+              "flex aspect-video w-full items-center justify-center rounded-t-xl bg-gradient-to-br",
               gradientFor(name),
             )}
           >

@@ -57,7 +57,7 @@ export function ImageUploadInput({
       {value ? (
         <div className="relative">
           {/* eslint-disable-next-line @next/next/no-img-element -- preview local/Storage, sin optimizador (output: export) */}
-          <img src={value} alt="" className="h-40 w-full rounded-lg object-cover" />
+          <img src={value} alt="" className="aspect-video w-full rounded-lg object-cover" />
           <div className="absolute top-2 right-2 flex gap-1">
             <Button
               type="button"

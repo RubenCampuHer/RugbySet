@@ -9,6 +9,7 @@ import {
   LogOut,
   User,
   Users,
+  UserCog,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -111,6 +112,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               {isAdmin(profile) && (
                 <DropdownMenuItem render={<Link href="/admin/approvals" />}>
                   <ClipboardCheck /> Cola de aprobación
+                </DropdownMenuItem>
+              )}
+              {isAdmin(profile) && (
+                <DropdownMenuItem render={<Link href="/admin/users" />}>
+                  <UserCog /> Gestionar usuarios
                 </DropdownMenuItem>
               )}
               <DropdownMenuSeparator />

@@ -1,7 +1,8 @@
 "use client";
 
-import { Camera, Check, Copy, LogOut, Megaphone, Trash2, Users, X } from "lucide-react";
-import { useRef, useState } from "react";
+import { get, ref } from "firebase/database";
+import { Camera, Check, Copy, Flame, LogOut, Megaphone, Trash2, Users, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { AvatarInitials } from "@/components/AvatarInitials";
@@ -33,9 +34,45 @@ import {
   resolveUidByName,
   updateTeamIcon,
 } from "@/lib/actions/team";
+import { PATHS } from "@/lib/constants";
+import { db } from "@/lib/firebase";
 import { sendGeneralMessage } from "@/lib/actions/notify";
 import { resizeAndUpload } from "@/lib/storage";
-import type { Team } from "@/lib/types";
+import { parseOr } from "@/lib/schemas/common";
+import { PublicProfileSchema } from "@/lib/schemas/user";
+import type { PublicProfile, Team } from "@/lib/types";
+
+/**
+ * Racha/% de asistencia de cada jugador — espejo de ListAdapterUser.kt, que
+ * las muestra en línea para TODOS los miembros del equipo (no solo el
+ * coach). Vía publicProfiles (calculado server-side por mirrorPublicProfile/
+ * mirrorTeamAttendanceStats) — nunca se lee assistedTrainingDays ajeno.
+ */
+function usePlayerStats(names: string[]) {
+  const [stats, setStats] = useState<Record<string, PublicProfile | null>>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    void Promise.all(
+      names.map(async (name) => {
+        const uid = await resolveUidByName(name);
+        if (!uid) return [name, null] as const;
+        const snap = await get(ref(db, `${PATHS.PUBLIC_PROFILES}/${uid}`));
+        const profile = snap.exists()
+          ? parseOr(PublicProfileSchema, snap.val(), `publicProfiles/${uid}`)
+          : null;
+        return [name, profile] as const;
+      }),
+    ).then((entries) => {
+      if (!cancelled) setStats(Object.fromEntries(entries));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [names]);
+
+  return stats;
+}
 
 const MAX_MESSAGE_LENGTH = 500;
 
@@ -181,15 +218,30 @@ function JoinTeamForm() {
 /** Fila de jugador en la lista del equipo — objetivo táctil 44px en las acciones. */
 function PlayerRow({
   name,
+  stats,
   action,
 }: {
   name: string;
+  stats?: PublicProfile | null;
   action?: React.ReactNode;
 }) {
   return (
     <div className="flex items-center gap-3 rounded-lg py-2 pr-1 pl-2 hover:bg-muted/50">
       <AvatarInitials name={name} size="sm" />
       <span className="flex-1 truncate text-sm">{name}</span>
+      {stats && (typeof stats.streak === "number" || typeof stats.attendanceRate === "number") && (
+        <span className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
+          {typeof stats.streak === "number" && stats.streak > 0 && (
+            <span className="flex items-center gap-0.5 text-warning" title="Racha actual">
+              <Flame className="size-3" />
+              {stats.streak}
+            </span>
+          )}
+          {typeof stats.attendanceRate === "number" && (
+            <span title="% de asistencia">{stats.attendanceRate}%</span>
+          )}
+        </span>
+      )}
       {action}
     </div>
   );
@@ -269,6 +321,7 @@ export default function TeamPage() {
   const [leaving, setLeaving] = useState(false);
   const [uploadingIcon, setUploadingIcon] = useState(false);
   const iconInputRef = useRef<HTMLInputElement>(null);
+  const playerStats = usePlayerStats(team?.userplayers ?? []);
 
   if (loading) {
     return <TeamSkeleton />;
@@ -430,6 +483,7 @@ export default function TeamPage() {
               <PlayerRow
                 key={name}
                 name={name}
+                stats={playerStats[name]}
                 action={
                   isCoach ? (
                     <ConfirmDialog

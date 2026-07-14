@@ -17,7 +17,10 @@ export const UserSchema = z.object({
 });
 
 // publicProfiles/{uid} — proyección pública mantenida por la Cloud Function
-// mirrorPublicProfile (sin mail, sin fcmToken, sin favoritos).
+// mirrorPublicProfile (sin mail, sin fcmToken, sin favoritos, sin
+// assistedTrainingDays crudo). streak/maxStreak/attendanceRate son agregados
+// ya calculados server-side (mirrorPublicProfile + mirrorTeamAttendanceStats)
+// — solo presentes cuando el usuario tiene equipo.
 export const PublicProfileSchema = z.object({
   userId: z.string().nullish(),
   username: z.string().nullish(),
@@ -25,6 +28,9 @@ export const PublicProfileSchema = z.object({
   usericon: z.string().nullish(),
   teamname: z.string().nullish(),
   role: RoleSchema,
+  streak: z.number().int().nullish(),
+  maxStreak: z.number().int().nullish(),
+  attendanceRate: z.number().int().nullish(),
 });
 
 export const NotificationSchema = z.object({

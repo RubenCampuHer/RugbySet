@@ -1,6 +1,6 @@
 "use client";
 
-import { Camera, Check, Copy, LogOut, Trash2, Users, X } from "lucide-react";
+import { Camera, Check, Copy, LogOut, Megaphone, Trash2, Users, X } from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -12,7 +12,16 @@ import { TeamSkeleton } from "@/components/skeletons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { useTeam } from "@/hooks/useTeam";
 import {
   acceptPendingPlayer,
@@ -21,10 +30,73 @@ import {
   leaveTeam,
   rejectPendingPlayer,
   removePlayer,
+  resolveUidByName,
   updateTeamIcon,
 } from "@/lib/actions/team";
+import { sendGeneralMessage } from "@/lib/actions/notify";
 import { resizeAndUpload } from "@/lib/storage";
 import type { Team } from "@/lib/types";
+
+const MAX_MESSAGE_LENGTH = 500;
+
+/** Aviso general del coach al equipo — espejo de SendGeneralMessageDialog.kt. */
+function GeneralMessageDialog({ team }: { team: Team }) {
+  const { firebaseUser, profile } = useAuth();
+  const [open, setOpen] = useState(false);
+  const [message, setMessage] = useState("");
+  const [sending, setSending] = useState(false);
+
+  const send = async () => {
+    setSending(true);
+    try {
+      const uids = (
+        await Promise.all(team.userplayers.map((n) => resolveUidByName(n)))
+      ).filter((u): u is string => u !== null);
+      const { sent } = await sendGeneralMessage({
+        teamName: team.teamname!,
+        message: message.trim(),
+        recipientUserIds: uids,
+        senderUserId: firebaseUser?.uid ?? "",
+        senderUsername: profile?.username ?? "",
+      });
+      toast.success(`Mensaje enviado a ${uids.length} jugadores (${sent} push)`);
+      setMessage("");
+      setOpen(false);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo enviar el mensaje");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger render={<Button variant="outline" className="w-full" />}>
+        <Megaphone className="size-4" /> Enviar aviso al equipo
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Aviso para {team.teamname}</DialogTitle>
+        </DialogHeader>
+        <Textarea
+          value={message}
+          maxLength={MAX_MESSAGE_LENGTH}
+          onChange={(e) => setMessage(e.target.value)}
+          placeholder="Escribe tu mensaje…"
+          rows={4}
+        />
+        <p className="text-right text-xs text-muted-foreground">
+          {message.length}/{MAX_MESSAGE_LENGTH}
+        </p>
+        <DialogFooter>
+          <Button disabled={!message.trim() || sending} onClick={() => void send()}>
+            {sending ? "Enviando…" : "Enviar"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 /**
  * Formulario de ingreso por código para quien todavía no tiene equipo.
@@ -324,6 +396,8 @@ export default function TeamPage() {
           </div>
         </div>
       </div>
+
+      {isCoach && <GeneralMessageDialog team={team} />}
 
       <Card>
         <CardHeader>

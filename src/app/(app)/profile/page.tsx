@@ -1,6 +1,6 @@
 "use client";
 
-import { ClipboardCheck, LogOut, Smartphone } from "lucide-react";
+import { ClipboardCheck, Flame, LogOut, Smartphone, Trophy } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AvatarInitials } from "@/components/AvatarInitials";
@@ -10,16 +10,42 @@ import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { useTeam } from "@/hooks/useTeam";
+import {
+  calculateAttendanceRate,
+  calculateMaxStreak,
+  calculateStreak,
+} from "@/lib/attendance";
 import { getRoleDisplayName, isAdmin } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 
+/** Barra de progreso simple (sin librería de gráficos) para el % de asistencia. */
+function AttendanceBar({ percent }: { percent: number }) {
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between text-sm">
+        <span className="text-muted-foreground">Asistencia (histórico)</span>
+        <span className="font-medium">{percent}%</span>
+      </div>
+      <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+        <div className="h-full rounded-full bg-primary" style={{ width: `${percent}%` }} />
+      </div>
+    </div>
+  );
+}
+
 export default function ProfilePage() {
   const { profile, logout } = useAuth();
+  const { team } = useTeam();
   const router = useRouter();
 
   if (profile === null) {
     return <ProfileSkeleton />;
   }
+
+  const streak = team ? calculateStreak(team, profile.assistedTrainingDays) : 0;
+  const maxStreak = team ? calculateMaxStreak(team, profile.assistedTrainingDays) : 0;
+  const rate = team ? calculateAttendanceRate(team, profile.assistedTrainingDays) : 0;
 
   return (
     <div className="mx-auto max-w-lg space-y-4">
@@ -46,6 +72,33 @@ export default function ProfilePage() {
           <p>Entrenos asistidos: {profile.assistedTrainingDays.length}</p>
         </CardContent>
       </Card>
+
+      {team && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Asistencia</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex gap-4">
+              <div className="flex flex-1 items-center gap-2 rounded-lg bg-muted/50 p-3">
+                <Flame className="size-5 shrink-0 text-warning" />
+                <div>
+                  <p className="text-lg font-bold leading-none">{streak}</p>
+                  <p className="text-xs text-muted-foreground">Racha actual</p>
+                </div>
+              </div>
+              <div className="flex flex-1 items-center gap-2 rounded-lg bg-muted/50 p-3">
+                <Trophy className="size-5 shrink-0 text-warning" />
+                <div>
+                  <p className="text-lg font-bold leading-none">{maxStreak}</p>
+                  <p className="text-xs text-muted-foreground">Racha máxima</p>
+                </div>
+              </div>
+            </div>
+            <AttendanceBar percent={rate} />
+          </CardContent>
+        </Card>
+      )}
 
       <p className="flex items-center gap-2 text-xs text-muted-foreground">
         <Smartphone className="size-3.5 shrink-0" />

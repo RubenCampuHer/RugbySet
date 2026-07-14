@@ -58,3 +58,53 @@ export async function sendAttendanceNotification(opts: {
   const data = result.data as { sentCount?: number };
   return { sent: data.sentCount ?? 0 };
 }
+
+/**
+ * Aviso general del coach al equipo — espejo de
+ * NotificationManager.sendGeneralMessage (mismo patrón de historial +
+ * callable que sendAttendanceNotification, tipo "general" en vez de
+ * "attendance", sin trainingDate/trainingTime).
+ */
+export async function sendGeneralMessage(opts: {
+  teamName: string;
+  message: string;
+  recipientUserIds: string[];
+  senderUserId: string;
+  senderUsername: string;
+}) {
+  const { teamName, message, recipientUserIds, senderUserId, senderUsername } = opts;
+  if (recipientUserIds.length === 0) return { sent: 0 };
+
+  const notificationId = crypto.randomUUID();
+  const title = `Mensaje de ${senderUsername} - ${teamName}`;
+
+  const updates: Record<string, unknown> = {};
+  for (const uid of recipientUserIds) {
+    updates[`${PATHS.USERS}/${uid}/${PATHS.NOTIFICATIONS}/${notificationId}`] = {
+      id: notificationId,
+      type: "general",
+      title,
+      message,
+      teamName,
+      senderUserId,
+      senderUsername,
+      timestamp: Date.now(),
+      read: false,
+      recipientUserId: uid,
+    };
+  }
+  await update(ref(db), updates);
+
+  const result = await httpsCallable(functions, "sendPushNotification")({
+    recipientUserIds,
+    title,
+    message,
+    type: "general",
+    notificationId,
+    teamName,
+    senderUserId,
+    senderUsername,
+  });
+  const data = result.data as { sentCount?: number };
+  return { sent: data.sentCount ?? 0 };
+}

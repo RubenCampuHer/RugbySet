@@ -1,20 +1,21 @@
 "use client";
 
 import { get, ref } from "firebase/database";
-import { Pencil } from "lucide-react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
+import { toast } from "sonner";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { BackLink } from "@/components/BackLink";
+import { CardActionsMenu } from "@/components/CardActionsMenu";
 import { FavoriteButton } from "@/components/FavoriteButton";
 import { PrivacyBadge, ApprovalBadge } from "@/components/PrivacyBadge";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { DetailSkeleton } from "@/components/skeletons";
+import { deleteExercise, duplicateExercise } from "@/lib/actions/exercises";
 import { PATHS } from "@/lib/constants";
 import { db } from "@/lib/firebase";
-import { canEditExercise, canViewExercise } from "@/lib/permissions";
+import { canDeleteExercise, canEditExercise, canViewExercise } from "@/lib/permissions";
 import { parseOr } from "@/lib/schemas/common";
 import { ExerciseSchema } from "@/lib/schemas/exercise";
 import type { Exercise } from "@/lib/types";
@@ -24,6 +25,7 @@ import type { Exercise } from "@/lib/types";
 function ExerciseDetail() {
   const params = useSearchParams();
   const name = params.get("name");
+  const router = useRouter();
   const { profile } = useAuth();
   const [result, setResult] = useState<
     { name: string; exercise: Exercise | null } | undefined
@@ -71,20 +73,24 @@ function ExerciseDetail() {
       <div className="flex items-start justify-between gap-2">
         <h1 className="text-3xl font-bold">{exercise.name}</h1>
         <div className="flex shrink-0 gap-1">
-          {canEditExercise(profile, exercise) && exercise.name && (
-            <Button
-              variant="outline"
-              size="icon"
-              render={
-                <Link
-                  href={`/exercises/edit?name=${encodeURIComponent(exercise.name)}`}
-                  aria-label="Editar ejercicio"
-                />
-              }
-            >
-              <Pencil />
-            </Button>
-          )}
+          {exercise.name &&
+            (canEditExercise(profile, exercise) || canDeleteExercise(profile, exercise)) && (
+              <CardActionsMenu
+                editHref={`/exercises/edit?name=${encodeURIComponent(exercise.name)}`}
+                onDuplicate={async () => {
+                  const newName = await duplicateExercise(exercise, profile);
+                  toast.success(`Duplicado como "${newName}"`);
+                  router.push(`/exercises/detail?name=${encodeURIComponent(newName)}`);
+                }}
+                onDelete={async () => {
+                  await deleteExercise(exercise, profile);
+                  toast.success(`"${exercise.name}" eliminado`);
+                  router.replace("/exercises");
+                }}
+                deleteTitle="¿Eliminar ejercicio?"
+                deleteDescription={`Se eliminará "${exercise.name}" permanentemente.`}
+              />
+            )}
           {exercise.name && <FavoriteButton kind="exercise" name={exercise.name} />}
         </div>
       </div>

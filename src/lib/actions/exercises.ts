@@ -8,6 +8,7 @@ import { PATHS } from "@/lib/constants";
 import { auth, db } from "@/lib/firebase";
 import { canCreateContent, canDeleteExercise, canEditExercise } from "@/lib/permissions";
 import { resizeAndUpload } from "@/lib/storage";
+import { findAvailableName } from "@/lib/utils";
 import type { Exercise, User } from "@/lib/types";
 
 export type ExerciseInput = {
@@ -99,4 +100,37 @@ export async function deleteExercise(exercise: Exercise, currentUser: User): Pro
       favExercises: list.filter((n) => n !== name),
     });
   }
+}
+
+/**
+ * Duplica un ejercicio con el usuario actual como nuevo autor — mejora
+ * deliberada sobre PopupExercise.kt (Android), que sobrescribe en
+ * silencio si "{name}_copy" ya existe: aquí se prueba con sufijo
+ * incremental (_copy2, _copy3...) hasta encontrar un nombre libre.
+ */
+export async function duplicateExercise(
+  exercise: Exercise,
+  currentUser: User,
+): Promise<string> {
+  if (!canCreateContent(currentUser)) {
+    throw new Error("Sin permiso para duplicar ejercicios");
+  }
+  const base = exercise.name ?? "ejercicio";
+  const name = await findAvailableName(base, async (candidate) => {
+    const snap = await get(ref(db, `${PATHS.EXERCISES}/${candidate}`));
+    return snap.exists();
+  });
+  const duplicate = buildExercise(
+    {
+      name,
+      descCorta: exercise.descCorta ?? "",
+      descLarga: exercise.descLarga ?? "",
+      image: exercise.image ?? null,
+      privacy: exercise.privacy === "Privado" ? "Privado" : "Publico",
+      etiquetas: exercise.etiquetas,
+    },
+    currentUser.username!,
+  );
+  await set(ref(db, `${PATHS.EXERCISES}/${name}`), duplicate);
+  return name;
 }

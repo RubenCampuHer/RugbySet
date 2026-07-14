@@ -1,22 +1,24 @@
 "use client";
 
 import { get, ref } from "firebase/database";
-import { ChevronRight, Clock, Pencil } from "lucide-react";
+import { ChevronRight, Clock } from "lucide-react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
+import { toast } from "sonner";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { BackLink } from "@/components/BackLink";
+import { CardActionsMenu } from "@/components/CardActionsMenu";
 import { FavoriteButton } from "@/components/FavoriteButton";
 import { PrivacyBadge, ApprovalBadge } from "@/components/PrivacyBadge";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { DetailSkeleton } from "@/components/skeletons";
+import { deleteTraining, duplicateTraining } from "@/lib/actions/trainings";
 import { PATHS } from "@/lib/constants";
 import { db } from "@/lib/firebase";
-import { canEditTraining, canViewTraining } from "@/lib/permissions";
+import { canDeleteTraining, canEditTraining, canViewTraining } from "@/lib/permissions";
 import { parseOr } from "@/lib/schemas/common";
 import { TrainingSchema } from "@/lib/schemas/training";
 import type { Training } from "@/lib/types";
@@ -24,6 +26,7 @@ import type { Training } from "@/lib/types";
 function TrainingDetail() {
   const params = useSearchParams();
   const name = params.get("name");
+  const router = useRouter();
   const { profile } = useAuth();
   const [result, setResult] = useState<
     { name: string; training: Training | null } | undefined
@@ -69,20 +72,24 @@ function TrainingDetail() {
       <div className="flex items-start justify-between gap-2">
         <h1 className="text-3xl font-bold">{training.name}</h1>
         <div className="flex shrink-0 gap-1">
-          {canEditTraining(profile, training) && training.name && (
-            <Button
-              variant="outline"
-              size="icon"
-              render={
-                <Link
-                  href={`/trainings/edit?name=${encodeURIComponent(training.name)}`}
-                  aria-label="Editar entreno"
-                />
-              }
-            >
-              <Pencil />
-            </Button>
-          )}
+          {training.name &&
+            (canEditTraining(profile, training) || canDeleteTraining(profile, training)) && (
+              <CardActionsMenu
+                editHref={`/trainings/edit?name=${encodeURIComponent(training.name)}`}
+                onDuplicate={async () => {
+                  const newName = await duplicateTraining(training, profile);
+                  toast.success(`Duplicado como "${newName}"`);
+                  router.push(`/trainings/detail?name=${encodeURIComponent(newName)}`);
+                }}
+                onDelete={async () => {
+                  await deleteTraining(training, profile);
+                  toast.success(`"${training.name}" eliminado`);
+                  router.replace("/trainings");
+                }}
+                deleteTitle="¿Eliminar entreno?"
+                deleteDescription={`Se eliminará "${training.name}" permanentemente.`}
+              />
+            )}
           {training.name && <FavoriteButton kind="training" name={training.name} />}
         </div>
       </div>

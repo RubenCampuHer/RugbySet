@@ -16,23 +16,35 @@ import {
 /**
  * Confirmación de acciones destructivas/importantes — sustituye los
  * `window.confirm()` nativos (calendario, equipo, aprobaciones).
+ *
+ * Admite uso controlado (open/onOpenChange, sin trigger) para los casos en
+ * que quien abre el diálogo es un DropdownMenuItem: anidar un
+ * AlertDialogTrigger dentro de un item de menú es frágil (el menú se cierra
+ * y se lleva el trigger con él), así que el padre controla el estado y
+ * "Eliminar" solo hace setOpen(true).
  */
 export function ConfirmDialog({
   trigger,
+  open: openProp,
+  onOpenChange: onOpenChangeProp,
   title,
   description,
   confirmLabel,
   destructive = false,
   onConfirm,
 }: {
-  trigger: React.ReactElement;
+  trigger?: React.ReactElement;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
   title: string;
   description?: string;
   confirmLabel: string;
   destructive?: boolean;
   onConfirm: () => void | Promise<void>;
 }) {
-  const [open, setOpen] = useState(false);
+  const [openState, setOpenState] = useState(false);
+  const open = openProp ?? openState;
+  const setOpen = onOpenChangeProp ?? setOpenState;
   const [busy, setBusy] = useState(false);
 
   const confirm = async () => {
@@ -47,7 +59,7 @@ export function ConfirmDialog({
 
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
-      <AlertDialogTrigger render={trigger} />
+      {trigger && <AlertDialogTrigger render={trigger} />}
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>

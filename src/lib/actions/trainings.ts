@@ -5,6 +5,7 @@ import { get, ref, remove, set, update } from "firebase/database";
 import { PATHS } from "@/lib/constants";
 import { auth, db } from "@/lib/firebase";
 import { canCreateContent, canDeleteTraining, canEditTraining } from "@/lib/permissions";
+import { findAvailableName } from "@/lib/utils";
 import type { Section, Training, User } from "@/lib/types";
 
 export type TrainingInput = {
@@ -104,4 +105,35 @@ export async function deleteTraining(training: Training, currentUser: User): Pro
       favTrainings: list.filter((n) => n !== name),
     });
   }
+}
+
+/**
+ * Duplica un entreno con el usuario actual como nuevo autor — mismo
+ * criterio anti-colisión que duplicateExercise (sufijo incremental en vez
+ * de sobrescribir en silencio, como hace PopupTraining.kt en Android).
+ */
+export async function duplicateTraining(
+  training: Training,
+  currentUser: User,
+): Promise<string> {
+  if (!canCreateContent(currentUser)) {
+    throw new Error("Sin permiso para duplicar entrenamientos");
+  }
+  const base = training.name ?? "entreno";
+  const name = await findAvailableName(base, async (candidate) => {
+    const snap = await get(ref(db, `${PATHS.TRAININGS}/${candidate}`));
+    return snap.exists();
+  });
+  const duplicate = buildTraining(
+    {
+      name,
+      descCorta: training.descCorta ?? "",
+      sections: training.sections,
+      privacy: training.privacy === "Privado" ? "Privado" : "Publico",
+      etiquetas: training.etiquetas,
+    },
+    currentUser.username!,
+  );
+  await set(ref(db, `${PATHS.TRAININGS}/${name}`), duplicate);
+  return name;
 }

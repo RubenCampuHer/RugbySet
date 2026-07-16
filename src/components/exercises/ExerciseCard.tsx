@@ -20,7 +20,7 @@ export function ExerciseCard({ exercise }: { exercise: Exercise }) {
   const canManage = canEditExercise(profile, exercise) || canDeleteExercise(profile, exercise);
 
   return (
-    <Card className="relative h-full overflow-hidden transition-all hover:border-border/80 hover:bg-muted/50 active:scale-[0.98]">
+    <Card className="relative h-full overflow-hidden pt-0 transition-all hover:border-border/80 hover:bg-muted/50 active:scale-[0.98]">
       <Link
         href={`/exercises/detail?name=${encodeURIComponent(name)}`}
         className="absolute inset-0 z-0"

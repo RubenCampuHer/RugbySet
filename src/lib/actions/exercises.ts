@@ -18,6 +18,8 @@ export type ExerciseInput = {
   image: string | null;
   privacy: "Publico" | "Privado";
   etiquetas: string[];
+  /** JSON del estado de la pizarra (null si la imagen no viene de ahí). */
+  boardData: string | null;
 };
 
 /** Sube la imagen de un ejercicio a exercises_images/{uid}/... (ver storage.rules). */
@@ -44,6 +46,7 @@ function buildExercise(input: ExerciseInput, author: string): Exercise {
     // El formulario, igual que AddExercise/PopupExercise en Android, no
     // ofrece privacidad "Equipo".
     teamname: null,
+    boardData: input.boardData,
   };
 }
 
@@ -128,6 +131,7 @@ export async function duplicateExercise(
       image: exercise.image ?? null,
       privacy: exercise.privacy === "Privado" ? "Privado" : "Publico",
       etiquetas: exercise.etiquetas,
+      boardData: exercise.boardData ?? null,
     },
     currentUser.username!,
   );

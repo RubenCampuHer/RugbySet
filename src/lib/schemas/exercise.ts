@@ -17,4 +17,7 @@ export const ExerciseSchema = z.object({
   approvalStatus: ApprovalStatusSchema,
   // Solo presente cuando privacy === "Equipo".
   teamname: z.string().nullish(),
+  // JSON serializado del estado de la pizarra (solo web, Android lo ignora
+  // pero debe preservarlo al editar — ver _Exercise.kt).
+  boardData: z.string().nullish(),
 });

@@ -51,6 +51,7 @@ function ExerciseForm({
   const [etiquetas, setEtiquetas] = useState<string[]>(original?.etiquetas ?? []);
   const [imagePreview, setImagePreview] = useState<string | null>(original?.image ?? null);
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const [boardData, setBoardData] = useState<string | null>(original?.boardData ?? null);
   const [saving, setSaving] = useState(false);
 
   const isNameValid = name.length >= NAME_MIN && name.length <= NAME_MAX;
@@ -74,6 +75,7 @@ function ExerciseForm({
         image: imageUrl,
         privacy,
         etiquetas,
+        boardData,
       };
       if (isEdit) {
         await updateExercise(originalName, input, profile);
@@ -109,6 +111,8 @@ function ExerciseForm({
           setImageFile(file);
           setImagePreview(preview);
         }}
+        boardData={boardData}
+        onBoardChange={setBoardData}
       />
 
       <div className="space-y-1.5">

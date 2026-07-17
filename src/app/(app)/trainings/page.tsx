@@ -7,6 +7,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { PageHeader } from "@/components/PageHeader";
 import { SearchInput } from "@/components/SearchInput";
 import { ListSkeleton } from "@/components/skeletons";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTrainings } from "@/hooks/useTrainings";
@@ -20,6 +21,7 @@ export default function TrainingsPage() {
   const { trainings, loading } = useTrainings();
   const { profile } = useAuth();
   const [search, setSearch] = useState("");
+  const [activeTags, setActiveTags] = useState<string[]>([]);
   const [tab, setTab] = useState<Tab>("all");
 
   const favNames = useMemo(
@@ -38,14 +40,31 @@ export default function TrainingsPage() {
     const matchesSearch =
       search === "" ||
       (t.name ?? "").toLowerCase().includes(search.toLowerCase());
+    const matchesTags = activeTags.every((tag) => t.etiquetas.includes(tag));
     const matchesTab =
       tab === "all"
         ? true
         : tab === "favs"
           ? favNames.has(t.name ?? "")
           : t.author === profile?.username;
-    return matchesSearch && matchesTab;
+    return matchesSearch && matchesTags && matchesTab;
   });
+
+  // Tags derivadas de lo que queda visible tras búsqueda/tab/etiquetas ya
+  // seleccionadas (filtrado facetado) — espejo de ExercisesPage/
+  // ReadTrainingsViewModel.computeEtiquetas (el nodo Etiquetas no se usa).
+  const allTags = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const t of shown) {
+      for (const tag of t.etiquetas) counts.set(tag, (counts.get(tag) ?? 0) + 1);
+    }
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([tag]) => tag);
+  }, [shown]);
+
+  const toggleTag = (tag: string) =>
+    setActiveTags((prev) =>
+      prev.includes(tag) ? prev.filter((tg) => tg !== tag) : [...prev, tag],
+    );
 
   if (loading) {
     return <ListSkeleton columns={2} />;
@@ -76,10 +95,29 @@ export default function TrainingsPage() {
         value={search}
         onChange={setSearch}
       />
-      {search && (
+      {(search || activeTags.length > 0) && (
         <p className="text-xs text-muted-foreground">
           {shown.length} de {trainings.length} entrenos
         </p>
+      )}
+      {allTags.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {allTags.slice(0, 15).map((tag) => (
+            <button
+              key={tag}
+              type="button"
+              onClick={() => toggleTag(tag)}
+              className="rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            >
+              <Badge
+                className="px-3 py-1.5"
+                variant={activeTags.includes(tag) ? "default" : "outline"}
+              >
+                {tag}
+              </Badge>
+            </button>
+          ))}
+        </div>
       )}
       {shown.length === 0 ? (
         <EmptyState

@@ -36,16 +36,6 @@ export default function ExercisesPage() {
     [exercises, profile],
   );
 
-  // Tags derivadas del contenido visible (el nodo Etiquetas no se usa —
-  // misma decisión que el plan v2 §F3).
-  const allTags = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const e of exercises) {
-      for (const tag of e.etiquetas) counts.set(tag, (counts.get(tag) ?? 0) + 1);
-    }
-    return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([tag]) => tag);
-  }, [exercises]);
-
   const filtered = exercises.filter((e) => {
     const matchesSearch =
       search === "" ||
@@ -59,6 +49,17 @@ export default function ExercisesPage() {
           : e.author === profile?.username;
     return matchesSearch && matchesTags && matchesTab;
   });
+
+  // Tags derivadas de lo que queda visible tras búsqueda/tab/etiquetas ya
+  // seleccionadas (filtrado facetado) — el nodo Etiquetas no se usa (misma
+  // decisión que el plan v2 §F3).
+  const allTags = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const e of filtered) {
+      for (const tag of e.etiquetas) counts.set(tag, (counts.get(tag) ?? 0) + 1);
+    }
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([tag]) => tag);
+  }, [filtered]);
 
   const toggleTag = (tag: string) =>
     setActiveTags((prev) =>

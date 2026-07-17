@@ -9,10 +9,7 @@ export const APPROVAL_REJECTED = "REJECTED";
 
 export const isAdmin = (u: User | null) => u?.role === "ADMIN";
 export const isCoach = (u: User | null) => u?.role === "COACH";
-export const isPlayer = (u: User | null) => u?.role === "PLAYER";
-export const canManageLibrary = (u: User | null) => isAdmin(u) || isCoach(u);
-export const canCreateContent = canManageLibrary;
-export const canApproveContent = (u: User | null) => isAdmin(u);
+export const canCreateContent = (u: User | null) => isAdmin(u) || isCoach(u);
 
 /**
  * Espejo de PermissionsManager.canViewExercise:

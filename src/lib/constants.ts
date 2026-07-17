@@ -7,6 +7,5 @@ export const PATHS = {
   CLUBS: "Clubs",
   EXERCISES: "Exercises",
   TRAININGS: "Trainings",
-  ETIQUETAS: "Etiquetas",
   NOTIFICATIONS: "notifications", // hijo de Users/{uid}
 } as const;

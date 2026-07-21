@@ -1,19 +1,13 @@
 "use client";
 
-import { Trash2, Trophy, Volleyball } from "lucide-react";
+import { ChevronRight, Trash2, Trophy, Volleyball } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { TrainingPickerSheet } from "@/components/calendar/TrainingPickerSheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Sheet,
   SheetContent,
@@ -31,8 +25,8 @@ const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 /**
  * Editor de sesión del coach en un Sheet inferior (equivalente al bottom
  * sheet de Android): tipo de evento, nombre, horas con <input type="time">
- * (sustituye el texto+regex), ubicación y Select de entreno (sustituye el
- * <select> nativo).
+ * (sustituye el texto+regex), ubicación y selector de entreno con búsqueda
+ * y filtro por etiqueta (TrainingPickerSheet).
  */
 export function EventEditorSheet({
   team,
@@ -57,6 +51,8 @@ export function EventEditorSheet({
   const [eventName, setEventName] = useState(day?.nameTrainingDay ?? "");
   const [location, setLocation] = useState(day?.location ?? "");
   const [busy, setBusy] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const selectedTraining = trainings.find((t) => t.name === trainingName);
 
   const save = async () => {
     if (!TIME_RE.test(horaInicio) || !TIME_RE.test(horaFin)) {
@@ -167,20 +163,32 @@ export function EventEditorSheet({
 
           <div className="space-y-1">
             <Label className="text-xs">Entreno</Label>
-            <Select value={trainingName} onValueChange={(v) => setTrainingName(v ?? "")}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Elegir entreno…" />
-              </SelectTrigger>
-              <SelectContent>
-                {trainings.map((t) => (
-                  <SelectItem key={t.name} value={t.name ?? ""}>
-                    {t.name} ({t.tiempoTotal ?? "?"} min)
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Button
+              type="button"
+              variant="outline"
+              size="xl"
+              className="w-full justify-between font-normal"
+              onClick={() => setPickerOpen(true)}
+            >
+              <span className={cn("line-clamp-1 text-left", !selectedTraining && "text-muted-foreground")}>
+                {selectedTraining
+                  ? `${selectedTraining.name} (${selectedTraining.tiempoTotal ?? "?"} min)`
+                  : "Elegir entreno…"}
+              </span>
+              <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+            </Button>
           </div>
         </div>
+
+        <TrainingPickerSheet
+          open={pickerOpen}
+          onOpenChange={setPickerOpen}
+          value={trainingName}
+          onConfirm={(name) => {
+            setTrainingName(name);
+            setPickerOpen(false);
+          }}
+        />
 
         <SheetFooter>
           <Button size="xl" disabled={busy} onClick={() => void save()}>

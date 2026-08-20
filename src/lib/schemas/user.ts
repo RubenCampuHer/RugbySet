@@ -14,6 +14,10 @@ export const UserSchema = z.object({
   favExercises: rtdbList(z.string()).default([]),
   favTrainings: rtdbList(z.string()).default([]),
   role: RoleSchema,
+  // Servidor: true solo cuando el wizard de onboarding (rol + equipo) se
+  // completó de verdad — ni ausente ni false deben tratarse como "listo".
+  // Ver src/lib/actions/onboarding.ts.
+  onboardingComplete: z.boolean().nullish(),
 });
 
 // publicProfiles/{uid} — proyección pública mantenida por la Cloud Function

@@ -3,6 +3,7 @@
 import { onAuthStateChanged, signOut, type User as FirebaseUser } from "firebase/auth";
 import { onValue, ref } from "firebase/database";
 import { createContext, useContext, useEffect, useState } from "react";
+import { ensureUserProfile } from "@/lib/actions/onboarding";
 import { PATHS } from "@/lib/constants";
 import { auth, db } from "@/lib/firebase";
 import { parseOr } from "@/lib/schemas/common";
@@ -44,6 +45,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!firebaseUser) return;
     const userRef = ref(db, `${PATHS.USERS}/${firebaseUser.uid}`);
     return onValue(userRef, (snap) => {
+      if (!snap.exists()) {
+        // Cuenta autenticada sin nodo Users/{uid} — típicamente un primer
+        // login con Google (la web no tiene registro propio, ver
+        // ensureUserProfile). Se autocura aquí, no solo en el botón de
+        // Google, para cubrir también sesiones ya persistidas de cuentas
+        // afectadas por este bug antes del fix. El propio onValue recibirá
+        // el valor recién creado y actualizará el perfil.
+        void ensureUserProfile(firebaseUser);
+        return;
+      }
       setProfileState(parseOr(UserSchema, snap.val(), `Users/${firebaseUser.uid}`));
     });
   }, [firebaseUser]);

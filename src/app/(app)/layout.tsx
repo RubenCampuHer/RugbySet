@@ -27,6 +27,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useNotifications } from "@/hooks/useNotifications";
+import { isOnboardingDone } from "@/lib/onboarding-flag";
 import { isAdmin } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 
@@ -59,8 +60,28 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     if (firebaseUser === null) router.replace("/login");
   }, [firebaseUser, router]);
 
+  // Usuario nuevo (típicamente primer login con Google — la web no tiene
+  // registro propio) que todavía no eligió rol/equipo. Se exige que NINGUNA
+  // de las dos señales confirme que ya terminó: `onboardingComplete` es la
+  // autoridad de servidor (válida en cualquier navegador/dispositivo, y la
+  // que decide tras el backfill de cuentas ya existentes); el flag local
+  // (`isOnboardingDone`) solo evita un parpadeo en la misma pestaña justo
+  // tras terminar el wizard, mientras el `update` de servidor todavía viaja.
+  // Mirror de _ActivityMain comprobando SetupActivity.isSetupDone en Android.
+  const needsOnboarding =
+    profile != null &&
+    profile.onboardingComplete !== true &&
+    !isOnboardingDone(firebaseUser?.uid ?? "");
+
+  useEffect(() => {
+    if (firebaseUser && needsOnboarding) {
+      router.replace("/onboarding");
+    }
+  }, [firebaseUser, needsOnboarding, router]);
+
   if (firebaseUser === undefined) return <BrandLoader />;
   if (firebaseUser === null) return null;
+  if (needsOnboarding) return <BrandLoader />;
 
   return (
     <div className="flex min-h-screen flex-col">

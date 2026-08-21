@@ -3,6 +3,7 @@
 import {
   BarChart3,
   Bell,
+  Building2,
   CalendarDays,
   ClipboardCheck,
   ClipboardList,
@@ -31,7 +32,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useNotifications } from "@/hooks/useNotifications";
 import { isOnboardingDone } from "@/lib/onboarding-flag";
-import { isAdmin } from "@/lib/permissions";
+import { isAdmin, isCoach } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 
 // 5 destinos como la bottom navigation Material de la app Android;
@@ -133,6 +134,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <DropdownMenuItem render={<Link href="/profile" />}>
                 <User /> Perfil
               </DropdownMenuItem>
+              {isCoach(profile) && (
+                <DropdownMenuItem render={<Link href="/club" />}>
+                  <Building2 /> Mi club
+                </DropdownMenuItem>
+              )}
               {isAdmin(profile) && (
                 <DropdownMenuItem render={<Link href="/admin/approvals" />}>
                   <ClipboardCheck /> Cola de aprobación

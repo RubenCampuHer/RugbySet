@@ -238,18 +238,22 @@ function PendingSection({ team, canManage }: { team: Team; canManage: boolean })
 
 /**
  * Cuerpo de la pantalla de equipo, parametrizado por `teamname` explícito en
- * vez de derivarlo siempre de `profile.teamname` — así lo reutilizan tanto
- * `/team` (el equipo propio) como `/admin/teams/detail` (un equipo ajeno,
- * con `viewingAsAdmin`). Las reglas RTDB ya dan a ADMIN lectura/escritura
- * completa de cualquier Team, así que ningún cambio de reglas fue necesario
- * para esto — ver database.rules.json.
+ * vez de derivarlo siempre de `profile.teamname` — así lo reutilizan
+ * `/team` (el equipo propio), `/admin/teams/detail` (un equipo ajeno, con
+ * `viewingAsAdmin`) y `/club/teams/detail` (un equipo del club que
+ * administras, con `viewingAsClubAdmin`). Las reglas RTDB ya dan a ADMIN y
+ * al admin del club lectura/escritura completa de los equipos que les
+ * corresponden, así que ningún cambio de reglas hace falta aquí — ver
+ * database.rules.json.
  */
 export function TeamManager({
   teamname,
   viewingAsAdmin = false,
+  viewingAsClubAdmin = false,
 }: {
   teamname: string | null;
   viewingAsAdmin?: boolean;
+  viewingAsClubAdmin?: boolean;
 }) {
   const { firebaseUser, profile } = useAuth();
   const { team, coach, hasTeam, loading } = useTeam(teamname ?? undefined);
@@ -258,12 +262,13 @@ export function TeamManager({
   const [uploadingIcon, setUploadingIcon] = useState(false);
   const iconInputRef = useRef<HTMLInputElement>(null);
   const playerStats = usePlayerStats(team?.userplayers ?? []);
+  const viewingAsSomeAdmin = viewingAsAdmin || viewingAsClubAdmin;
 
   if (loading) {
     return <TeamSkeleton />;
   }
   if (!hasTeam || team === null) {
-    if (viewingAsAdmin) {
+    if (viewingAsSomeAdmin) {
       return <EmptyState icon={Users} title="Equipo no encontrado" />;
     }
     return (
@@ -280,12 +285,13 @@ export function TeamManager({
   }
 
   // Identidad real de coach (para el badge "Eres el entrenador") — distinta
-  // de canManage, que además incluye al ADMIN viendo un equipo ajeno.
+  // de canManage, que además incluye al ADMIN global o al admin del club
+  // viendo un equipo ajeno.
   const isLiteralCoach = team.usercoach === firebaseUser?.uid;
-  const canManage = isLiteralCoach || (viewingAsAdmin && isAdmin(profile));
+  const canManage = isLiteralCoach || (viewingAsAdmin && isAdmin(profile)) || viewingAsClubAdmin;
   // "Salir del equipo" es una acción de MIEMBRO — nunca tiene sentido para
-  // un ADMIN que está mirando un equipo ajeno del que no forma parte.
-  const canLeave = !viewingAsAdmin && !isLiteralCoach;
+  // alguien que está mirando un equipo ajeno del que no forma parte.
+  const canLeave = !viewingAsSomeAdmin && !isLiteralCoach;
 
   const kick = async (name: string) => {
     setKicking(name);
@@ -349,9 +355,10 @@ export function TeamManager({
 
   return (
     <div className="mx-auto max-w-2xl space-y-4">
-      {viewingAsAdmin && (
+      {viewingAsSomeAdmin && (
         <Badge className="border-transparent bg-primary/15 text-brand">
-          <ShieldCheck className="size-3" /> Viendo como administrador
+          <ShieldCheck className="size-3" />
+          {viewingAsClubAdmin ? "Viendo como admin del club" : "Viendo como administrador"}
         </Badge>
       )}
       <div className="flex items-center gap-4">

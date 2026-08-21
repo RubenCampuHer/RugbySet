@@ -124,7 +124,17 @@ export async function createStandaloneTeam(opts: {
 /**
  * Mirror de SetupCreateTeamFragment.createClubAndTeam +
  * SetupCreateClubFragment: crea el club (push id) y su primer equipo,
- * vincula al coach — misma escritura atómica.
+ * vincula al coach.
+ *
+ * NO es una única escritura atómica (a diferencia de lo que decía este
+ * comentario antes de 2026-08-21): Teams/{teamName}/clubId tiene una
+ * .validate que comprueba Clubs/{clubId}/adminUserId — si Clubs/{clubId}
+ * se crea EN LA MISMA escritura que el equipo, esa referencia cruzada
+ * entre dos nodos top-level distintos no se resuelve de forma fiable
+ * contra el árbol ya combinado (permission denied real contra RTDB,
+ * confirmado en QA; cada escritura por separado sí vale). Por eso el club
+ * se crea primero (ya comprometido) y solo después el equipo + el
+ * teamname del coach.
  */
 export async function createClubAndTeam(opts: {
   clubName: string;
@@ -150,6 +160,7 @@ export async function createClubAndTeam(opts: {
     clubicon: opts.clubIconUrl,
     adminUserId: opts.uid,
     teams: [opts.teamName],
+    pendingTeams: {},
   };
   const team = buildTeam({
     teamName: opts.teamName,
@@ -161,8 +172,8 @@ export async function createClubAndTeam(opts: {
     category: opts.category,
   });
 
+  await update(ref(db, `${PATHS.CLUBS}/${clubId}`), club);
   await update(ref(db), {
-    [`${PATHS.CLUBS}/${clubId}`]: club,
     [`${PATHS.TEAMS}/${opts.teamName}`]: team,
     [`${PATHS.USERS}/${opts.uid}/teamname`]: opts.teamName,
   });

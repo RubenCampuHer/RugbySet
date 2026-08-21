@@ -16,6 +16,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { DetailSkeleton } from "@/components/skeletons";
+import { useClub } from "@/hooks/useClub";
+import { useMyClubId } from "@/hooks/useMyClubId";
 import { deleteTraining, duplicateTraining } from "@/lib/actions/trainings";
 import { PATHS } from "@/lib/constants";
 import { db } from "@/lib/firebase";
@@ -29,6 +31,8 @@ function TrainingDetail() {
   const name = params.get("name");
   const router = useRouter();
   const { profile } = useAuth();
+  const { clubId: myClubId, loading: loadingMyClub } = useMyClubId();
+  const { club: adminClub, loading: loadingAdminClub } = useClub();
   const [result, setResult] = useState<
     { name: string; training: Training | null } | undefined
   >(undefined);
@@ -53,10 +57,13 @@ function TrainingDetail() {
       ? result.training
       : undefined;
 
-  if (training === undefined || profile === null) {
+  if (training === undefined || profile === null || loadingMyClub || loadingAdminClub) {
     return <DetailSkeleton />;
   }
-  if (training === null || !canViewTraining(profile, training)) {
+  if (
+    training === null ||
+    !canViewTraining(profile, training, { myClubId, myAdminClubId: adminClub?.clubId })
+  ) {
     return (
       <div className="space-y-4 py-12 text-center">
         <p className="text-muted-foreground">Entreno no encontrado.</p>

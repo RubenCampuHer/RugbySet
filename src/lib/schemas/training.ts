@@ -28,5 +28,7 @@ export const TrainingSchema = z.object({
   etiquetas: rtdbList(z.string()).default([]),
   created_at: timestampMs.nullish(),
   approvalStatus: ApprovalStatusSchema,
+  // Ver comentario equivalente en schemas/exercise.ts.
   teamname: z.string().nullish(),
+  clubId: z.string().nullish(),
 });

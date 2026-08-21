@@ -343,8 +343,7 @@ export function TeamManager({
   const removeTeam = async () => {
     // El coach literal sigue usando la vía barata client-side (deleteTeam);
     // un ADMIN sobre un equipo ajeno pasa por la Cloud Function, que además
-    // reconvierte el contenido "Equipo" a "Privado" y limpia el icono en
-    // Storage (ver adminDeleteTeam en lib/actions/team.ts).
+    // limpia el icono en Storage (ver adminDeleteTeam en lib/actions/team.ts).
     if (isLiteralCoach) {
       await deleteTeam(team);
     } else {

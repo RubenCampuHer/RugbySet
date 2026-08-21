@@ -14,10 +14,10 @@ export function PrivacyBadge({ privacy }: { privacy: string | null | undefined }
           <Lock className="size-3" /> Privado
         </Badge>
       );
-    case "Equipo":
+    case "Club":
       return (
         <Badge className="gap-1 border-transparent bg-primary/15 text-brand">
-          <Users className="size-3" /> Equipo
+          <Users className="size-3" /> Club
         </Badge>
       );
     case "Publico":

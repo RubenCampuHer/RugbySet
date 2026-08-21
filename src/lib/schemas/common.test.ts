@@ -63,7 +63,7 @@ describe("RoleSchema", () => {
 
 describe("PrivacySchema", () => {
   it("acepta los tres valores válidos", () => {
-    for (const v of ["Publico", "Privado", "Equipo"]) {
+    for (const v of ["Publico", "Privado", "Club"]) {
       expect(PrivacySchema.parse(v)).toBe(v);
     }
   });

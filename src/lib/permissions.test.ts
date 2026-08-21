@@ -11,6 +11,7 @@ import {
   canEditTraining,
   canViewExercise,
   canViewTraining,
+  type ClubContext,
   getRoleDisplayName,
   isAdmin,
   isCoach,
@@ -60,6 +61,7 @@ describe("canViewExercise / canViewTraining — matriz privacy × approvalStatus
     label: string;
     viewer: User;
     contentOverrides: Record<string, unknown>;
+    club?: ClubContext;
     expected: boolean;
   }> = [
     {
@@ -81,27 +83,70 @@ describe("canViewExercise / canViewTraining — matriz privacy × approvalStatus
       expected: false,
     },
     {
-      label: "Equipo: el autor sí, aunque no tenga teamname",
-      viewer: user({ username: "author1", teamname: null }),
-      contentOverrides: { privacy: "Equipo", teamname: "Spartans" },
+      label: "Club + APPROVED: el autor sí, aunque no pertenezca a ningún club",
+      viewer: user({ username: "author1" }),
+      contentOverrides: { privacy: "Club", clubId: "club1", approvalStatus: "APPROVED" },
       expected: true,
     },
     {
-      label: "Equipo: un compañero del mismo equipo sí",
-      viewer: user({ username: "compañero", teamname: "Spartans" }),
-      contentOverrides: { privacy: "Equipo", teamname: "Spartans" },
+      label: "Club + APPROVED: un miembro del mismo club sí",
+      viewer: user({ username: "compañero" }),
+      contentOverrides: { privacy: "Club", clubId: "club1", approvalStatus: "APPROVED" },
+      club: { myClubId: "club1" },
       expected: true,
     },
     {
-      label: "Equipo: alguien de otro equipo no",
-      viewer: user({ username: "rival", teamname: "Tigers" }),
-      contentOverrides: { privacy: "Equipo", teamname: "Spartans" },
+      label: "Club + APPROVED: alguien de otro club no",
+      viewer: user({ username: "rival" }),
+      contentOverrides: { privacy: "Club", clubId: "club1", approvalStatus: "APPROVED" },
+      club: { myClubId: "club2" },
       expected: false,
     },
     {
-      label: "Equipo: el contenido sin teamname asignado no es visible ni para un compañero sin equipo",
-      viewer: user({ username: "sinequipo", teamname: null }),
-      contentOverrides: { privacy: "Equipo", teamname: null },
+      label: "Club + PENDING: el autor sí",
+      viewer: user({ username: "author1" }),
+      contentOverrides: { privacy: "Club", clubId: "club1", approvalStatus: "PENDING" },
+      expected: true,
+    },
+    {
+      label: "Club + PENDING: el admin de ESE club sí (cola de aprobación del club)",
+      viewer: user({ username: "admin_club" }),
+      contentOverrides: { privacy: "Club", clubId: "club1", approvalStatus: "PENDING" },
+      club: { myClubId: "club1", myAdminClubId: "club1" },
+      expected: true,
+    },
+    {
+      label: "Club + PENDING: un miembro del club que NO lo administra no",
+      viewer: user({ username: "compañero" }),
+      contentOverrides: { privacy: "Club", clubId: "club1", approvalStatus: "PENDING" },
+      club: { myClubId: "club1" },
+      expected: false,
+    },
+    {
+      label: "Club + PENDING: un ADMIN GLOBAL no (a diferencia de Publico — aquí solo cuenta el admin del club)",
+      viewer: user({ username: "admin1", role: "ADMIN" }),
+      contentOverrides: { privacy: "Club", clubId: "club1", approvalStatus: "PENDING" },
+      expected: false,
+    },
+    {
+      label: "Club + REJECTED: solo el autor",
+      viewer: user({ username: "compañero" }),
+      contentOverrides: { privacy: "Club", clubId: "club1", approvalStatus: "REJECTED" },
+      club: { myClubId: "club1", myAdminClubId: "club1" },
+      expected: false,
+    },
+    {
+      label: "Club + approvalStatus null (legacy): solo el autor, ni siquiera el admin del club",
+      viewer: user({ username: "admin_club" }),
+      contentOverrides: { privacy: "Club", clubId: "club1", approvalStatus: null },
+      club: { myClubId: "club1", myAdminClubId: "club1" },
+      expected: false,
+    },
+    {
+      label: "Club: sin clubId asignado (dato corrupto), nadie salvo el autor lo ve",
+      viewer: user({ username: "compañero" }),
+      contentOverrides: { privacy: "Club", clubId: null, approvalStatus: "APPROVED" },
+      club: { myClubId: "club1" },
       expected: false,
     },
     {
@@ -154,12 +199,12 @@ describe("canViewExercise / canViewTraining — matriz privacy × approvalStatus
     },
   ];
 
-  for (const { label, viewer, contentOverrides, expected } of cases) {
+  for (const { label, viewer, contentOverrides, club, expected } of cases) {
     it(`Exercise — ${label}`, () => {
-      expect(canViewExercise(viewer, exercise(contentOverrides))).toBe(expected);
+      expect(canViewExercise(viewer, exercise(contentOverrides), club)).toBe(expected);
     });
     it(`Training — ${label}`, () => {
-      expect(canViewTraining(viewer, training(contentOverrides))).toBe(expected);
+      expect(canViewTraining(viewer, training(contentOverrides), club)).toBe(expected);
     });
   }
 

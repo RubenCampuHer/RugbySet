@@ -24,7 +24,7 @@ export const RoleSchema = z
   // absorbe usuarios legacy sin rol o con valores corruptos.
   .catch("PLAYER");
 
-export const PrivacySchema = z.enum(["Publico", "Privado", "Equipo"]);
+export const PrivacySchema = z.enum(["Publico", "Privado", "Club"]);
 
 // null = contenido legacy anterior al sistema de aprobación (visible solo
 // para el autor, ver permissions.ts).

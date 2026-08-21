@@ -22,11 +22,11 @@ describe("ExerciseSchema", () => {
     expect(ExerciseSchema.safeParse({ approvalStatus: "APROBADO" }).success).toBe(false);
   });
 
-  it("privacy Equipo requiere teamname en la práctica, pero el schema no lo obliga", () => {
-    // teamname es nullish independientemente de privacy — la relación la
+  it("privacy Club requiere clubId en la práctica, pero el schema no lo obliga", () => {
+    // clubId es nullish independientemente de privacy — la relación la
     // impone permissions.ts (canViewExercise), no el schema.
-    const result = ExerciseSchema.parse({ privacy: "Equipo", teamname: "Spartans" });
-    expect(result.teamname).toBe("Spartans");
+    const result = ExerciseSchema.parse({ privacy: "Club", clubId: "club1" });
+    expect(result.clubId).toBe("club1");
   });
 
   it("etiquetas por defecto vacío, boardData opcional (solo lo genera la web)", () => {

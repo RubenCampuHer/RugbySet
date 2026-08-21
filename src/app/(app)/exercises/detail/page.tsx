@@ -12,6 +12,8 @@ import { FavoriteButton } from "@/components/FavoriteButton";
 import { PrivacyBadge, ApprovalBadge } from "@/components/PrivacyBadge";
 import { Badge } from "@/components/ui/badge";
 import { DetailSkeleton } from "@/components/skeletons";
+import { useClub } from "@/hooks/useClub";
+import { useMyClubId } from "@/hooks/useMyClubId";
 import { deleteExercise, duplicateExercise } from "@/lib/actions/exercises";
 import { PATHS } from "@/lib/constants";
 import { db } from "@/lib/firebase";
@@ -27,6 +29,8 @@ function ExerciseDetail() {
   const name = params.get("name");
   const router = useRouter();
   const { profile } = useAuth();
+  const { clubId: myClubId, loading: loadingMyClub } = useMyClubId();
+  const { club: adminClub, loading: loadingAdminClub } = useClub();
   const [result, setResult] = useState<
     { name: string; exercise: Exercise | null } | undefined
   >(undefined);
@@ -53,10 +57,13 @@ function ExerciseDetail() {
       ? result.exercise
       : undefined;
 
-  if (exercise === undefined || profile === null) {
+  if (exercise === undefined || profile === null || loadingMyClub || loadingAdminClub) {
     return <DetailSkeleton />;
   }
-  if (exercise === null || !canViewExercise(profile, exercise)) {
+  if (
+    exercise === null ||
+    !canViewExercise(profile, exercise, { myClubId, myAdminClubId: adminClub?.clubId })
+  ) {
     return (
       <div className="space-y-4 py-12 text-center">
         <p className="text-muted-foreground">Ejercicio no encontrado.</p>

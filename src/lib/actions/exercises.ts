@@ -16,10 +16,17 @@ export type ExerciseInput = {
   descCorta: string;
   descLarga: string;
   image: string | null;
-  privacy: "Publico" | "Privado";
+  privacy: "Publico" | "Privado" | "Club";
   etiquetas: string[];
   /** JSON del estado de la pizarra (null si la imagen no viene de ahí). */
   boardData: string | null;
+  /**
+   * clubId del autor en el momento de guardar — solo relevante si
+   * privacy === "Club" (resuelto por la página vía useMyClubId() antes de
+   * llamar; snapshot, no se recalcula si el autor cambia de club después,
+   * mismo criterio que ya se documentaba para teamname).
+   */
+  clubId?: string | null;
 };
 
 /** Sube la imagen de un ejercicio a exercises_images/{uid}/... (ver storage.rules). */
@@ -40,12 +47,13 @@ function buildExercise(input: ExerciseInput, author: string): Exercise {
     author,
     etiquetas: input.etiquetas,
     created_at: Date.now(),
-    // Público siempre pasa a PENDING al guardar (crear o editar) — igual
-    // que Android, no se preserva un approvalStatus previo.
-    approvalStatus: input.privacy === "Publico" ? "PENDING" : null,
-    // El formulario, igual que AddExercise/PopupExercise en Android, no
-    // ofrece privacidad "Equipo".
-    teamname: null,
+    // Público y Club pasan a PENDING al guardar (crear o editar) — igual
+    // que Android, no se preserva un approvalStatus previo. Club lo
+    // aprueba el admin del club (ver database.rules.json), no un ADMIN
+    // global.
+    approvalStatus: input.privacy === "Publico" || input.privacy === "Club" ? "PENDING" : null,
+    teamname: null, // sin uso real — ver comentario en schemas/exercise.ts
+    clubId: input.privacy === "Club" ? (input.clubId ?? null) : null,
     boardData: input.boardData,
   };
 }
@@ -123,15 +131,17 @@ export async function duplicateExercise(
     const snap = await get(ref(db, `${PATHS.EXERCISES}/${candidate}`));
     return snap.exists();
   });
+  const privacy = exercise.privacy === "Privado" || exercise.privacy === "Club" ? exercise.privacy : "Publico";
   const duplicate = buildExercise(
     {
       name,
       descCorta: exercise.descCorta ?? "",
       descLarga: exercise.descLarga ?? "",
       image: exercise.image ?? null,
-      privacy: exercise.privacy === "Privado" ? "Privado" : "Publico",
+      privacy,
       etiquetas: exercise.etiquetas,
       boardData: exercise.boardData ?? null,
+      clubId: privacy === "Club" ? exercise.clubId : null,
     },
     currentUser.username!,
   );

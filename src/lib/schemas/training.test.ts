@@ -32,8 +32,8 @@ describe("TrainingSchema", () => {
   it("parsea un entreno completo con secciones anidadas", () => {
     const result = TrainingSchema.parse({
       name: "Entreno físico",
-      privacy: "Equipo",
-      teamname: "Spartans",
+      privacy: "Club",
+      clubId: "club1",
       author: "rudyx28",
       sections: [
         {

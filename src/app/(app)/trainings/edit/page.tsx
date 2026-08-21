@@ -19,6 +19,7 @@ import { createTraining, updateTraining } from "@/lib/actions/trainings";
 import { PATHS } from "@/lib/constants";
 import { db } from "@/lib/firebase";
 import { useExercises } from "@/hooks/useExercises";
+import { useMyClubId } from "@/hooks/useMyClubId";
 import { canCreateContent, canEditTraining } from "@/lib/permissions";
 import { parseOr } from "@/lib/schemas/common";
 import { TrainingSchema } from "@/lib/schemas/training";
@@ -54,11 +55,12 @@ function TrainingForm({
   const router = useRouter();
   const isEdit = originalName !== null;
   const { exercises: visibleExercises } = useExercises();
+  const { clubId: myClubId, loading: loadingMyClub } = useMyClubId();
 
   const [name, setName] = useState(original?.name ?? "");
   const [descCorta, setDescCorta] = useState(original?.descCorta ?? "");
-  const [privacy, setPrivacy] = useState<"Publico" | "Privado">(
-    original?.privacy === "Privado" ? "Privado" : "Publico",
+  const [privacy, setPrivacy] = useState<"Publico" | "Privado" | "Club">(
+    original?.privacy === "Privado" || original?.privacy === "Club" ? original.privacy : "Publico",
   );
   const [etiquetas, setEtiquetas] = useState<string[]>(original?.etiquetas ?? []);
   const [sections, setSections] = useState<Section[]>(
@@ -72,7 +74,12 @@ function TrainingForm({
   const isDescCortaValid =
     descCorta.length >= DESC_CORTA_MIN && descCorta.length <= DESC_CORTA_MAX;
   const hasExercises = sections.some((s) => s.exercises.length > 0);
-  const canSave = isNameValid && isDescCortaValid && hasExercises && !saving;
+  const canSave =
+    isNameValid &&
+    isDescCortaValid &&
+    hasExercises &&
+    !saving &&
+    (privacy !== "Club" || myClubId != null);
   const tiempoTotal = sections.reduce((sum, s) => sum + s.tiempoSeccion, 0);
 
   const updateSection = (uid: string, fn: (s: Section) => Section) =>
@@ -157,6 +164,7 @@ function TrainingForm({
         sections,
         privacy,
         etiquetas,
+        clubId: privacy === "Club" ? myClubId : null,
       };
       if (isEdit) {
         await updateTraining(originalName, input, profile);
@@ -164,7 +172,7 @@ function TrainingForm({
         await createTraining(input, profile);
       }
       toast.success(
-        privacy === "Publico"
+        privacy === "Publico" || privacy === "Club"
           ? `Entreno ${isEdit ? "modificado" : "guardado"} y enviado a revisión`
           : `Entreno ${isEdit ? "modificado" : "guardado"} correctamente`,
       );
@@ -229,7 +237,25 @@ function TrainingForm({
           >
             Privado
           </Button>
+          <Button
+            type="button"
+            variant={privacy === "Club" ? "default" : "outline"}
+            disabled={!loadingMyClub && myClubId == null}
+            onClick={() => setPrivacy("Club")}
+          >
+            Club
+          </Button>
         </div>
+        {!loadingMyClub && myClubId == null && (
+          <p className="text-xs text-muted-foreground">
+            Tu equipo no pertenece a ningún club — únete o crea uno desde &quot;Mi club&quot;.
+          </p>
+        )}
+        {privacy === "Club" && (
+          <p className="text-xs text-muted-foreground">
+            El admin de tu club debe aprobarlo antes de que el resto del club lo vea.
+          </p>
+        )}
       </div>
 
       <TagInput value={etiquetas} onChange={setEtiquetas} />

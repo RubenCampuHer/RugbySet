@@ -11,27 +11,37 @@ export const isAdmin = (u: User | null) => u?.role === "ADMIN";
 export const isCoach = (u: User | null) => u?.role === "COACH";
 export const canCreateContent = (u: User | null) => isAdmin(u) || isCoach(u);
 
+/** Club del que el usuario es miembro (`myClubId`, vía su propio equipo) y/o administra (`myAdminClubId`, vía `Clubs.adminUserId`) — resueltos por quien llama, ver useMyClubId()/useClub(). */
+export type ClubContext = { myClubId?: string | null; myAdminClubId?: string | null };
+
 /**
  * Espejo de PermissionsManager.canViewExercise:
  * - "Privado" → solo el autor
- * - "Equipo"  → autor + cualquier miembro del mismo equipo
+ * - "Club"    → autor + miembros del club (según aprobación: APPROVED=todo
+ *   el club, PENDING=autor+admin del club, REJECTED/legacy=solo autor) —
+ *   sin bypass de ADMIN global, igual que "Privado".
  * - "Publico" (y cualquier otro valor) → según approvalStatus:
  *   APPROVED=todos, PENDING=autor+admin, REJECTED=autor, null(legacy)=autor
  */
-export function canViewExercise(user: User | null, exercise: Exercise): boolean {
+export function canViewExercise(user: User | null, exercise: Exercise, club: ClubContext = {}): boolean {
   if (user == null) return false;
 
   switch (exercise.privacy) {
     case "Privado":
       return exercise.author === user.username;
 
-    case "Equipo":
-      return (
-        exercise.author === user.username ||
-        (exercise.teamname != null &&
-          exercise.teamname === user.teamname &&
-          user.teamname != null)
-      );
+    case "Club": {
+      if (exercise.author === user.username) return true;
+      if (exercise.clubId == null || exercise.clubId !== club.myClubId) return false;
+      switch (exercise.approvalStatus) {
+        case APPROVAL_APPROVED:
+          return true;
+        case APPROVAL_PENDING:
+          return club.myAdminClubId === exercise.clubId;
+        default:
+          return false; // REJECTED o legacy sin aprobación: solo el autor (ya cubierto arriba)
+      }
+    }
 
     default:
       switch (exercise.approvalStatus) {
@@ -50,21 +60,26 @@ export function canViewExercise(user: User | null, exercise: Exercise): boolean 
   }
 }
 
-/** Espejo de PermissionsManager.canViewTraining (misma lógica). */
-export function canViewTraining(user: User | null, training: Training): boolean {
+/** Espejo de PermissionsManager.canViewTraining (misma lógica que canViewExercise). */
+export function canViewTraining(user: User | null, training: Training, club: ClubContext = {}): boolean {
   if (user == null) return false;
 
   switch (training.privacy) {
     case "Privado":
       return training.author === user.username;
 
-    case "Equipo":
-      return (
-        training.author === user.username ||
-        (training.teamname != null &&
-          training.teamname === user.teamname &&
-          user.teamname != null)
-      );
+    case "Club": {
+      if (training.author === user.username) return true;
+      if (training.clubId == null || training.clubId !== club.myClubId) return false;
+      switch (training.approvalStatus) {
+        case APPROVAL_APPROVED:
+          return true;
+        case APPROVAL_PENDING:
+          return club.myAdminClubId === training.clubId;
+        default:
+          return false;
+      }
+    }
 
     default:
       switch (training.approvalStatus) {

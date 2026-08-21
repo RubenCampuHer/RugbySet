@@ -12,8 +12,10 @@ export type TrainingInput = {
   name: string;
   descCorta: string;
   sections: Section[];
-  privacy: "Publico" | "Privado";
+  privacy: "Publico" | "Privado" | "Club";
   etiquetas: string[];
+  /** Ver comentario equivalente en lib/actions/exercises.ts (ExerciseInput.clubId). */
+  clubId?: string | null;
 };
 
 /**
@@ -45,12 +47,13 @@ function buildTraining(input: TrainingInput, author: string): Training {
     author,
     etiquetas: input.etiquetas,
     created_at: Date.now(),
-    // Público siempre pasa a PENDING al guardar (crear o editar) — igual
-    // que Android, no se preserva un approvalStatus previo.
-    approvalStatus: input.privacy === "Publico" ? "PENDING" : null,
-    // El formulario, igual que AddTraining/PopupTraining en Android, no
-    // ofrece privacidad "Equipo".
-    teamname: null,
+    // Público y Club pasan a PENDING al guardar (crear o editar) — igual
+    // que Android, no se preserva un approvalStatus previo. Club lo
+    // aprueba el admin del club (ver database.rules.json), no un ADMIN
+    // global.
+    approvalStatus: input.privacy === "Publico" || input.privacy === "Club" ? "PENDING" : null,
+    teamname: null, // sin uso real — ver comentario en schemas/training.ts
+    clubId: input.privacy === "Club" ? (input.clubId ?? null) : null,
   };
 }
 
@@ -124,13 +127,15 @@ export async function duplicateTraining(
     const snap = await get(ref(db, `${PATHS.TRAININGS}/${candidate}`));
     return snap.exists();
   });
+  const privacy = training.privacy === "Privado" || training.privacy === "Club" ? training.privacy : "Publico";
   const duplicate = buildTraining(
     {
       name,
       descCorta: training.descCorta ?? "",
       sections: training.sections,
-      privacy: training.privacy === "Privado" ? "Privado" : "Publico",
+      privacy,
       etiquetas: training.etiquetas,
+      clubId: privacy === "Club" ? training.clubId : null,
     },
     currentUser.username!,
   );

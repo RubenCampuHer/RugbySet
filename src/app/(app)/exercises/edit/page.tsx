@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { useMyClubId } from "@/hooks/useMyClubId";
 import { createExercise, updateExercise, uploadExerciseImage } from "@/lib/actions/exercises";
 import { PATHS } from "@/lib/constants";
 import { auth, db } from "@/lib/firebase";
@@ -41,12 +42,13 @@ function ExerciseForm({
 }) {
   const router = useRouter();
   const isEdit = originalName !== null;
+  const { clubId: myClubId, loading: loadingMyClub } = useMyClubId();
 
   const [name, setName] = useState(original?.name ?? "");
   const [descCorta, setDescCorta] = useState(original?.descCorta ?? "");
   const [descLarga, setDescLarga] = useState(original?.descLarga ?? "");
-  const [privacy, setPrivacy] = useState<"Publico" | "Privado">(
-    original?.privacy === "Privado" ? "Privado" : "Publico",
+  const [privacy, setPrivacy] = useState<"Publico" | "Privado" | "Club">(
+    original?.privacy === "Privado" || original?.privacy === "Club" ? original.privacy : "Publico",
   );
   const [etiquetas, setEtiquetas] = useState<string[]>(original?.etiquetas ?? []);
   const [imagePreview, setImagePreview] = useState<string | null>(original?.image ?? null);
@@ -57,7 +59,8 @@ function ExerciseForm({
   const isNameValid = name.length >= NAME_MIN && name.length <= NAME_MAX;
   const isDescCortaValid =
     descCorta.length >= DESC_CORTA_MIN && descCorta.length <= DESC_CORTA_MAX;
-  const canSave = isNameValid && isDescCortaValid && !saving;
+  const canSave =
+    isNameValid && isDescCortaValid && !saving && (privacy !== "Club" || myClubId != null);
 
   const save = async () => {
     setSaving(true);
@@ -76,6 +79,7 @@ function ExerciseForm({
         privacy,
         etiquetas,
         boardData,
+        clubId: privacy === "Club" ? myClubId : null,
       };
       if (isEdit) {
         await updateExercise(originalName, input, profile);
@@ -83,7 +87,7 @@ function ExerciseForm({
         await createExercise(input, profile);
       }
       toast.success(
-        privacy === "Publico"
+        privacy === "Publico" || privacy === "Club"
           ? `Ejercicio ${isEdit ? "modificado" : "guardado"} y enviado a revisión`
           : `Ejercicio ${isEdit ? "modificado" : "guardado"} correctamente`,
       );
@@ -167,7 +171,25 @@ function ExerciseForm({
           >
             Privado
           </Button>
+          <Button
+            type="button"
+            variant={privacy === "Club" ? "default" : "outline"}
+            disabled={!loadingMyClub && myClubId == null}
+            onClick={() => setPrivacy("Club")}
+          >
+            Club
+          </Button>
         </div>
+        {!loadingMyClub && myClubId == null && (
+          <p className="text-xs text-muted-foreground">
+            Tu equipo no pertenece a ningún club — únete o crea uno desde &quot;Mi club&quot;.
+          </p>
+        )}
+        {privacy === "Club" && (
+          <p className="text-xs text-muted-foreground">
+            El admin de tu club debe aprobarlo antes de que el resto del club lo vea.
+          </p>
+        )}
       </div>
 
       <TagInput value={etiquetas} onChange={setEtiquetas} />

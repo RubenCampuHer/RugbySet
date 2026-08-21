@@ -10,6 +10,8 @@ import { parseOr } from "@/lib/schemas/common";
 import { ClubSchema } from "@/lib/schemas/club";
 import type { Club } from "@/lib/types";
 
+type ContentKind = "exercise" | "training";
+
 /** Mirror de ClubRepository.getClubByCode — búsqueda pública por código. */
 export async function getClubByCode(clubcode: string): Promise<Club | null> {
   const snap = await get(
@@ -137,4 +139,19 @@ export async function removeTeamFromClub(club: Club, teamname: string): Promise<
  */
 export async function leaveClub(teamname: string): Promise<void> {
   await update(ref(db, `${PATHS.TEAMS}/${teamname}`), { clubId: null });
+}
+
+/**
+ * El admin del club aprueba/rechaza un ejercicio o entreno privacy=="Club"
+ * pendiente — wrapper fino sobre approvalStatus, mismo patrón que
+ * updateApprovalStatus (admin.ts) pero autorizado por database.rules.json
+ * a Clubs/{clubId}.adminUserId, no solo a un ADMIN global.
+ */
+export async function updateClubContentStatus(
+  kind: ContentKind,
+  name: string,
+  status: "APPROVED" | "REJECTED",
+): Promise<void> {
+  const node = kind === "exercise" ? PATHS.EXERCISES : PATHS.TRAININGS;
+  await update(ref(db, `${node}/${name}`), { approvalStatus: status });
 }

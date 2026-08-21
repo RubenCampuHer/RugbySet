@@ -15,8 +15,13 @@ export const ExerciseSchema = z.object({
   etiquetas: rtdbList(z.string()).default([]),
   created_at: timestampMs.nullish(),
   approvalStatus: ApprovalStatusSchema,
-  // Solo presente cuando privacy === "Equipo".
+  // Solo presente cuando privacy === "Club" — snapshot del club del autor
+  // en el momento de guardar (no se recalcula si el autor cambia de club
+  // después, mismo criterio ya usado para teamname). teamname queda sin
+  // uso real hoy (privacidad "Equipo" nunca se implementó) pero se
+  // conserva por compatibilidad con el mirror de Android.
   teamname: z.string().nullish(),
+  clubId: z.string().nullish(),
   // JSON serializado del estado de la pizarra (solo web, Android lo ignora
   // pero debe preservarlo al editar — ver _Exercise.kt).
   boardData: z.string().nullish(),

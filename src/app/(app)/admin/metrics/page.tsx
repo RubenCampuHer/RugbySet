@@ -94,7 +94,7 @@ export default function AdminMetricsPage() {
 
   const contentStats = useMemo(() => {
     const byApproval = { PENDING: 0, APPROVED: 0, REJECTED: 0, legacy: 0 };
-    const byPrivacy = { Privado: 0, Equipo: 0, Publico: 0, sin_dato: 0 };
+    const byPrivacy = { Privado: 0, Club: 0, Publico: 0, sin_dato: 0 };
     for (const item of [...exercises, ...trainings]) {
       if (item.approvalStatus === "PENDING") byApproval.PENDING++;
       else if (item.approvalStatus === "APPROVED") byApproval.APPROVED++;
@@ -102,7 +102,7 @@ export default function AdminMetricsPage() {
       else byApproval.legacy++;
 
       if (item.privacy === "Privado") byPrivacy.Privado++;
-      else if (item.privacy === "Equipo") byPrivacy.Equipo++;
+      else if (item.privacy === "Club") byPrivacy.Club++;
       else if (item.privacy === "Publico") byPrivacy.Publico++;
       else byPrivacy.sin_dato++;
     }
@@ -167,7 +167,7 @@ export default function AdminMetricsPage() {
           <StatRow label="Pendientes de aprobación" value={contentStats.byApproval.PENDING} />
           <StatRow label="Rechazados" value={contentStats.byApproval.REJECTED} />
           <StatRow label="Privados" value={contentStats.byPrivacy.Privado} />
-          <StatRow label="De equipo" value={contentStats.byPrivacy.Equipo} />
+          <StatRow label="De club" value={contentStats.byPrivacy.Club} />
           <StatRow label="Públicos" value={contentStats.byPrivacy.Publico} />
         </CardContent>
       </Card>

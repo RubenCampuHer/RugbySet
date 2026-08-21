@@ -1,15 +1,17 @@
 "use client";
 
 import { onValue, ref } from "firebase/database";
-import { Lock, Users } from "lucide-react";
+import { Lock, Trash2, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { AvatarInitials } from "@/components/AvatarInitials";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/PageHeader";
 import { SearchInput } from "@/components/SearchInput";
 import { ListRowsSkeleton } from "@/components/skeletons";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Select,
@@ -18,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { updateUserRole } from "@/lib/actions/admin";
+import { deleteUser, updateUserRole } from "@/lib/actions/admin";
 import { PATHS } from "@/lib/constants";
 import { db } from "@/lib/firebase";
 import { getRoleDisplayName, isAdmin } from "@/lib/permissions";
@@ -81,6 +83,18 @@ export default function AdminUsersPage() {
     }
   };
 
+  const removeUser = async (uid: string, name: string) => {
+    setBusy(uid);
+    try {
+      await deleteUser(uid);
+      toast.success(`Cuenta de ${name} eliminada`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo eliminar la cuenta");
+    } finally {
+      setBusy(null);
+    }
+  };
+
   return (
     <div className="mx-auto max-w-2xl space-y-4">
       <PageHeader title="Gestionar usuarios" count={profiles.length} />
@@ -126,6 +140,24 @@ export default function AdminUsersPage() {
                       ))}
                     </SelectContent>
                   </Select>
+                  <ConfirmDialog
+                    trigger={
+                      <Button
+                        size="icon-sm"
+                        variant="ghost"
+                        className="text-destructive hover:text-destructive"
+                        aria-label={`Eliminar cuenta de ${p.nameSurname ?? p.username}`}
+                        disabled={isSelf || busy === uid}
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    }
+                    title={`¿Eliminar la cuenta de ${p.nameSurname ?? p.username}?`}
+                    description="Se borrará su acceso, su ficha y sus imágenes. Si es entrenador de un equipo activo, primero hay que eliminar o reasignar ese equipo."
+                    confirmLabel="Eliminar cuenta"
+                    destructive
+                    onConfirm={() => removeUser(uid, p.nameSurname ?? p.username ?? uid)}
+                  />
                 </CardContent>
               </Card>
             );

@@ -275,3 +275,15 @@ export async function deleteTeam(team: Team): Promise<void> {
 export async function updateTeamIcon(teamname: string, iconUrl: string): Promise<void> {
   await update(ref(db, `${PATHS.TEAMS}/${teamname}`), { teamicon: iconUrl });
 }
+
+/**
+ * Un ADMIN elimina un equipo ajeno (o el suyo) vía la Cloud Function
+ * adminDeleteTeam: a diferencia de deleteTeam (update client-side), también
+ * reconvierte a "Privado" el contenido "Equipo" de ese team y limpia su
+ * icono en Storage — un delete de Storage está bloqueado estructuralmente
+ * desde el cliente por storage.rules (request.resource es null en un
+ * delete), así que esa limpieza solo puede hacerla el Admin SDK.
+ */
+export async function adminDeleteTeam(teamname: string): Promise<void> {
+  await httpsCallable(functions, "adminDeleteTeam")({ teamname });
+}

@@ -14,34 +14,38 @@ import type { PublicProfile, Team } from "@/lib/types";
  * Equipo del usuario actual (vía Users/{yo}/teamname) en tiempo real, y el
  * perfil público del coach (publicProfiles/{usercoach} — NUNCA Users/{uid},
  * las reglas solo permiten leer el nodo propio).
+ *
+ * Un `teamname` explícito (panel admin, ver un equipo ajeno) sustituye al
+ * del perfil propio — las reglas RTDB ya dan lectura de cualquier equipo a
+ * ADMIN, así que no hace falta ningún cambio de reglas para esto.
  */
-export function useTeam() {
+export function useTeam(teamname?: string) {
   const { profile } = useAuth();
-  const teamname = profile?.teamname ?? null;
+  const resolvedTeamname = teamname ?? profile?.teamname ?? null;
   const [teamState, setTeamState] = useState<{ name: string; team: Team | null } | undefined>(undefined);
   const [coach, setCoach] = useState<PublicProfile | null>(null);
 
   useEffect(() => {
-    if (!teamname) return;
-    const teamRef = ref(db, `${PATHS.TEAMS}/${teamname}`);
+    if (!resolvedTeamname) return;
+    const teamRef = ref(db, `${PATHS.TEAMS}/${resolvedTeamname}`);
     return onValue(
       teamRef,
       (snap) =>
         setTeamState({
-          name: teamname,
+          name: resolvedTeamname,
           team: snap.exists()
-            ? parseOr(TeamSchema, snap.val(), `Teams/${teamname}`)
+            ? parseOr(TeamSchema, snap.val(), `Teams/${resolvedTeamname}`)
             : null,
         }),
       (error) => {
         console.error("useTeam:", error);
-        setTeamState({ name: teamname, team: null });
+        setTeamState({ name: resolvedTeamname, team: null });
       },
     );
-  }, [teamname]);
+  }, [resolvedTeamname]);
 
   const team =
-    !teamname ? null : teamState?.name === teamname ? teamState.team : undefined;
+    !resolvedTeamname ? null : teamState?.name === resolvedTeamname ? teamState.team : undefined;
 
   const coachUid = team && team !== undefined ? team.usercoach : null;
   useEffect(() => {
@@ -59,5 +63,5 @@ export function useTeam() {
 
   // team: undefined = cargando, null = sin equipo, Team = cargado
   const loading = profile === null || team === undefined;
-  return { team: team ?? null, coach, hasTeam: Boolean(teamname), loading };
+  return { team: team ?? null, coach, hasTeam: Boolean(resolvedTeamname), loading };
 }

@@ -1,12 +1,15 @@
 "use client";
 
 import {
+  BarChart3,
   Bell,
   CalendarDays,
   ClipboardCheck,
   ClipboardList,
   Dumbbell,
+  FolderKanban,
   LogOut,
+  Shield,
   User,
   Users,
   UserCog,
@@ -138,6 +141,21 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               {isAdmin(profile) && (
                 <DropdownMenuItem render={<Link href="/admin/users" />}>
                   <UserCog /> Gestionar usuarios
+                </DropdownMenuItem>
+              )}
+              {isAdmin(profile) && (
+                <DropdownMenuItem render={<Link href="/admin/teams" />}>
+                  <Shield /> Todos los equipos
+                </DropdownMenuItem>
+              )}
+              {isAdmin(profile) && (
+                <DropdownMenuItem render={<Link href="/admin/content" />}>
+                  <FolderKanban /> Todo el contenido
+                </DropdownMenuItem>
+              )}
+              {isAdmin(profile) && (
+                <DropdownMenuItem render={<Link href="/admin/metrics" />}>
+                  <BarChart3 /> Métricas
                 </DropdownMenuItem>
               )}
               <DropdownMenuSeparator />

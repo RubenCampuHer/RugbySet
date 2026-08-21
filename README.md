@@ -45,3 +45,10 @@ firebase deploy --only hosting     # → rugbyset.web.app (site "rugbyset")
 
 Las cuentas se crean en la app Android (wizard de rol/club/equipo). La web
 solo inicia sesión (email+password verificado, o Google).
+
+## Páginas estáticas en la raíz del repo
+
+`index.html` (política de privacidad) y `delete_account.html` (eliminar
+cuenta) son páginas independientes del proyecto Next.js — se sirven vía
+GitHub Pages (https://rubencampuher.github.io/RugbySet/) y están enlazadas
+desde la ficha de Play Store. No tocan ni son tocadas por `src/`.

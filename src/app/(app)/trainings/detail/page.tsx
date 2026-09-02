@@ -148,7 +148,7 @@ function TrainingDetail() {
                       <img
                         src={et.exercise.image}
                         alt=""
-                        className="size-14 shrink-0 rounded-md bg-muted object-contain print:size-28"
+                        className="size-14 shrink-0 rounded-md bg-muted object-contain print:size-36"
                       />
                     )}
                     <div className="min-w-0 flex-1">

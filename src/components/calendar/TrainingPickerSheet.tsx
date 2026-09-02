@@ -104,13 +104,18 @@ export function TrainingPickerSheet({
             </TabsList>
           </Tabs>
           {allTags.length > 0 && (
-            <div className="flex flex-wrap gap-1">
+            // Scroll horizontal en vez de flex-wrap: con el sheet limitado a
+            // max-h-[85vh], envolver en varias líneas se comía el espacio de
+            // la lista scrolleable en pantallas estrechas. Mismo criterio
+            // que ExercisePickerSheet y la barra de etiquetas de Android
+            // (HorizontalScrollView).
+            <div className="-mx-4 flex gap-1 overflow-x-auto px-4 pb-1">
               {allTags.slice(0, 15).map((tag) => (
                 <button
                   key={tag}
                   type="button"
                   onClick={() => toggleTag(tag)}
-                  className="rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                  className="shrink-0 rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                 >
                   <Badge
                     className="px-3 py-1.5"

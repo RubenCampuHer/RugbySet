@@ -1,6 +1,7 @@
 "use client";
 
 import { get, ref } from "firebase/database";
+import { Download } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
@@ -11,6 +12,7 @@ import { CardActionsMenu } from "@/components/CardActionsMenu";
 import { FavoriteButton } from "@/components/FavoriteButton";
 import { PrivacyBadge, ApprovalBadge } from "@/components/PrivacyBadge";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { DetailSkeleton } from "@/components/skeletons";
 import { useClub } from "@/hooks/useClub";
 import { useMyClubId } from "@/hooks/useMyClubId";
@@ -111,12 +113,30 @@ function ExerciseDetail() {
         ))}
       </div>
       {exercise.image && (
-        // eslint-disable-next-line @next/next/no-img-element -- URL de Storage con token, sin optimizador (output: export)
-        <img
-          src={exercise.image}
-          alt={exercise.name ?? ""}
-          className="w-full rounded-xl object-cover"
-        />
+        <div className="relative">
+          {/* eslint-disable-next-line @next/next/no-img-element -- URL de Storage con token, sin optimizador (output: export) */}
+          <img
+            src={exercise.image}
+            alt={exercise.name ?? ""}
+            className="w-full rounded-xl object-cover"
+          />
+          <Button
+            variant="outline"
+            size="icon"
+            aria-label="Descargar imagen"
+            className="absolute top-2 right-2 bg-background/80 backdrop-blur-sm"
+            render={
+              <a
+                href={exercise.image}
+                download={`${exercise.name || "ejercicio"}.jpg`}
+                target="_blank"
+                rel="noopener noreferrer"
+              />
+            }
+          >
+            <Download />
+          </Button>
+        </div>
       )}
       {exercise.descCorta && (
         <p className="font-medium">{exercise.descCorta}</p>

@@ -7,6 +7,7 @@ import {
   PrivacySchema,
   RoleSchema,
   rtdbList,
+  rtdbRecord,
   timestampMs,
 } from "./common";
 
@@ -40,6 +41,31 @@ describe("rtdbList", () => {
   it("cualquier otro tipo (string, número) cae a array vacío", () => {
     expect(schema.parse("no-es-una-lista")).toEqual([]);
     expect(schema.parse(42)).toEqual([]);
+  });
+});
+
+describe("rtdbRecord", () => {
+  const schema = rtdbRecord(z.string());
+
+  it("null/undefined dan objeto vacío", () => {
+    expect(schema.parse(null)).toEqual({});
+    expect(schema.parse(undefined)).toEqual({});
+  });
+
+  it("deja pasar un objeto tal cual", () => {
+    expect(schema.parse({ "1": "a", "9": "b" })).toEqual({ "1": "a", "9": "b" });
+  });
+
+  it("reconstruye un array (RTDB con 2+ claves numéricas) al objeto {índice: valor} original, saltando los null — bug real 2026-09-03 (alineaciones)", () => {
+    expect(schema.parse([null, "Rupert Campuzano Hernández", "Rue Camp", "RU"])).toEqual({
+      "1": "Rupert Campuzano Hernández",
+      "2": "Rue Camp",
+      "3": "RU",
+    });
+  });
+
+  it("array vacío da objeto vacío", () => {
+    expect(schema.parse([])).toEqual({});
   });
 });
 

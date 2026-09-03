@@ -15,6 +15,33 @@ export function rtdbList<T extends z.ZodTypeAny>(item: T) {
   }, z.array(item));
 }
 
+/**
+ * Objetos con claves puramente numéricas (p.ej. las posiciones "1".."15"
+ * de una alineación) — RTDB los devuelve como ARRAY, no como objeto,
+ * aunque se hayan escrito como objeto: es un comportamiento conocido y
+ * documentado de Realtime Database (claves enteras secuenciales -> se
+ * lee como array, con `null` en los huecos). Sin este preprocess, un
+ * z.record normal falla al parsear y `parseOr` devuelve null para TODO
+ * el objeto que lo contiene — causó un bug real (2026-09-03): crear una
+ * alineación con 2+ posiciones asignadas rompía el parseo de Team
+ * entero, y el equipo entero desaparecía de la app para el usuario.
+ * Este preprocess reconstruye el objeto {clave: valor} a partir del
+ * array (índice = clave), sin perder nada.
+ */
+export function rtdbRecord<T extends z.ZodTypeAny>(item: T) {
+  return z.preprocess((v) => {
+    if (v == null) return {};
+    if (Array.isArray(v)) {
+      const obj: Record<string, unknown> = {};
+      v.forEach((val, i) => {
+        if (val != null) obj[String(i)] = val;
+      });
+      return obj;
+    }
+    return v;
+  }, z.record(z.string(), item));
+}
+
 // Epoch-ms escritos por Kotlin (Long) — caben en Number sin pérdida.
 export const timestampMs = z.number().int();
 

@@ -5,14 +5,17 @@
 // real por useTeam() — sin reglas RTDB nuevas.
 //
 // starters/bench: objeto por número de posición ("1".."15") o dorsal de
-// banquillo ("16", "17"...), no array — RTDB borra las claves con valor
-// null, así que un array con huecos perdería el índice/orden. Solo
-// aparecen las posiciones ya asignadas. El valor es texto libre (nombre
-// del roster o escrito a mano para alguien sin cuenta) — ver
+// banquillo ("16", "17"...). ⚠️ RTDB devuelve esto como ARRAY (con `null`
+// en los huecos) en vez de objeto en cuanto hay 2+ claves puramente
+// numéricas — comportamiento conocido de Realtime Database, no un bug de
+// escritura — por eso se parsea con rtdbRecord (normaliza ambas formas).
+// Solo aparecen las posiciones ya asignadas. El valor es texto libre
+// (nombre del roster o escrito a mano para alguien sin cuenta) — ver
 // src/lib/lineup.ts.
 //
 // Sin equivalente en Android todavía (backlog).
 import { z } from "zod";
+import { rtdbRecord } from "./common";
 
 export const LineupDocSchema = z.object({
   lineupId: z.string().nullish(),
@@ -20,7 +23,7 @@ export const LineupDocSchema = z.object({
   name: z.string().nullish(),
   /** "dd/MM/yyyy" del partido al que pertenece, o ausente = plantilla suelta sin fecha. */
   matchFecha: z.string().nullish(),
-  starters: z.record(z.string(), z.string()).default({}),
-  bench: z.record(z.string(), z.string()).default({}),
+  starters: rtdbRecord(z.string()).default({}),
+  bench: rtdbRecord(z.string()).default({}),
   createdAt: z.number().nullish(),
 });

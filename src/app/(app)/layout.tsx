@@ -155,6 +155,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 </DropdownMenuItem>
               )}
               {isAdmin(profile) && (
+                <DropdownMenuItem render={<Link href="/admin/clubs" />}>
+                  <Building2 /> Todos los clubes
+                </DropdownMenuItem>
+              )}
+              {isAdmin(profile) && (
                 <DropdownMenuItem render={<Link href="/admin/content" />}>
                   <FolderKanban /> Todo el contenido
                 </DropdownMenuItem>

@@ -36,3 +36,22 @@ describe("ClubSchema", () => {
     expect(result.adminUserId).toBeUndefined();
   });
 });
+
+describe("ClubSchema.directors (varios directores, rediseño 2026-09-03)", () => {
+  it("por defecto vacío", () => {
+    expect(ClubSchema.parse({ clubId: "c1" }).directors).toEqual({});
+  });
+
+  it("parsea un mapa uid->true", () => {
+    const result = ClubSchema.parse({ clubId: "c1", directors: { uid2: true } });
+    expect(result.directors).toEqual({ uid2: true });
+  });
+
+  it("se reconstruye si RTDB lo devuelve como array (2+ claves numéricas) — mismo bug que coaches", () => {
+    // Forma que RTDB devolvería si dos directores tuvieran uids puramente
+    // numéricos (extremadamente improbable con uids de Firebase Auth, pero
+    // rtdbRecord ya cubre el caso general — ver common.test.ts).
+    const result = ClubSchema.parse({ clubId: "c1", directors: [null, true, true] });
+    expect(result.directors).toEqual({ "1": true, "2": true });
+  });
+});

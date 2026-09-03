@@ -58,6 +58,7 @@ export async function createClub(opts: {
     adminUserId: opts.uid,
     teams: [opts.teamname],
     pendingTeams: {},
+    directors: {},
   };
 
   await update(ref(db, `${PATHS.CLUBS}/${clubId}`), club);
@@ -65,8 +66,40 @@ export async function createClub(opts: {
   const teamUpdates: Record<string, unknown> = { clubId };
   if (opts.category) teamUpdates.category = opts.category;
   await update(ref(db, `${PATHS.TEAMS}/${opts.teamname}`), teamUpdates);
+  // Puntero de descubrimiento (rediseño multi-director 2026-09-03) — mismo
+  // criterio que team.usercoach: el fundador lo tiene desde el minuto uno,
+  // igual que un co-director al ser nombrado (ver appointDirector).
+  await update(ref(db, `${PATHS.USERS}/${opts.uid}`), { directorOfClubId: clubId });
 
   return clubId;
+}
+
+/**
+ * Un director (fundador o co-director) nombra directamente a un
+ * entrenador de uno de los equipos de SU club como co-director — sin paso
+ * pendiente (el director ya lo conoce, mismo criterio que promoteToCoach
+ * en equipos, no el de una solicitud con aceptación).
+ */
+export async function appointDirector(club: Club, uid: string): Promise<void> {
+  const clubId = club.clubId!;
+  await update(ref(db), {
+    [`${PATHS.CLUBS}/${clubId}/directors/${uid}`]: true,
+    [`${PATHS.USERS}/${uid}/directorOfClubId`]: clubId,
+  });
+}
+
+/**
+ * Quita a un co-director — lo hace el fundador (sobre cualquier
+ * co-director) o el propio director sobre sí mismo (autoexclusión, sin
+ * pedir permiso a nadie). Nunca al fundador (para eso no hay borrado de
+ * club todavía — fuera de alcance).
+ */
+export async function removeDirector(club: Club, uid: string): Promise<void> {
+  const clubId = club.clubId!;
+  await update(ref(db), {
+    [`${PATHS.CLUBS}/${clubId}/directors/${uid}`]: null,
+    [`${PATHS.USERS}/${uid}/directorOfClubId`]: null,
+  });
 }
 
 /**

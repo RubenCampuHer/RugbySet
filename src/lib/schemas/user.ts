@@ -8,6 +8,11 @@ export const UserSchema = z.object({
   username: z.string().nullish(),
   nameSurname: z.string().nullish(),
   teamname: z.string().nullish(),
+  // Club que dirige (fundador o co-director, rediseño 2026-09-03) — mismo
+  // criterio que `teamname` para el coach: RTDB no permite descubrir "a qué
+  // club pertenezco" buscando dentro de un mapa anidado (Clubs/{id}/directors),
+  // así que se mantiene este puntero, escrito por createClub/appointDirector.
+  directorOfClubId: z.string().nullish(),
   mail: z.string().nullish(),
   usericon: z.string().nullish(),
   assistedTrainingDays: rtdbList(z.string()).default([]),

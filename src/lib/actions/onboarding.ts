@@ -174,6 +174,7 @@ export async function createClubAndTeam(opts: {
     adminUserId: opts.uid,
     teams: [opts.teamName],
     pendingTeams: {},
+    directors: {},
   };
   const team = buildTeam({
     teamName: opts.teamName,
@@ -191,4 +192,7 @@ export async function createClubAndTeam(opts: {
     [`${PATHS.TEAMS}/${opts.teamName}`]: team,
     [`${PATHS.USERS}/${opts.uid}/teamname`]: opts.teamName,
   });
+  // Puntero de descubrimiento del club que dirijo (rediseño multi-director
+  // 2026-09-03) — mismo criterio que createClub en actions/club.ts.
+  await update(ref(db, `${PATHS.USERS}/${opts.uid}`), { directorOfClubId: clubId });
 }

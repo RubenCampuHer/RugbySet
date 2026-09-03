@@ -24,6 +24,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { useProfilesByUid } from "@/hooks/useProfilesByUid";
 import { useTeam } from "@/hooks/useTeam";
 import {
   acceptPendingCoach,
@@ -79,33 +80,6 @@ function usePlayerStats(names: string[]) {
   }, [names]);
 
   return stats;
-}
-
-/** Perfil público de cada uid (entrenadores, guardados por uid a diferencia de userplayers) — misma fuente que usePlayerStats, dirección inversa (uid, no nombre). */
-function useProfilesByUid(uids: string[]) {
-  const [profiles, setProfiles] = useState<Record<string, PublicProfile | null>>({});
-  const key = uids.slice().sort().join(",");
-
-  useEffect(() => {
-    let cancelled = false;
-    void Promise.all(
-      uids.map(async (uid) => {
-        const snap = await get(ref(db, `${PATHS.PUBLIC_PROFILES}/${uid}`));
-        const profile = snap.exists()
-          ? parseOr(PublicProfileSchema, snap.val(), `publicProfiles/${uid}`)
-          : null;
-        return [uid, profile] as const;
-      }),
-    ).then((entries) => {
-      if (!cancelled) setProfiles(Object.fromEntries(entries));
-    });
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- key ya resume el contenido real de uids
-  }, [key]);
-
-  return profiles;
 }
 
 const MAX_MESSAGE_LENGTH = 500;
@@ -274,16 +248,19 @@ function PendingSection({ team, canManage }: { team: Team; canManage: boolean })
  * co-entrenadores aceptados, solicitudes pendientes de co-entrenador
  * (aceptar/rechazar, mismo patrón que PendingSection) — visible a todos,
  * acciones solo para quien gestiona el equipo. Quitar a un co-entrenador ya
- * aceptado es exclusivo del fundador (isFounder), no de cualquier co-coach.
+ * aceptado es exclusivo del fundador o de un ADMIN/admin de club viendo el
+ * equipo (canRemoveCoach — mismo criterio que canDeleteTeam, ver
+ * TeamManager: un ADMIN viendo un equipo ajeno nunca es el fundador literal,
+ * así que sin este bypass el botón no aparecía nunca para admin).
  */
 function CoachesSection({
   team,
   canManage,
-  isFounder,
+  canRemoveCoach,
 }: {
   team: Team;
   canManage: boolean;
-  isFounder: boolean;
+  canRemoveCoach: boolean;
 }) {
   const [busy, setBusy] = useState<string | null>(null);
   const coCoachUids = Object.keys(team.coaches);
@@ -332,7 +309,7 @@ function CoachesSection({
             key={uid}
             name={profiles[uid]?.nameSurname || "Entrenador"}
             action={
-              isFounder ? (
+              canRemoveCoach ? (
                 <Button
                   size="icon-xl"
                   variant="ghost"
@@ -636,7 +613,7 @@ export function TeamManager({
 
       <PendingSection team={team} canManage={canManage} />
 
-      <CoachesSection team={team} canManage={canManage} isFounder={isFounder} />
+      <CoachesSection team={team} canManage={canManage} canRemoveCoach={canDeleteTeam} />
 
       <Card>
         <CardHeader>

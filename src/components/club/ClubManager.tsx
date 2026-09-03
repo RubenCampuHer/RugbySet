@@ -145,8 +145,6 @@ function DirectorsSection({
   const directorUids = Object.keys(club.directors).filter((uid) => uid !== club.adminUserId);
   const profiles = useProfilesByUid([club.adminUserId, ...directorUids].filter((u): u is string => Boolean(u)));
 
-  if (directorUids.length === 0) return null;
-
   const remove = async (uid: string) => {
     setBusy(uid);
     try {

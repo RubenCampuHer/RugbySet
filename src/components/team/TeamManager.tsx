@@ -244,14 +244,17 @@ function PendingSection({ team, canManage }: { team: Team; canManage: boolean })
 }
 
 /**
- * Sección "Entrenadores" (rediseño multi-coach 2026-09-03): fundador +
- * co-entrenadores aceptados, solicitudes pendientes de co-entrenador
- * (aceptar/rechazar, mismo patrón que PendingSection) — visible a todos,
- * acciones solo para quien gestiona el equipo. Quitar a un co-entrenador ya
- * aceptado es exclusivo del fundador o de un ADMIN/admin de club viendo el
- * equipo (canRemoveCoach — mismo criterio que canDeleteTeam, ver
- * TeamManager: un ADMIN viendo un equipo ajeno nunca es el fundador literal,
- * así que sin este bypass el botón no aparecía nunca para admin).
+ * Sección "Entrenadores" (rediseño multi-coach 2026-09-03, unificada
+ * 2026-09-03 tras QA real: antes el fundador vivía en una tarjeta "Entrenador"
+ * aparte de esta, así que un equipo con co-entrenadores mostraba DOS sitios
+ * distintos con pinta de lista de entrenadores — confuso). Fundador (badge
+ * "Fundador", sin botón de quitar — para eso está "Eliminar equipo") +
+ * co-entrenadores aceptados + solicitudes pendientes, siempre visible (un
+ * equipo siempre tiene fundador). Acciones solo para quien gestiona el
+ * equipo. Quitar a un co-entrenador ya aceptado es exclusivo del fundador o
+ * de un ADMIN/admin de club viendo el equipo (canRemoveCoach — mismo
+ * criterio que canDeleteTeam: un ADMIN viendo un equipo ajeno nunca es el
+ * fundador literal, así que sin este bypass el botón no aparecía nunca).
  */
 function CoachesSection({
   team,
@@ -263,11 +266,12 @@ function CoachesSection({
   canRemoveCoach: boolean;
 }) {
   const [busy, setBusy] = useState<string | null>(null);
+  const founderUid = team.usercoach;
   const coCoachUids = Object.keys(team.coaches);
   const pendingUids = Object.keys(team.pendingCoaches);
-  const profiles = useProfilesByUid([...coCoachUids, ...pendingUids]);
-
-  if (coCoachUids.length === 0 && pendingUids.length === 0) return null;
+  const profiles = useProfilesByUid(
+    [founderUid, ...coCoachUids, ...pendingUids].filter((u): u is string => Boolean(u)),
+  );
 
   const act = async (uid: string, accept: boolean) => {
     setBusy(uid);
@@ -304,6 +308,18 @@ function CoachesSection({
         <CardTitle className="text-lg">Entrenadores</CardTitle>
       </CardHeader>
       <CardContent className="divide-y divide-border">
+        {founderUid && (
+          <div className="flex items-center gap-3 rounded-lg py-2 pr-1 pl-2">
+            <AvatarInitials name={profiles[founderUid]?.nameSurname || "Entrenador"} size="sm" />
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm">{profiles[founderUid]?.nameSurname || "Entrenador"}</p>
+              {profiles[founderUid]?.username && (
+                <p className="truncate text-xs text-muted-foreground">@{profiles[founderUid]?.username}</p>
+              )}
+            </div>
+            <Badge variant="outline">Fundador</Badge>
+          </div>
+        )}
         {coCoachUids.map((uid) => (
           <PlayerRow
             key={uid}
@@ -380,7 +396,7 @@ export function TeamManager({
   viewingAsClubAdmin?: boolean;
 }) {
   const { firebaseUser, profile } = useAuth();
-  const { team, coach, hasTeam, loading } = useTeam(teamname ?? undefined);
+  const { team, hasTeam, loading } = useTeam(teamname ?? undefined);
   const [kicking, setKicking] = useState<string | null>(null);
   const [leaving, setLeaving] = useState(false);
   const [uploadingIcon, setUploadingIcon] = useState(false);
@@ -595,21 +611,6 @@ export function TeamManager({
           <Trophy className="size-4" /> Ver alineaciones
         </Link>
       )}
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Entrenador</CardTitle>
-        </CardHeader>
-        <CardContent className="flex items-center gap-3">
-          <AvatarInitials name={coach?.nameSurname} src={coach?.usericon} />
-          <div>
-            <p className="font-medium">{coach?.nameSurname ?? "Entrenador"}</p>
-            {coach?.username && (
-              <p className="text-sm text-muted-foreground">@{coach.username}</p>
-            )}
-          </div>
-        </CardContent>
-      </Card>
 
       <PendingSection team={team} canManage={canManage} />
 

@@ -133,7 +133,13 @@ export function TrainingPickerSheet({
             </p>
           )}
         </div>
-        <ScrollArea className="flex-1 px-4">
+        {/*
+          flex + min-h-0 + flex-col en el propio ScrollArea (no solo
+          flex-1) — ver ExercisePickerSheet para la explicación completa:
+          sin esto el Viewport interno (height:100%) no se resuelve y la
+          lista larga queda cortada sin poder desplazarse.
+        */}
+        <ScrollArea className="flex min-h-0 flex-1 flex-col px-4">
           <div className="space-y-1 pb-4">
             {filtered.map((t) => {
               const name = t.name ?? "";

@@ -132,7 +132,16 @@ export function ExercisePickerSheet({
             </p>
           )}
         </div>
-        <ScrollArea className="flex-1 px-4">
+        {/*
+          flex + min-h-0 + flex-col en el propio ScrollArea (no solo
+          flex-1): su Viewport interno usa height:100% (size-full), y un
+          hijo de bloque normal con % height no lo resuelve dentro de un
+          padre que solo se encogió por flexbox — hace falta que el
+          ScrollArea sea a su vez contenedor flex para que el 100% cuente
+          como definido. Sin esto la lista larga desborda el sheet
+          (max-h-[85vh] overflow-hidden) sin poder desplazarse: se corta.
+        */}
+        <ScrollArea className="flex min-h-0 flex-1 flex-col px-4">
           <div className="space-y-1 pb-4">
             {filtered.map((e) => {
               const name = e.name ?? "";

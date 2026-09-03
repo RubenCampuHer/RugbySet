@@ -147,7 +147,9 @@ export function DayPanel({
           </div>
         )}
 
-        {!isCoach && isMatch && day.lineup?.published && <LineupSummary lineup={day.lineup} />}
+        {!isCoach && isMatch && day.lineupId && team.lineups[day.lineupId] && (
+          <LineupSummary lineup={team.lineups[day.lineupId]} />
+        )}
 
         {isCoach && (
           <Tabs defaultValue="summary">
@@ -178,7 +180,18 @@ export function DayPanel({
             </TabsContent>
             {isMatch && (
               <TabsContent value="lineup" className="pt-3">
-                <LineupEditor team={team} day={day} />
+                {day.lineupId && team.lineups[day.lineupId] ? (
+                  <LineupEditor team={team} lineup={team.lineups[day.lineupId]} />
+                ) : (
+                  <div className="space-y-3 text-center">
+                    <p className="text-sm text-muted-foreground">
+                      Este partido todavía no tiene ninguna alineación publicada.
+                    </p>
+                    <Button className="w-full" render={<Link href="/team/lineups" />}>
+                      Crear o elegir alineación
+                    </Button>
+                  </div>
+                )}
               </TabsContent>
             )}
           </Tabs>

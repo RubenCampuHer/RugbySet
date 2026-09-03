@@ -1,8 +1,9 @@
 "use client";
 
-import { Plus, Undo2, X } from "lucide-react";
+import { Plus, Trash2, Undo2, X } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,8 +14,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { saveLineup } from "@/lib/actions/team";
-import { parseKey } from "@/lib/calendar";
+import { deleteLineup, publishLineup, unpublishLineup, updateLineup } from "@/lib/actions/lineup";
+import { fechaToInputValue, inputValueToFecha } from "@/lib/calendar";
 import {
   findDuplicateName,
   nextBenchNumber,
@@ -22,10 +23,9 @@ import {
   STARTER_POSITIONS,
   takenNames,
 } from "@/lib/lineup";
-import type { Lineup, Team, TrainingDay } from "@/lib/types";
+import type { LineupDoc, Team } from "@/lib/types";
 
 const NO_TEMPLATE = "__none__";
-
 const NONE = "__none__";
 const MANUAL = "__manual__";
 
@@ -109,9 +109,9 @@ function LineupRow({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value={NONE}>Sin asignar</SelectItem>
-            {options.map((name) => (
-              <SelectItem key={name} value={name}>
-                {name}
+            {options.map((n) => (
+              <SelectItem key={n} value={n}>
+                {n}
               </SelectItem>
             ))}
             <SelectItem value={MANUAL}>Otro (escribir nombre)…</SelectItem>
@@ -133,110 +133,117 @@ function LineupRow({
   );
 }
 
-const EMPTY_LINEUP: Lineup = { published: false, starters: {}, bench: {} };
-
-/** Editor de alineación de un Partido — 15 posiciones fijas + banquillo dinámico, borrador/publicar. */
-export function LineupEditor({ team, day }: { team: Team; day: TrainingDay }) {
-  const [lineup, setLineup] = useState<Lineup>(day.lineup ?? EMPTY_LINEUP);
-  // Qué filas de banquillo se VEN, por separado de qué nombre tiene cada
-  // una: RTDB no persiste valores vacíos, así que una fila añadida (o
-  // vaciada para escribir un nombre a mano) no tiene clave en
-  // lineup.bench todavía — si la lista de filas saliera de
-  // Object.keys(lineup.bench), esa fila desaparecería en cuanto se
-  // vaciara (bug real: "al escribir nombre en suplente se borra la
-  // fila"). benchOrder es la lista de dorsales visibles; lineup.bench
-  // solo guarda los ya asignados.
+/**
+ * Editor de una alineación — entidad propia (Teams/{team}/lineups/{id}),
+ * desacoplada del partido desde el rediseño 2026-09-03: puede no tener
+ * fecha (plantilla suelta), y varias alineaciones distintas pueden existir
+ * para el mismo partido (Plan A/B) — "publicada" ya no es un campo propio,
+ * es que team.trainingdays[fecha].lineupId apunte a ESTA.
+ */
+export function LineupEditor({
+  team,
+  lineup,
+  onDeleted,
+}: {
+  team: Team;
+  lineup: LineupDoc;
+  /** Ya no queda nada que editar tras borrar — quien la aloja (p.ej. el Sheet) debe cerrarse. */
+  onDeleted?: () => void;
+}) {
+  const [name, setName] = useState(lineup.name ?? "");
+  const [matchFechaInput, setMatchFechaInput] = useState(
+    lineup.matchFecha ? fechaToInputValue(lineup.matchFecha) : "",
+  );
+  const [starters, setStarters] = useState<Record<string, string>>(lineup.starters);
+  const [bench, setBench] = useState<Record<string, string>>(lineup.bench);
   const [benchOrder, setBenchOrder] = useState<number[]>(() =>
-    Object.keys((day.lineup ?? EMPTY_LINEUP).bench)
+    Object.keys(lineup.bench)
       .map(Number)
       .sort((a, b) => a - b),
   );
   const [saving, setSaving] = useState(false);
-  // Cada LineupRow decide "roster o texto libre" una sola vez, al montar
-  // (ver LineupRow) — necesario para no saltar de vuelta al Select a mitad
-  // de escribir un nombre que coincide con uno del roster. Al copiar una
-  // plantilla (applyTemplate) hace falta lo contrario: que CADA fila
-  // vuelva a decidirlo de cero según el dato copiado. Cambiar la `key` de
-  // las filas al copiar fuerza ese remount — templateVersion es ese
-  // contador.
+  const [publishing, setPublishing] = useState(false);
+  // Ver LineupEditor (versión embebida anterior): cada fila decide
+  // "roster o texto libre" una sola vez al montar; forzar remount al
+  // copiar una plantilla para que cada una lo vuelva a decidir con el
+  // dato recién copiado.
   const [templateVersion, setTemplateVersion] = useState(0);
 
-  const setStarter = (pos: number, name: string) => {
-    setLineup((prev) => {
-      const starters = { ...prev.starters };
-      if (name) starters[String(pos)] = name;
-      else delete starters[String(pos)];
-      return { ...prev, starters };
+  const matchFecha = inputValueToFecha(matchFechaInput);
+  const linkedDay = matchFecha ? team.trainingdays.find((d) => d.fecha === matchFecha) : undefined;
+  const isPublished = Boolean(linkedDay && linkedDay.lineupId === lineup.lineupId);
+
+  const setStarter = (pos: number, value: string) => {
+    setStarters((prev) => {
+      const next = { ...prev };
+      if (value) next[String(pos)] = value;
+      else delete next[String(pos)];
+      return next;
     });
   };
-  const setBenchSlot = (num: number, name: string) => {
-    setLineup((prev) => {
-      const bench = { ...prev.bench };
-      if (name) bench[String(num)] = name;
-      else delete bench[String(num)];
-      return { ...prev, bench };
+  const setBenchSlot = (num: number, value: string) => {
+    setBench((prev) => {
+      const next = { ...prev };
+      if (value) next[String(num)] = value;
+      else delete next[String(num)];
+      return next;
     });
   };
   const removeBenchSlot = (num: number) => {
     setBenchOrder((prev) => prev.filter((n) => n !== num));
-    setLineup((prev) => {
-      const bench = { ...prev.bench };
-      delete bench[String(num)];
-      return { ...prev, bench };
+    setBench((prev) => {
+      const next = { ...prev };
+      delete next[String(num)];
+      return next;
     });
   };
   const addBenchSlot = () => {
     setBenchOrder((prev) => [...prev, nextBenchNumber(prev)]);
   };
 
-  // Partidos anteriores con alguna alineación ya hecha (publicada o
-  // borrador — esto solo lo ve el propio coach, así que da igual) para
-  // poder reutilizarla como punto de partida en vez de rehacerla cada
-  // partido. Más reciente primero.
-  const pastLineups = team.trainingdays
-    .filter(
-      (d): d is TrainingDay & { fecha: string; lineup: Lineup } =>
-        d.eventType === "MATCH" &&
-        d.fecha != null &&
-        d.fecha !== day.fecha &&
-        d.lineup != null &&
-        (Object.keys(d.lineup.starters).length > 0 || Object.keys(d.lineup.bench).length > 0),
-    )
-    .sort((a, b) => (parseKey(b.fecha)?.getTime() ?? 0) - (parseKey(a.fecha)?.getTime() ?? 0));
+  // Copiar de otra alineación del equipo (cualquiera — con o sin partido,
+  // publicada o no) como punto de partida para ESTA. Solo se copian
+  // titulares/banquillo — nombre y fecha de la alineación que se está
+  // editando no cambian.
+  const otherLineups = Object.values(team.lineups)
+    .filter((l) => l.lineupId !== lineup.lineupId)
+    .sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
 
-  const applyTemplate = (fecha: string) => {
-    const source = pastLineups.find((d) => d.fecha === fecha);
+  const applyTemplate = (sourceId: string) => {
+    const source = otherLineups.find((l) => l.lineupId === sourceId);
     if (!source) return;
-    // published:false — copiar no publica automáticamente, el coach sigue
-    // teniendo que revisar y pulsar "Publicada" él mismo.
-    setLineup({ ...source.lineup, published: false });
-    setBenchOrder(Object.keys(source.lineup.bench).map(Number).sort((a, b) => a - b));
+    setStarters(source.starters);
+    setBench(source.bench);
+    setBenchOrder(Object.keys(source.bench).map(Number).sort((a, b) => a - b));
     setTemplateVersion((v) => v + 1);
-    toast.success(
-      `Alineación de "${source.nameTrainingDay || source.fecha}" copiada — revisa y guarda.`,
-    );
+    toast.success(`Alineación "${source.name || "sin nombre"}" copiada — revisa y guarda.`);
   };
 
-  const save = async () => {
-    // Defensivo: una fila de banquillo recién añadida y nunca asignada no
-    // debe persistirse vacía.
-    const clean: Lineup = {
-      ...lineup,
-      starters: Object.fromEntries(Object.entries(lineup.starters).filter(([, v]) => v)),
-      bench: Object.fromEntries(Object.entries(lineup.bench).filter(([, v]) => v)),
-    };
-    // Un nombre escrito a mano en dos filas distintas no pasa por ningún
-    // roster que lo impida (a diferencia de elegir dos veces del equipo,
-    // que el Select ya evita) — se valida aquí antes de guardar.
+  const cleanAssignments = () => ({
+    starters: Object.fromEntries(Object.entries(starters).filter(([, v]) => v)),
+    bench: Object.fromEntries(Object.entries(bench).filter(([, v]) => v)),
+  });
+
+  const persist = async () => {
+    const clean = cleanAssignments();
     const duplicate = findDuplicateName(clean);
     if (duplicate) {
       toast.error(`"${duplicate}" está asignado en más de una posición`);
-      return;
+      return false;
     }
+    await updateLineup(team.teamname!, lineup.lineupId!, {
+      name,
+      matchFecha,
+      ...clean,
+    });
+    return true;
+  };
+
+  const save = async () => {
     setSaving(true);
     try {
-      await saveLineup(team.teamname!, day.fecha!, clean, team.trainingdays);
-      toast.success(clean.published ? "Alineación publicada" : "Alineación guardada como borrador");
+      const ok = await persist();
+      if (ok) toast.success("Alineación guardada");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "No se pudo guardar la alineación");
     } finally {
@@ -244,20 +251,91 @@ export function LineupEditor({ team, day }: { team: Team; day: TrainingDay }) {
     }
   };
 
+  const publish = async () => {
+    if (!matchFecha) {
+      toast.error("Asigna primero una fecha de partido para poder publicarla.");
+      return;
+    }
+    setPublishing(true);
+    try {
+      const ok = await persist();
+      if (!ok) return;
+      await publishLineup(team.teamname!, lineup.lineupId!, matchFecha, name || null, team.trainingdays);
+      toast.success("Alineación publicada — el equipo ya puede verla.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo publicar la alineación");
+    } finally {
+      setPublishing(false);
+    }
+  };
+
+  const unpublish = async () => {
+    if (!matchFecha) return;
+    setPublishing(true);
+    try {
+      await unpublishLineup(team.teamname!, matchFecha, team.trainingdays);
+      toast.success("Alineación despublicada — ya no la ve el equipo.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo despublicar");
+    } finally {
+      setPublishing(false);
+    }
+  };
+
+  const remove = async () => {
+    try {
+      await deleteLineup(team.teamname!, lineup.lineupId!, team.trainingdays);
+      toast.success("Alineación eliminada");
+      onDeleted?.();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo eliminar la alineación");
+    }
+  };
+
   return (
     <div className="space-y-4">
-      {pastLineups.length > 0 && (
+      <div className="space-y-1">
+        <Label htmlFor="lineup-name" className="text-xs">
+          Nombre
+        </Label>
+        <Input
+          id="lineup-name"
+          value={name}
+          placeholder="p.ej. Plan A, Titular vs Leones RC…"
+          onChange={(e) => setName(e.target.value)}
+        />
+      </div>
+
+      <div className="space-y-1">
+        <Label htmlFor="lineup-fecha" className="text-xs">
+          Fecha del partido (opcional — vacío = plantilla suelta)
+        </Label>
+        <Input
+          id="lineup-fecha"
+          type="date"
+          value={matchFechaInput}
+          disabled={isPublished}
+          onChange={(e) => setMatchFechaInput(e.target.value)}
+        />
+        {isPublished && (
+          <p className="text-xs text-muted-foreground">
+            Publicada — despublica primero para cambiar la fecha.
+          </p>
+        )}
+      </div>
+
+      {otherLineups.length > 0 && (
         <div className="space-y-1">
-          <Label className="text-xs text-muted-foreground">Copiar de un partido anterior</Label>
+          <Label className="text-xs text-muted-foreground">Copiar de otra alineación</Label>
           <Select value={NO_TEMPLATE} onValueChange={(v) => v && v !== NO_TEMPLATE && applyTemplate(v)}>
-            <SelectTrigger className="w-full" aria-label="Copiar de un partido anterior">
-              <SelectValue>Elegir partido…</SelectValue>
+            <SelectTrigger className="w-full" aria-label="Copiar de otra alineación">
+              <SelectValue>Elegir alineación…</SelectValue>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={NO_TEMPLATE}>Elegir partido…</SelectItem>
-              {pastLineups.map((d) => (
-                <SelectItem key={d.fecha} value={d.fecha}>
-                  {d.fecha} · {d.nameTrainingDay || "Partido"}
+              <SelectItem value={NO_TEMPLATE}>Elegir alineación…</SelectItem>
+              {otherLineups.map((l) => (
+                <SelectItem key={l.lineupId} value={l.lineupId!}>
+                  {l.name || "(sin nombre)"} {l.matchFecha ? `· ${l.matchFecha}` : "· plantilla"}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -271,10 +349,10 @@ export function LineupEditor({ team, day }: { team: Team; day: TrainingDay }) {
             key={`${pos}-${templateVersion}`}
             rowKey={String(pos)}
             label={RUGBY_POSITIONS[pos]}
-            value={lineup.starters[String(pos)] ?? ""}
+            value={starters[String(pos)] ?? ""}
             players={team.userplayers}
-            takenElsewhere={takenNames(lineup, String(pos))}
-            onChange={(name) => setStarter(pos, name)}
+            takenElsewhere={takenNames({ starters, bench }, String(pos))}
+            onChange={(v) => setStarter(pos, v)}
           />
         ))}
       </div>
@@ -286,10 +364,10 @@ export function LineupEditor({ team, day }: { team: Team; day: TrainingDay }) {
             key={`${num}-${templateVersion}`}
             rowKey={String(num)}
             label="Suplente"
-            value={lineup.bench[String(num)] ?? ""}
+            value={bench[String(num)] ?? ""}
             players={team.userplayers}
-            takenElsewhere={takenNames(lineup, String(num))}
-            onChange={(name) => setBenchSlot(num, name)}
+            takenElsewhere={takenNames({ starters, bench }, String(num))}
+            onChange={(v) => setBenchSlot(num, v)}
             onRemove={() => removeBenchSlot(num)}
           />
         ))}
@@ -298,35 +376,55 @@ export function LineupEditor({ team, day }: { team: Team; day: TrainingDay }) {
         </Button>
       </div>
 
-      <div className="space-y-1">
-        <div className="flex gap-2">
-          <Button
-            type="button"
-            variant={!lineup.published ? "default" : "outline"}
-            className="flex-1"
-            onClick={() => setLineup((prev) => ({ ...prev, published: false }))}
-          >
-            Borrador
-          </Button>
-          <Button
-            type="button"
-            variant={lineup.published ? "default" : "outline"}
-            className="flex-1"
-            onClick={() => setLineup((prev) => ({ ...prev, published: true }))}
-          >
-            Publicada
-          </Button>
-        </div>
-        <p className="text-xs text-muted-foreground">
-          {lineup.published
-            ? "Cualquier jugador del equipo puede verla."
-            : "En borrador: solo la ves tú, hasta que la publiques."}
-        </p>
-      </div>
-
-      <Button size="xl" className="w-full" disabled={saving} onClick={() => void save()}>
+      <Button size="xl" className="w-full" disabled={saving || publishing} onClick={() => void save()}>
         Guardar
       </Button>
+
+      {isPublished ? (
+        <Button
+          size="xl"
+          variant="outline"
+          className="w-full"
+          disabled={saving || publishing}
+          onClick={() => void unpublish()}
+        >
+          Despublicar
+        </Button>
+      ) : (
+        <div className="space-y-1">
+          <Button
+            size="xl"
+            variant="outline"
+            className="w-full"
+            disabled={saving || publishing || !matchFecha}
+            onClick={() => void publish()}
+          >
+            Publicar para este partido
+          </Button>
+          {!matchFecha && (
+            <p className="text-xs text-muted-foreground">
+              Asigna una fecha de partido arriba para poder publicarla.
+            </p>
+          )}
+        </div>
+      )}
+
+      <ConfirmDialog
+        trigger={
+          <Button variant="ghost" className="w-full text-destructive hover:text-destructive">
+            <Trash2 className="size-4" /> Eliminar alineación
+          </Button>
+        }
+        title={`¿Eliminar "${name || "esta alineación"}"?`}
+        description={
+          isPublished
+            ? "Está publicada — el partido se quedará sin alineación asignada."
+            : undefined
+        }
+        confirmLabel="Eliminar"
+        destructive
+        onConfirm={remove}
+      />
     </div>
   );
 }

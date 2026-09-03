@@ -36,3 +36,19 @@ export function paramToKey(param: string): string | null {
   if (!m) return null;
   return `${m[1]}/${m[2]}/${m[3]}`;
 }
+
+/** "dd/MM/yyyy" → "yyyy-MM-dd" (formato nativo de <input type="date">). */
+export function fechaToInputValue(fecha: string): string {
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(fecha);
+  if (!m) return "";
+  const [, d, mo, y] = m;
+  return `${y}-${mo}-${d}`;
+}
+
+/** "yyyy-MM-dd" (de <input type="date">) → "dd/MM/yyyy"; null si no encaja. */
+export function inputValueToFecha(value: string): string | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!m) return null;
+  const [, y, mo, d] = m;
+  return `${d}/${mo}/${y}`;
+}

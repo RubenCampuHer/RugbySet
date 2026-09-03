@@ -1,12 +1,12 @@
 import { RUGBY_POSITIONS, STARTER_POSITIONS } from "@/lib/lineup";
-import type { Lineup } from "@/lib/types";
+import type { LineupDoc } from "@/lib/types";
 
 /**
  * Alineación de solo lectura — usada tanto en DayPanel (jugador, día
  * seleccionado en el calendario) como en /team/lineups (vista agregada de
  * partidos publicados). Solo se llama cuando ya está publicada.
  */
-export function LineupSummary({ lineup }: { lineup: Lineup }) {
+export function LineupSummary({ lineup }: { lineup: LineupDoc }) {
   const starters = STARTER_POSITIONS.map((pos) => [pos, lineup.starters[String(pos)]] as const).filter(
     ([, name]) => name,
   );

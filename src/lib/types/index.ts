@@ -3,7 +3,8 @@
 import type { z } from "zod";
 import type { ClubSchema } from "../schemas/club";
 import type { ExerciseSchema } from "../schemas/exercise";
-import type { LineupSchema, TeamSchema, TrainingDaySchema } from "../schemas/team";
+import type { LineupDocSchema } from "../schemas/lineup";
+import type { TeamSchema, TrainingDaySchema } from "../schemas/team";
 import type { ExerciseTrainingSchema, SectionSchema, TrainingSchema } from "../schemas/training";
 import type { NotificationSchema, PublicProfileSchema, UserSchema } from "../schemas/user";
 
@@ -16,7 +17,7 @@ export type Section = z.infer<typeof SectionSchema>;
 export type ExerciseTraining = z.infer<typeof ExerciseTrainingSchema>;
 export type Team = z.infer<typeof TeamSchema>;
 export type TrainingDay = z.infer<typeof TrainingDaySchema>;
-export type Lineup = z.infer<typeof LineupSchema>;
+export type LineupDoc = z.infer<typeof LineupDocSchema>;
 export type Club = z.infer<typeof ClubSchema>;
 
 export type Role = "ADMIN" | "COACH" | "PLAYER";

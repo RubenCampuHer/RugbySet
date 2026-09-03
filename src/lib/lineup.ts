@@ -1,5 +1,3 @@
-import type { Lineup } from "./types";
-
 /** Las 15 posiciones de rugby union, en orden. */
 export const RUGBY_POSITIONS: Record<number, string> = {
   1: "Pilar izquierdo",
@@ -21,7 +19,18 @@ export const RUGBY_POSITIONS: Record<number, string> = {
 
 export const STARTER_POSITIONS = Object.keys(RUGBY_POSITIONS).map(Number);
 
-const EMPTY_LINEUP: Lineup = { published: false, starters: {}, bench: {} };
+/**
+ * Forma mínima que necesitan estas utilidades — no el LineupDoc completo
+ * (que además lleva lineupId/name/matchFecha) — para poder llamarlas
+ * también sobre el estado local en edición de LineupEditor, sin tener que
+ * reconstruir un doc completo en cada tecla.
+ */
+export type RosterAssignments = {
+  starters: Record<string, string>;
+  bench: Record<string, string>;
+};
+
+const EMPTY: RosterAssignments = { starters: {}, bench: {} };
 
 /**
  * Nombres ya asignados en la alineación (titulares + banquillo), para
@@ -30,13 +39,13 @@ const EMPTY_LINEUP: Lineup = { published: false, starters: {}, bench: {} };
  * banquillo) — así su valor actual sigue apareciendo como opción en su
  * propio Select en vez de desaparecer.
  */
-export function takenNames(lineup: Lineup | null | undefined, excludeKey?: string): Set<string> {
-  const l = lineup ?? EMPTY_LINEUP;
+export function takenNames(assignments: RosterAssignments | null | undefined, excludeKey?: string): Set<string> {
+  const a = assignments ?? EMPTY;
   const names = new Set<string>();
-  for (const [key, name] of Object.entries(l.starters)) {
+  for (const [key, name] of Object.entries(a.starters)) {
     if (key !== excludeKey && name) names.add(name);
   }
-  for (const [key, name] of Object.entries(l.bench)) {
+  for (const [key, name] of Object.entries(a.bench)) {
     if (key !== excludeKey && name) names.add(name);
   }
   return names;
@@ -62,9 +71,9 @@ export function nextBenchNumber(usedNumbers: number[]): number {
  * aquí, al guardar. Comparación sin mayúsculas ni espacios extra (mismo
  * "Juan Pérez" escrito con distinto formato en dos filas también cuenta).
  */
-export function findDuplicateName(lineup: Lineup): string | null {
+export function findDuplicateName(assignments: RosterAssignments): string | null {
   const seen = new Set<string>();
-  for (const name of [...Object.values(lineup.starters), ...Object.values(lineup.bench)]) {
+  for (const name of [...Object.values(assignments.starters), ...Object.values(assignments.bench)]) {
     const key = name.trim().toLowerCase();
     if (!key) continue;
     if (seen.has(key)) return name;

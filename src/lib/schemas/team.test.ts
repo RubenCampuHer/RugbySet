@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { LineupSchema, TeamSchema, TrainingDaySchema } from "./team";
+import { TeamSchema, TrainingDaySchema } from "./team";
 
 describe("TeamSchema", () => {
   it("parsea un equipo mínimo con defaults de listas vacías", () => {
@@ -59,33 +59,30 @@ describe("TrainingDaySchema", () => {
     expect(TrainingDaySchema.parse({}).training).toBeUndefined();
   });
 
-  it("lineup es opcional (aditivo, sin equivalente en Android todavía)", () => {
-    expect(TrainingDaySchema.parse({}).lineup).toBeUndefined();
-  });
-
-  it("lineup embebido se parsea con LineupSchema", () => {
-    const result = TrainingDaySchema.parse({
-      lineup: { published: true, starters: { "1": "Juan Pérez" }, bench: {} },
-    });
-    expect(result.lineup).toEqual({
-      published: true,
-      starters: { "1": "Juan Pérez" },
-      bench: {},
-    });
+  it("lineupId es opcional — referencia a Teams/{team}/lineups/{id}, ausente = ninguna publicada (rediseño 2026-09-03)", () => {
+    expect(TrainingDaySchema.parse({}).lineupId).toBeUndefined();
+    expect(TrainingDaySchema.parse({ lineupId: "-Nabc123" }).lineupId).toBe("-Nabc123");
   });
 });
 
-describe("LineupSchema", () => {
-  it("defaults: published false, starters/bench vacíos", () => {
-    expect(LineupSchema.parse({})).toEqual({ published: false, starters: {}, bench: {} });
+describe("TeamSchema.lineups", () => {
+  it("por defecto vacío", () => {
+    expect(TeamSchema.parse({ teamname: "Spartans" }).lineups).toEqual({});
   });
 
-  it("acepta nombres del roster y nombres escritos a mano por igual (texto libre)", () => {
-    const result = LineupSchema.parse({
-      published: true,
-      starters: { "1": "Juan Pérez", "9": "Invitado Sin Cuenta" },
-      bench: { "16": "Marc López" },
+  it("se parsea como objeto por lineupId, cada uno con LineupDocSchema completo", () => {
+    const result = TeamSchema.parse({
+      lineups: {
+        "-Nabc123": {
+          lineupId: "-Nabc123",
+          name: "Plan A",
+          matchFecha: "10/09/2026",
+          starters: { "1": "Juan Pérez" },
+          bench: {},
+        },
+      },
     });
-    expect(result.starters["9"]).toBe("Invitado Sin Cuenta");
+    expect(result.lineups["-Nabc123"].name).toBe("Plan A");
+    expect(result.lineups["-Nabc123"].starters["1"]).toBe("Juan Pérez");
   });
 });

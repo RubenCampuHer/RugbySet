@@ -102,6 +102,7 @@ function buildTeam(opts: {
     trainingdays: [],
     clubId: opts.clubId ?? null,
     category: opts.category ?? null,
+    lineups: {},
   };
 }
 

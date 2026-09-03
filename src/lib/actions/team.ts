@@ -151,9 +151,11 @@ export async function setAttendance(opts: {
  *
  * `training` es opcional: un Partido puede no llevar ningún entreno
  * adjunto (Android ya lo permitía, la web lo forzaba solo en la UI — ver
- * EventEditorSheet). `lineup` se preserva del día existente igual que
+ * EventEditorSheet). `lineupId` (referencia a Teams/{team}/lineups/{id},
+ * ver lib/actions/lineup.ts) se preserva del día existente igual que
  * accepted_players/declined_players — este upsert lo usa el editor de
- * evento (horas/ubicación/entreno), que nunca toca la alineación.
+ * evento (horas/ubicación/entreno), que nunca toca qué alineación está
+ * publicada.
  */
 export async function upsertTrainingDay(
   teamname: string,
@@ -177,8 +179,8 @@ export async function upsertTrainingDay(
     // Firebase (update/set) RECHAZA cualquier `undefined` en el objeto que
     // se escribe (arroja "contains undefined in property...") — a
     // diferencia de `null`, que sí se persiste como "ausente". training/
-    // lineup son opcionales (Partido sin entreno; día sin alineación
-    // guardada todavía, el caso normal) así que hay que convertir
+    // lineupId son opcionales (Partido sin entreno; sin alineación
+    // publicada todavía, el caso normal) así que hay que convertir
     // undefined -> null explícitamente antes de escribir, mismo criterio
     // que ya usa location aquí abajo.
     training: day.training ?? null,
@@ -186,48 +188,9 @@ export async function upsertTrainingDay(
     location: day.location?.trim() ? day.location.trim() : null,
     accepted_players: existingDay?.accepted_players ?? [],
     declined_players: existingDay?.declined_players ?? [],
-    lineup: existingDay?.lineup ?? null,
+    lineupId: existingDay?.lineupId ?? null,
   };
   const rest = existing.filter((d) => d.fecha !== day.fecha);
-  await update(ref(db, `${PATHS.TEAMS}/${teamname}`), {
-    trainingdays: [...rest, newDay],
-  });
-}
-
-/**
- * Coach guarda/publica la alineación de un Partido — mismo patrón de upsert
- * por fecha que upsertTrainingDay, pero solo toca `lineup` (preserva todo
- * lo demás del día: horas, ubicación, entreno, asistencia).
- *
- * Reconstruye `newDay` campo a campo (no `{...existingDay, lineup}`): un
- * TrainingDay leído de RTDB puede traer algún campo nullish ausente
- * (undefined tras el parseo de Zod) si el día es antiguo — por ejemplo un
- * entreno creado antes de que existiera `eventType`/`location`. Firebase
- * rechaza cualquier `undefined` en el objeto que se escribe, así que cada
- * campo se normaliza igual que en upsertTrainingDay; un spread tal cual
- * arrastraría ese undefined y el guardado fallaría.
- */
-export async function saveLineup(
-  teamname: string,
-  fecha: string,
-  lineup: TrainingDay["lineup"],
-  existing: TrainingDay[],
-) {
-  const existingDay = existing.find((d) => d.fecha === fecha);
-  if (!existingDay) throw new Error(`No existe ningún evento el ${fecha}`);
-  const newDay: TrainingDay = {
-    fecha: existingDay.fecha ?? fecha,
-    horaInicio: existingDay.horaInicio ?? null,
-    horaFin: existingDay.horaFin ?? null,
-    nameTrainingDay: existingDay.nameTrainingDay ?? "",
-    training: existingDay.training ?? null,
-    eventType: existingDay.eventType ?? "TRAINING",
-    location: existingDay.location ?? null,
-    accepted_players: existingDay.accepted_players,
-    declined_players: existingDay.declined_players,
-    lineup: lineup ?? null,
-  };
-  const rest = existing.filter((d) => d.fecha !== fecha);
   await update(ref(db, `${PATHS.TEAMS}/${teamname}`), {
     trainingdays: [...rest, newDay],
   });

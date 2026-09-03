@@ -4,20 +4,8 @@
 // un ARRAY embebido y cada TrainingDay lleva el _Training COMPLETO copiado.
 import { z } from "zod";
 import { rtdbList } from "./common";
+import { LineupDocSchema } from "./lineup";
 import { TrainingSchema } from "./training";
-
-// Alineación de un Partido — campo aditivo, sin equivalente en Android
-// todavía (ver plan). RTDB borra las claves con valor null, así que un
-// array de 15 posiciones con huecos perdería el índice/orden: se guarda
-// como objeto por número de posición ("1".."15") o dorsal de banquillo
-// ("16", "17"...) — solo aparecen las claves ya asignadas. El valor es
-// texto libre (nombre del roster O escrito a mano para alguien sin
-// cuenta) — ver src/lib/lineup.ts.
-export const LineupSchema = z.object({
-  published: z.boolean().default(false),
-  starters: z.record(z.string(), z.string()).default({}),
-  bench: z.record(z.string(), z.string()).default({}),
-});
 
 export const TrainingDaySchema = z.object({
   fecha: z.string().nullish(), // "dd/MM/yyyy"
@@ -30,7 +18,12 @@ export const TrainingDaySchema = z.object({
   // Campos aditivos (2026-07-13): null/"TRAINING" = entrenamiento, "MATCH" = partido.
   eventType: z.enum(["TRAINING", "MATCH"]).nullish(),
   location: z.string().nullish(),
-  lineup: LineupSchema.nullish(),
+  // Qué alineación (Teams/{team}/lineups/{lineupId}) es "la oficial" de
+  // este partido — null/ausente = ninguna publicada todavía. Rediseño
+  // 2026-09-03: antes era un objeto embebido (lineup), ahora una
+  // referencia — permite varias alineaciones alternativas por partido
+  // (Plan A/B) sin publicar más de una a la vez, y plantillas sin partido.
+  lineupId: z.string().nullish(),
 });
 
 export const TeamSchema = z.object({
@@ -43,4 +36,5 @@ export const TeamSchema = z.object({
   trainingdays: rtdbList(TrainingDaySchema).default([]),
   clubId: z.string().nullish(),
   category: z.string().nullish(),
+  lineups: z.record(z.string(), LineupDocSchema).default({}),
 });

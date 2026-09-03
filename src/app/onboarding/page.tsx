@@ -189,7 +189,7 @@ export default function OnboardingPage() {
             <TeamForm
               submitLabel="Crear equipo"
               busy={busy}
-              onSubmit={async ({ name, code, iconFile }) => {
+              onSubmit={async ({ name, code, iconFile, alsoPlayer }) => {
                 setBusy(true);
                 try {
                   // Las reglas RTDB no dejan a un no-miembro leer /Teams, así
@@ -213,6 +213,7 @@ export default function OnboardingPage() {
                     iconUrl,
                     coachName,
                     uid: firebaseUser.uid,
+                    alsoPlayer,
                   });
                   setCreatedTeam({ name, code });
                   setStep("team-created");
@@ -255,7 +256,7 @@ export default function OnboardingPage() {
               submitLabel="Crear club y equipo"
               busy={busy}
               withCategory
-              onSubmit={async ({ name, code, iconFile, category }) => {
+              onSubmit={async ({ name, code, iconFile, category, alsoPlayer }) => {
                 setBusy(true);
                 try {
                   const dup = await joinTeamByCode(code, true);
@@ -278,6 +279,7 @@ export default function OnboardingPage() {
                     teamIconUrl: iconUrl,
                     coachName,
                     uid: firebaseUser.uid,
+                    alsoPlayer,
                   });
                   setCreatedTeam({ name, code });
                   setStep("team-created");
@@ -398,9 +400,14 @@ function TeamForm({
     code: string;
     iconFile: File | null;
     category?: string;
+    alsoPlayer: boolean;
   }) => void;
 }) {
   const [name, setName] = useState("");
+  // Desmarcado por defecto (rediseño multi-coach 2026-09-03): ser
+  // entrenador ya no implica ser jugador — quien también juega lo marca
+  // explícitamente.
+  const [alsoPlayer, setAlsoPlayer] = useState(false);
   // Código autosugerido desde el nombre — el entrenador confundía "Código
   // de acceso" con algo que debía recibir, no inventar (ver plan onboarding
   // 2026-09-03). Precargarlo, editable, deja claro que es él quien lo
@@ -436,7 +443,13 @@ function TeamForm({
     const codeErr = validateTeamCode(code);
     setCodeError(codeErr);
     if (nameErr || codeErr) return;
-    onSubmit({ name: name.trim(), code: code.trim(), iconFile, category: withCategory ? category : undefined });
+    onSubmit({
+      name: name.trim(),
+      code: code.trim(),
+      iconFile,
+      category: withCategory ? category : undefined,
+      alsoPlayer,
+    });
   };
 
   return (
@@ -502,6 +515,16 @@ function TeamForm({
         preview={iconPreview}
         onChange={(file, url) => { setIconFile(file); setIconPreview(url); }}
       />
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={alsoPlayer}
+          disabled={busy}
+          onChange={(e) => setAlsoPlayer(e.target.checked)}
+          className="size-4 rounded border-input accent-primary"
+        />
+        También quiero aparecer como jugador
+      </label>
       <Button className="w-full" disabled={busy || !name.trim() || !code.trim()} onClick={submit}>
         {busy ? "Creando…" : submitLabel}
       </Button>

@@ -15,11 +15,14 @@ import {
   getRoleDisplayName,
   isAdmin,
   isCoach,
+  isTeamCoach,
+  isTeamFounder,
 } from "./permissions";
 import { ExerciseSchema } from "./schemas/exercise";
+import { TeamSchema } from "./schemas/team";
 import { TrainingSchema } from "./schemas/training";
 import { UserSchema } from "./schemas/user";
-import type { Exercise, Training, User } from "./types";
+import type { Exercise, Team, Training, User } from "./types";
 
 function user(overrides: Partial<Parameters<typeof UserSchema.parse>[0]> = {}): User {
   return UserSchema.parse({ username: "author1", role: "PLAYER", ...overrides });
@@ -31,6 +34,10 @@ function exercise(overrides: Partial<Parameters<typeof ExerciseSchema.parse>[0]>
 
 function training(overrides: Partial<Parameters<typeof TrainingSchema.parse>[0]> = {}): Training {
   return TrainingSchema.parse({ name: "Entreno", author: "author1", ...overrides });
+}
+
+function team(overrides: Partial<Parameters<typeof TeamSchema.parse>[0]> = {}): Team {
+  return TeamSchema.parse({ teamname: "Spartans", usercoach: "founder-uid", ...overrides });
 }
 
 describe("isAdmin / isCoach / canCreateContent", () => {
@@ -251,6 +258,34 @@ describe("canEditTraining / canDeleteTraining", () => {
 
   it("canDeleteTraining es el mismo comportamiento que canEditTraining", () => {
     expect(canDeleteTraining).toBe(canEditTraining);
+  });
+});
+
+describe("isTeamCoach / isTeamFounder (varios entrenadores, rediseño 2026-09-03)", () => {
+  it("isTeamCoach reconoce al fundador (usercoach)", () => {
+    expect(isTeamCoach(team(), "founder-uid")).toBe(true);
+  });
+
+  it("isTeamCoach reconoce a un co-entrenador ya aceptado (coaches)", () => {
+    const t = team({ coaches: { "co-uid": true } });
+    expect(isTeamCoach(t, "co-uid")).toBe(true);
+  });
+
+  it("isTeamCoach NO reconoce a alguien todavía pendiente de aceptar", () => {
+    const t = team({ pendingCoaches: { "pending-uid": true } });
+    expect(isTeamCoach(t, "pending-uid")).toBe(false);
+  });
+
+  it("isTeamCoach es false para un jugador cualquiera o un uid ausente", () => {
+    expect(isTeamCoach(team(), "player-uid")).toBe(false);
+    expect(isTeamCoach(team(), null)).toBe(false);
+    expect(isTeamCoach(team(), undefined)).toBe(false);
+  });
+
+  it("isTeamFounder solo es true para el usercoach original, nunca para un co-entrenador", () => {
+    const t = team({ coaches: { "co-uid": true } });
+    expect(isTeamFounder(t, "founder-uid")).toBe(true);
+    expect(isTeamFounder(t, "co-uid")).toBe(false);
   });
 });
 

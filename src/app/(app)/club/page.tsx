@@ -9,6 +9,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { TeamSkeleton } from "@/components/skeletons";
 import { useClub } from "@/hooks/useClub";
 import { useTeam } from "@/hooks/useTeam";
+import { isTeamCoach } from "@/lib/permissions";
 
 /**
  * "Mi club": si administras un club (Clubs.adminUserId === tu uid) ves su
@@ -26,7 +27,7 @@ export default function ClubPage() {
     return <TeamSkeleton />;
   }
 
-  const isCoachOfOwnTeam = Boolean(team && firebaseUser && team.usercoach === firebaseUser.uid);
+  const isCoachOfOwnTeam = Boolean(team && isTeamCoach(team, firebaseUser?.uid));
 
   return (
     <div className="mx-auto max-w-2xl space-y-4">

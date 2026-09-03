@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { useTeam } from "@/hooks/useTeam";
 import { setAttendance } from "@/lib/actions/team";
 import { paramToKey, todayKey } from "@/lib/calendar";
+import { isTeamCoach } from "@/lib/permissions";
 import type { TrainingDay } from "@/lib/types";
 
 function CalendarContent() {
@@ -67,7 +68,7 @@ function CalendarContent() {
     );
   }
 
-  const isCoach = team.usercoach === firebaseUser?.uid;
+  const isCoach = isTeamCoach(team, firebaseUser?.uid);
   const myName = profile?.nameSurname ?? "";
   const selectedDay = selected ? (daysByFecha.get(selected) ?? null) : null;
 

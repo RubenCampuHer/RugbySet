@@ -3,7 +3,7 @@
 // pendingplayers son listas de nameSurname (texto, no uids); trainingdays es
 // un ARRAY embebido y cada TrainingDay lleva el _Training COMPLETO copiado.
 import { z } from "zod";
-import { rtdbList } from "./common";
+import { rtdbList, rtdbRecord } from "./common";
 import { LineupDocSchema } from "./lineup";
 import { TrainingSchema } from "./training";
 
@@ -28,7 +28,7 @@ export const TrainingDaySchema = z.object({
 
 export const TeamSchema = z.object({
   teamname: z.string().nullish(),
-  usercoach: z.string().nullish(), // uid del coach
+  usercoach: z.string().nullish(), // uid del coach fundador — sigue siendo "el dueño" (borrar equipo, no puede salir sin borrarlo)
   teamcode: z.string().nullish(),
   teamicon: z.string().nullish(),
   userplayers: rtdbList(z.string()).default([]),
@@ -37,4 +37,11 @@ export const TeamSchema = z.object({
   clubId: z.string().nullish(),
   category: z.string().nullish(),
   lineups: z.record(z.string(), LineupDocSchema).default({}),
+  // Varios entrenadores por equipo (rediseño 2026-09-03): mapa uid->true, no
+  // array — RTDB no tiene "contains" sobre arrays, así que las reglas
+  // comprueban pertenencia con .child(uid) (mismo truco que Clubs.pendingTeams).
+  // Un co-entrenador NUNCA aparece en userplayers solo por serlo (a diferencia
+  // del fundador, que sí, ver buildTeam) — coach y jugador son cosas distintas.
+  coaches: rtdbRecord(z.literal(true)).default({}),
+  pendingCoaches: rtdbRecord(z.literal(true)).default({}),
 });

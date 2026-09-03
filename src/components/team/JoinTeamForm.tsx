@@ -53,7 +53,9 @@ export function JoinTeamForm({ onJoined }: { onJoined?: () => void }) {
           ? `Te has unido a ${result.teamname}`
           : result.status === "already_member"
             ? `Ya eres miembro de ${result.teamname}`
-            : `Solicitud enviada a ${result.teamname}. Tu entrenador debe aceptarte.`;
+            : result.status === "pending_coach"
+              ? `Solicitud de co-entrenador enviada a ${result.teamname}. El entrenador debe aceptarte.`
+              : `Solicitud enviada a ${result.teamname}. Tu entrenador debe aceptarte.`;
       toast.success(message);
       onJoined?.();
     } catch (e) {

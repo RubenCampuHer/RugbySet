@@ -1,7 +1,7 @@
 // Port literal de PermissionsManager.kt (repo Android) — mantener en
 // sincronía caso por caso. Es la única lógica de negocio real del MVP:
 // decide qué contenido ve cada usuario según privacy × approvalStatus.
-import type { Exercise, Training, User } from "./types";
+import type { Exercise, Team, Training, User } from "./types";
 
 export const APPROVAL_PENDING = "PENDING";
 export const APPROVAL_APPROVED = "APPROVED";
@@ -10,6 +10,24 @@ export const APPROVAL_REJECTED = "REJECTED";
 export const isAdmin = (u: User | null) => u?.role === "ADMIN";
 export const isCoach = (u: User | null) => u?.role === "COACH";
 export const canCreateContent = (u: User | null) => isAdmin(u) || isCoach(u);
+
+/**
+ * ¿Gestiona ESTE equipo? (rediseño multi-coach 2026-09-03 — antes cada
+ * pantalla reinventaba `team.usercoach === uid` por su cuenta). El fundador
+ * (`usercoach`) y cualquier co-entrenador aceptado (`coaches[uid]`) tienen
+ * los mismos permisos de gestión — calendario, roster, alineaciones,
+ * asistencia. Solo el fundador puede borrar el equipo o no puede
+ * abandonarlo (ver isTeamFounder) — esa distinción SÍ importa y vive aparte.
+ */
+export function isTeamCoach(team: Team, uid: string | null | undefined): boolean {
+  if (!uid) return false;
+  return team.usercoach === uid || team.coaches[uid] === true;
+}
+
+/** El fundador del equipo — el único que no puede "salir" (debe borrar el equipo) y el único que puede quitar a un co-entrenador. */
+export function isTeamFounder(team: Team, uid: string | null | undefined): boolean {
+  return Boolean(uid) && team.usercoach === uid;
+}
 
 /** Club del que el usuario es miembro (`myClubId`, vía su propio equipo) y/o administra (`myAdminClubId`, vía `Clubs.adminUserId`) — resueltos por quien llama, ver useMyClubId()/useClub(). */
 export type ClubContext = { myClubId?: string | null; myAdminClubId?: string | null };

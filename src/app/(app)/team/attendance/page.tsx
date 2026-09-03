@@ -29,7 +29,7 @@ import {
   type DateRange,
 } from "@/lib/attendance";
 import { downloadCsv, toCsv } from "@/lib/csv";
-import { isAdmin } from "@/lib/permissions";
+import { isAdmin, isTeamCoach } from "@/lib/permissions";
 
 /** "yyyy-MM-dd" (formato nativo de <input type="date">) → Date en medianoche local — mismo criterio que parseKey/toKey (lib/calendar.ts), sin pasar por UTC. */
 function parseDateInputLocal(value: string): Date | undefined {
@@ -70,8 +70,7 @@ function TeamAttendance() {
     return <EmptyState icon={Users} title="Equipo no encontrado" />;
   }
 
-  const isLiteralCoach = team.usercoach === firebaseUser?.uid;
-  const canView = isLiteralCoach || isAdmin(profile);
+  const canView = isTeamCoach(team, firebaseUser?.uid) || isAdmin(profile);
   if (!canView) {
     return (
       <EmptyState

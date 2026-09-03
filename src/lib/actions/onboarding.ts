@@ -91,18 +91,22 @@ function buildTeam(opts: {
   uid: string;
   clubId?: string;
   category?: string;
+  /** El fundador ya NO se añade como jugador por defecto (rediseño multi-coach 2026-09-03: coach y jugador son cosas distintas) — opt-in explícito. */
+  alsoPlayer?: boolean;
 }): Team {
   return {
     teamname: opts.teamName,
     usercoach: opts.uid,
     teamcode: opts.teamCode,
     teamicon: opts.iconUrl ?? "",
-    userplayers: [opts.coachName],
+    userplayers: opts.alsoPlayer ? [opts.coachName] : [],
     pendingplayers: [],
     trainingdays: [],
     clubId: opts.clubId ?? null,
     category: opts.category ?? null,
     lineups: {},
+    coaches: {},
+    pendingCoaches: {},
   };
 }
 
@@ -117,6 +121,7 @@ export async function createStandaloneTeam(opts: {
   iconUrl: string | null;
   coachName: string;
   uid: string;
+  alsoPlayer?: boolean;
 }): Promise<void> {
   const error = validateTeamName(opts.teamName);
   if (error) throw new Error(error);
@@ -153,6 +158,7 @@ export async function createClubAndTeam(opts: {
   teamIconUrl: string | null;
   coachName: string;
   uid: string;
+  alsoPlayer?: boolean;
 }): Promise<void> {
   const error = validateTeamName(opts.teamName);
   if (error) throw new Error(error);
@@ -177,6 +183,7 @@ export async function createClubAndTeam(opts: {
     uid: opts.uid,
     clubId,
     category: opts.category,
+    alsoPlayer: opts.alsoPlayer,
   });
 
   await update(ref(db, `${PATHS.CLUBS}/${clubId}`), club);

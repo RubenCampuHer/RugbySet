@@ -1,7 +1,7 @@
 "use client";
 
 import { get, ref } from "firebase/database";
-import { Camera, Check, ClipboardList, Copy, Flame, LogOut, Megaphone, ShieldCheck, Trash2, Trophy, Users, X } from "lucide-react";
+import { ArrowUpCircle, Camera, Check, ClipboardList, Copy, Flame, LogOut, Megaphone, ShieldCheck, Trash2, Trophy, Users, X } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -26,11 +26,15 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useTeam } from "@/hooks/useTeam";
 import {
+  acceptPendingCoach,
   acceptPendingPlayer,
   adminDeleteTeam,
   deleteTeam,
   leaveTeam,
+  promoteToCoach,
+  rejectPendingCoach,
   rejectPendingPlayer,
+  removeCoach,
   removePlayer,
   resolveUidByName,
   updateTeamIcon,
@@ -38,7 +42,7 @@ import {
 import { PATHS } from "@/lib/constants";
 import { db } from "@/lib/firebase";
 import { sendGeneralMessage } from "@/lib/actions/notify";
-import { isAdmin } from "@/lib/permissions";
+import { isAdmin, isTeamCoach, isTeamFounder } from "@/lib/permissions";
 import { resizeAndUpload } from "@/lib/storage";
 import { parseOr } from "@/lib/schemas/common";
 import { PublicProfileSchema } from "@/lib/schemas/user";
@@ -75,6 +79,33 @@ function usePlayerStats(names: string[]) {
   }, [names]);
 
   return stats;
+}
+
+/** Perfil público de cada uid (entrenadores, guardados por uid a diferencia de userplayers) — misma fuente que usePlayerStats, dirección inversa (uid, no nombre). */
+function useProfilesByUid(uids: string[]) {
+  const [profiles, setProfiles] = useState<Record<string, PublicProfile | null>>({});
+  const key = uids.slice().sort().join(",");
+
+  useEffect(() => {
+    let cancelled = false;
+    void Promise.all(
+      uids.map(async (uid) => {
+        const snap = await get(ref(db, `${PATHS.PUBLIC_PROFILES}/${uid}`));
+        const profile = snap.exists()
+          ? parseOr(PublicProfileSchema, snap.val(), `publicProfiles/${uid}`)
+          : null;
+        return [uid, profile] as const;
+      }),
+    ).then((entries) => {
+      if (!cancelled) setProfiles(Object.fromEntries(entries));
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- key ya resume el contenido real de uids
+  }, [key]);
+
+  return profiles;
 }
 
 const MAX_MESSAGE_LENGTH = 500;
@@ -239,6 +270,120 @@ function PendingSection({ team, canManage }: { team: Team; canManage: boolean })
 }
 
 /**
+ * Sección "Entrenadores" (rediseño multi-coach 2026-09-03): fundador +
+ * co-entrenadores aceptados, solicitudes pendientes de co-entrenador
+ * (aceptar/rechazar, mismo patrón que PendingSection) — visible a todos,
+ * acciones solo para quien gestiona el equipo. Quitar a un co-entrenador ya
+ * aceptado es exclusivo del fundador (isFounder), no de cualquier co-coach.
+ */
+function CoachesSection({
+  team,
+  canManage,
+  isFounder,
+}: {
+  team: Team;
+  canManage: boolean;
+  isFounder: boolean;
+}) {
+  const [busy, setBusy] = useState<string | null>(null);
+  const coCoachUids = Object.keys(team.coaches);
+  const pendingUids = Object.keys(team.pendingCoaches);
+  const profiles = useProfilesByUid([...coCoachUids, ...pendingUids]);
+
+  if (coCoachUids.length === 0 && pendingUids.length === 0) return null;
+
+  const act = async (uid: string, accept: boolean) => {
+    setBusy(uid);
+    try {
+      if (accept) {
+        await acceptPendingCoach(team, uid);
+        toast.success("Co-entrenador aceptado");
+      } else {
+        await rejectPendingCoach(team, uid);
+        toast.success("Solicitud rechazada");
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo completar");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const remove = async (uid: string) => {
+    setBusy(uid);
+    try {
+      await removeCoach(team, uid);
+      toast.success("Co-entrenador eliminado");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo quitar");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-lg">Entrenadores</CardTitle>
+      </CardHeader>
+      <CardContent className="divide-y divide-border">
+        {coCoachUids.map((uid) => (
+          <PlayerRow
+            key={uid}
+            name={profiles[uid]?.nameSurname || "Entrenador"}
+            action={
+              isFounder ? (
+                <Button
+                  size="icon-xl"
+                  variant="ghost"
+                  className="rounded-full text-destructive hover:text-destructive"
+                  aria-label={`Quitar a ${profiles[uid]?.nameSurname ?? "este co-entrenador"}`}
+                  disabled={busy === uid}
+                  onClick={() => void remove(uid)}
+                >
+                  <Trash2 className="size-4" />
+                </Button>
+              ) : undefined
+            }
+          />
+        ))}
+        {pendingUids.map((uid) => (
+          <PlayerRow
+            key={uid}
+            name={profiles[uid]?.nameSurname || "Solicitud pendiente"}
+            action={
+              canManage ? (
+                <span className="flex gap-1">
+                  <Button
+                    size="icon-xl"
+                    className="rounded-full bg-accent text-accent-foreground hover:bg-accent/80"
+                    aria-label={`Aceptar a ${profiles[uid]?.nameSurname ?? "co-entrenador"}`}
+                    disabled={busy === uid}
+                    onClick={() => void act(uid, true)}
+                  >
+                    <Check className="size-4" />
+                  </Button>
+                  <Button
+                    size="icon-xl"
+                    variant="destructive"
+                    className="rounded-full"
+                    aria-label={`Rechazar a ${profiles[uid]?.nameSurname ?? "co-entrenador"}`}
+                    disabled={busy === uid}
+                    onClick={() => void act(uid, false)}
+                  >
+                    <X className="size-4" />
+                  </Button>
+                </span>
+              ) : undefined
+            }
+          />
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
  * Cuerpo de la pantalla de equipo, parametrizado por `teamname` explícito en
  * vez de derivarlo siempre de `profile.teamname` — así lo reutilizan
  * `/team` (el equipo propio), `/admin/teams/detail` (un equipo ajeno, con
@@ -286,14 +431,21 @@ export function TeamManager({
     );
   }
 
-  // Identidad real de coach (para el badge "Eres el entrenador") — distinta
-  // de canManage, que además incluye al ADMIN global o al admin del club
-  // viendo un equipo ajeno.
-  const isLiteralCoach = team.usercoach === firebaseUser?.uid;
-  const canManage = isLiteralCoach || (viewingAsAdmin && isAdmin(profile)) || viewingAsClubAdmin;
+  // Fundador (isFounder, el usercoach histórico — único que no puede
+  // "salir" y único que puede quitar a un co-entrenador) vs "gestiona este
+  // equipo" (isMyCoach, fundador O co-entrenador aceptado — mismos permisos
+  // de gestión día a día, rediseño multi-coach 2026-09-03). canManage
+  // además incluye al ADMIN global o al admin del club viendo un equipo
+  // ajeno; canDeleteTeam es más estricto (nunca un co-entrenador, solo
+  // quien fundó el equipo o un admin).
+  const isFounder = isTeamFounder(team, firebaseUser?.uid);
+  const isMyCoach = isTeamCoach(team, firebaseUser?.uid);
+  const canManage = isMyCoach || (viewingAsAdmin && isAdmin(profile)) || viewingAsClubAdmin;
+  const canDeleteTeam = isFounder || (viewingAsAdmin && isAdmin(profile)) || viewingAsClubAdmin;
   // "Salir del equipo" es una acción de MIEMBRO — nunca tiene sentido para
-  // alguien que está mirando un equipo ajeno del que no forma parte.
-  const canLeave = !viewingAsSomeAdmin && !isLiteralCoach;
+  // alguien que está mirando un equipo ajeno del que no forma parte, y el
+  // fundador no puede salir (debe eliminar el equipo); un co-entrenador sí.
+  const canLeave = !viewingAsSomeAdmin && !isFounder;
 
   const kick = async (name: string) => {
     setKicking(name);
@@ -343,15 +495,24 @@ export function TeamManager({
   };
 
   const removeTeam = async () => {
-    // El coach literal sigue usando la vía barata client-side (deleteTeam);
-    // un ADMIN sobre un equipo ajeno pasa por la Cloud Function, que además
+    // El fundador sigue usando la vía barata client-side (deleteTeam); un
+    // ADMIN sobre un equipo ajeno pasa por la Cloud Function, que además
     // limpia el icono en Storage (ver adminDeleteTeam en lib/actions/team.ts).
-    if (isLiteralCoach) {
+    if (isFounder) {
       await deleteTeam(team);
     } else {
       await adminDeleteTeam(team.teamname!);
     }
     toast.success(`Equipo "${team.teamname}" eliminado`);
+  };
+
+  const promote = async (name: string) => {
+    try {
+      await promoteToCoach(team, name);
+      toast.success(`${name} ascendido a co-entrenador`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo ascender");
+    }
   };
 
   return (
@@ -407,9 +568,14 @@ export function TeamManager({
                 <Copy className="size-3" />
               </button>
             )}
-            {isLiteralCoach && (
+            {isFounder && (
               <Badge className="border-transparent bg-primary/15 text-brand">
                 Eres el entrenador
+              </Badge>
+            )}
+            {isMyCoach && !isFounder && (
+              <Badge className="border-transparent bg-primary/15 text-brand">
+                Eres co-entrenador
               </Badge>
             )}
           </div>
@@ -470,6 +636,8 @@ export function TeamManager({
 
       <PendingSection team={team} canManage={canManage} />
 
+      <CoachesSection team={team} canManage={canManage} isFounder={isFounder} />
+
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">
@@ -487,24 +655,36 @@ export function TeamManager({
                 stats={playerStats[name]}
                 action={
                   canManage ? (
-                    <ConfirmDialog
-                      trigger={
-                        <Button
-                          size="icon-xl"
-                          variant="ghost"
-                          className="rounded-full text-destructive hover:text-destructive"
-                          aria-label={`Expulsar a ${name}`}
-                          disabled={kicking === name}
-                        >
-                          <Trash2 className="size-4" />
-                        </Button>
-                      }
-                      title={`¿Expulsar a ${name}?`}
-                      description="Perderá el acceso al equipo y su historial de asistencia."
-                      confirmLabel="Expulsar"
-                      destructive
-                      onConfirm={() => kick(name)}
-                    />
+                    <span className="flex gap-1">
+                      <Button
+                        size="icon-xl"
+                        variant="ghost"
+                        className="rounded-full"
+                        aria-label={`Ascender a ${name} a co-entrenador`}
+                        title="Ascender a co-entrenador"
+                        onClick={() => void promote(name)}
+                      >
+                        <ArrowUpCircle className="size-4" />
+                      </Button>
+                      <ConfirmDialog
+                        trigger={
+                          <Button
+                            size="icon-xl"
+                            variant="ghost"
+                            className="rounded-full text-destructive hover:text-destructive"
+                            aria-label={`Expulsar a ${name}`}
+                            disabled={kicking === name}
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        }
+                        title={`¿Expulsar a ${name}?`}
+                        description="Perderá el acceso al equipo y su historial de asistencia."
+                        confirmLabel="Expulsar"
+                        destructive
+                        onConfirm={() => kick(name)}
+                      />
+                    </span>
                   ) : undefined
                 }
               />
@@ -532,7 +712,7 @@ export function TeamManager({
         />
       )}
 
-      {canManage && (
+      {canDeleteTeam && (
         <ConfirmDialog
           trigger={
             <Button variant="ghost" className="w-full text-destructive hover:text-destructive">

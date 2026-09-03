@@ -19,6 +19,8 @@ function team(overrides: Partial<Team> = {}): Team {
     clubId: null,
     category: null,
     lineups: {},
+    coaches: {},
+    pendingCoaches: {},
     ...overrides,
   };
 }

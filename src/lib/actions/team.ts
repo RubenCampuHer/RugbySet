@@ -64,6 +64,57 @@ export async function rejectPendingPlayer(team: Team, playerName: string) {
 }
 
 /**
+ * Un coach (fundador o co-entrenador) acepta una solicitud de co-entrenador
+ * — multi-path atómico, mismo patrón que acceptPendingPlayer: sale de
+ * pendingCoaches, entra en coaches y su Users/{uid}/teamname apunta al
+ * equipo. A diferencia de un jugador, NUNCA entra en userplayers.
+ */
+export async function acceptPendingCoach(team: Team, uid: string) {
+  const teamname = team.teamname!;
+  await update(ref(db), {
+    [`${PATHS.TEAMS}/${teamname}/pendingCoaches/${uid}`]: null,
+    [`${PATHS.TEAMS}/${teamname}/coaches/${uid}`]: true,
+    [`${PATHS.USERS}/${uid}/teamname`]: teamname,
+  });
+}
+
+/** Rechaza una solicitud de co-entrenador — solo limpia pendingCoaches. */
+export async function rejectPendingCoach(team: Team, uid: string) {
+  await update(ref(db), {
+    [`${PATHS.TEAMS}/${team.teamname}/pendingCoaches/${uid}`]: null,
+  });
+}
+
+/**
+ * El fundador quita a un co-entrenador — no al revés (para dejar de ser
+ * co-entrenador, ver leaveTeam) y nunca al propio fundador (para eso está
+ * eliminar el equipo). Limpia también su teamname, igual que removePlayer.
+ */
+export async function removeCoach(team: Team, uid: string) {
+  const teamname = team.teamname!;
+  await update(ref(db), {
+    [`${PATHS.TEAMS}/${teamname}/coaches/${uid}`]: null,
+    [`${PATHS.USERS}/${uid}/teamname`]: null,
+    [`${PATHS.USERS}/${uid}/assistedTrainingDays`]: null,
+  });
+}
+
+/**
+ * Un jugador YA en el roster se sube a co-entrenador de un tirón — sin pasar
+ * por pendingCoaches (el coach que lo asciende ya lo conoce, no hace falta
+ * que "se solicite" a sí mismo). Sale de userplayers, entra en coaches.
+ */
+export async function promoteToCoach(team: Team, playerName: string) {
+  const teamname = team.teamname!;
+  const uid = await resolveUidByName(playerName);
+  if (!uid) throw new Error(`No se encontró el perfil de ${playerName}`);
+  await update(ref(db), {
+    [`${PATHS.TEAMS}/${teamname}/userplayers`]: team.userplayers.filter((n) => n !== playerName),
+    [`${PATHS.TEAMS}/${teamname}/coaches/${uid}`]: true,
+  });
+}
+
+/**
  * Coach expulsa a un jugador — multi-path atómico (espejo de
  * TeamRepository.removePlayer): fuera de userplayers y se limpian su
  * teamname y asistencia (escrituras por hijo, permitidas al coach).
@@ -225,8 +276,8 @@ export async function deleteTrainingDay(
 
 export type JoinByCodeResult = {
   found: boolean;
-  /** "pending" | "joined" | "already_member" | undefined (dryRun) */
-  status?: "pending" | "joined" | "already_member";
+  /** "pending" | "pending_coach" | "joined" | "already_member" | undefined (dryRun) */
+  status?: "pending" | "pending_coach" | "joined" | "already_member";
   teamname?: string;
   teamicon?: string | null;
 };
@@ -264,8 +315,9 @@ export async function leaveTeam(): Promise<void> {
 /**
  * El coach elimina el equipo — escritura multi-path atómica (espejo de
  * TeamRepository.deleteTeam / ReadTeam.deleteTeamViaRepository): borra
- * Teams/{teamname} y desvincula a todos los jugadores Y al propio coach
- * (su teamname también apunta al equipo) en la misma operación.
+ * Teams/{teamname} y desvincula a todos los jugadores, al coach fundador Y a
+ * cualquier co-entrenador (su teamname también apunta al equipo) en la
+ * misma operación.
  */
 export async function deleteTeam(team: Team): Promise<void> {
   const teamname = team.teamname!;
@@ -274,7 +326,9 @@ export async function deleteTeam(team: Team): Promise<void> {
   );
   const uids = Array.from(
     new Set(
-      [...resolvedUids, team.usercoach].filter((uid): uid is string => Boolean(uid)),
+      [...resolvedUids, team.usercoach, ...Object.keys(team.coaches)].filter(
+        (uid): uid is string => Boolean(uid),
+      ),
     ),
   );
 

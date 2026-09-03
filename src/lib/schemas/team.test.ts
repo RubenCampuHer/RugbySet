@@ -85,3 +85,20 @@ describe("TeamSchema.lineups", () => {
     expect(result.lineups["-Nabc123"].starters["1"]).toBe("Juan Pérez");
   });
 });
+
+describe("TeamSchema.coaches / pendingCoaches (varios entrenadores, rediseño 2026-09-03)", () => {
+  it("por defecto vacíos", () => {
+    const result = TeamSchema.parse({ teamname: "Spartans" });
+    expect(result.coaches).toEqual({});
+    expect(result.pendingCoaches).toEqual({});
+  });
+
+  it("se parsean como mapa uid->true", () => {
+    const result = TeamSchema.parse({
+      coaches: { uid1: true },
+      pendingCoaches: { uid2: true },
+    });
+    expect(result.coaches).toEqual({ uid1: true });
+    expect(result.pendingCoaches).toEqual({ uid2: true });
+  });
+});

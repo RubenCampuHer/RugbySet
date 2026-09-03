@@ -24,7 +24,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useTeam } from "@/hooks/useTeam";
 import { createLineup } from "@/lib/actions/lineup";
-import { isAdmin } from "@/lib/permissions";
+import { isAdmin, isTeamCoach } from "@/lib/permissions";
 import type { LineupDoc } from "@/lib/types";
 
 /** Diálogo mínimo "+ Nueva alineación": solo nombre, crea y abre el editor. */
@@ -122,7 +122,7 @@ function TeamLineups() {
     );
   }
 
-  const isManage = team.usercoach === firebaseUser?.uid || isAdmin(profile);
+  const isManage = isTeamCoach(team, firebaseUser?.uid) || isAdmin(profile);
 
   // Por partido asignado a cada lineupId — solo informativo (ver
   // LineupEditor: la asignación en sí es exclusiva del Calendario).

@@ -134,6 +134,19 @@ const EMPTY_LINEUP: Lineup = { published: false, starters: {}, bench: {} };
 /** Editor de alineación de un Partido — 15 posiciones fijas + banquillo dinámico, borrador/publicar. */
 export function LineupEditor({ team, day }: { team: Team; day: TrainingDay }) {
   const [lineup, setLineup] = useState<Lineup>(day.lineup ?? EMPTY_LINEUP);
+  // Qué filas de banquillo se VEN, por separado de qué nombre tiene cada
+  // una: RTDB no persiste valores vacíos, así que una fila añadida (o
+  // vaciada para escribir un nombre a mano) no tiene clave en
+  // lineup.bench todavía — si la lista de filas saliera de
+  // Object.keys(lineup.bench), esa fila desaparecería en cuanto se
+  // vaciara (bug real: "al escribir nombre en suplente se borra la
+  // fila"). benchOrder es la lista de dorsales visibles; lineup.bench
+  // solo guarda los ya asignados.
+  const [benchOrder, setBenchOrder] = useState<number[]>(() =>
+    Object.keys((day.lineup ?? EMPTY_LINEUP).bench)
+      .map(Number)
+      .sort((a, b) => a - b),
+  );
   const [saving, setSaving] = useState(false);
 
   const setStarter = (pos: number, name: string) => {
@@ -153,6 +166,7 @@ export function LineupEditor({ team, day }: { team: Team; day: TrainingDay }) {
     });
   };
   const removeBenchSlot = (num: number) => {
+    setBenchOrder((prev) => prev.filter((n) => n !== num));
     setLineup((prev) => {
       const bench = { ...prev.bench };
       delete bench[String(num)];
@@ -160,10 +174,7 @@ export function LineupEditor({ team, day }: { team: Team; day: TrainingDay }) {
     });
   };
   const addBenchSlot = () => {
-    setLineup((prev) => ({
-      ...prev,
-      bench: { ...prev.bench, [String(nextBenchNumber(prev))]: "" },
-    }));
+    setBenchOrder((prev) => [...prev, nextBenchNumber(prev)]);
   };
 
   const save = async () => {
@@ -193,10 +204,6 @@ export function LineupEditor({ team, day }: { team: Team; day: TrainingDay }) {
     }
   };
 
-  const benchKeys = Object.keys(lineup.bench)
-    .map(Number)
-    .sort((a, b) => a - b);
-
   return (
     <div className="space-y-4">
       <div className="space-y-1.5">
@@ -215,7 +222,7 @@ export function LineupEditor({ team, day }: { team: Team; day: TrainingDay }) {
 
       <div className="space-y-1.5">
         <p className="text-xs font-medium text-muted-foreground">Suplentes</p>
-        {benchKeys.map((num) => (
+        {benchOrder.map((num) => (
           <LineupRow
             key={num}
             rowKey={String(num)}

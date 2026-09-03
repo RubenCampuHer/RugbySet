@@ -92,17 +92,11 @@ describe("findDuplicateName", () => {
 });
 
 describe("nextBenchNumber", () => {
-  it("empieza en 16 con el banquillo vacío", () => {
-    expect(nextBenchNumber(undefined)).toBe(16);
-    expect(nextBenchNumber({ published: false, starters: {}, bench: {} })).toBe(16);
+  it("empieza en 16 sin ningún número usado", () => {
+    expect(nextBenchNumber([])).toBe(16);
   });
 
-  it("continúa tras el dorsal más alto ya asignado, sin importar el orden de inserción", () => {
-    const lineup: Lineup = {
-      published: false,
-      starters: {},
-      bench: { "16": "Ana", "18": "Marc", "17": "Juan" },
-    };
-    expect(nextBenchNumber(lineup)).toBe(19);
+  it("continúa tras el número más alto ya usado, sin importar el orden", () => {
+    expect(nextBenchNumber([16, 18, 17])).toBe(19);
   });
 });

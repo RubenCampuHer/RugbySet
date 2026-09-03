@@ -42,10 +42,16 @@ export function takenNames(lineup: Lineup | null | undefined, excludeKey?: strin
   return names;
 }
 
-/** Siguiente dorsal de banquillo libre (16, 17…) al pulsar "Añadir suplente". */
-export function nextBenchNumber(lineup: Lineup | null | undefined): number {
-  const keys = Object.keys((lineup ?? EMPTY_LINEUP).bench).map(Number);
-  return keys.length === 0 ? 16 : Math.max(...keys) + 1;
+/**
+ * Siguiente dorsal de banquillo libre (16, 17…) al pulsar "Añadir suplente".
+ * Recibe los números YA VISIBLES en el editor (no las claves de
+ * lineup.bench): una fila de banquillo añadida pero sin nombre asignado
+ * todavía no tiene clave en `bench` (RTDB no persiste vacíos), así que
+ * derivar el siguiente número solo de `bench` repetiría un número ya en
+ * pantalla — ver LineupEditor.benchOrder.
+ */
+export function nextBenchNumber(usedNumbers: number[]): number {
+  return usedNumbers.length === 0 ? 16 : Math.max(...usedNumbers) + 1;
 }
 
 /**

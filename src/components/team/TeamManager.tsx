@@ -1,7 +1,7 @@
 "use client";
 
 import { get, ref } from "firebase/database";
-import { Camera, Check, ClipboardList, Copy, Flame, LogOut, Megaphone, ShieldCheck, Trash2, Users, X } from "lucide-react";
+import { Camera, Check, ClipboardList, Copy, Flame, LogOut, Megaphone, ShieldCheck, Trash2, Trophy, Users, X } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -434,6 +434,22 @@ export function TeamManager({
           className={cn(buttonVariants({ variant: "outline", size: "xl" }), "w-full")}
         >
           <ClipboardList className="size-4" /> Ver asistencia
+        </Link>
+      )}
+
+      {/*
+        A diferencia de "Ver asistencia" (solo coach/ADMIN), las
+        alineaciones publicadas son para todo el equipo — sin gate de
+        canManage. Se oculta viendo un equipo ajeno (admin/admin de club)
+        porque team/lineups solo reconoce miembro literal + ADMIN global
+        (mismo criterio que "Ver asistencia" evita el enlace roto).
+      */}
+      {!viewingAsAdmin && !viewingAsClubAdmin && (
+        <Link
+          href="/team/lineups"
+          className={cn(buttonVariants({ variant: "outline", size: "xl" }), "w-full")}
+        >
+          <Trophy className="size-4" /> Ver alineaciones
         </Link>
       )}
 

@@ -8,6 +8,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { AttendanceToggle } from "@/components/AttendanceToggle";
 import { EventEditorSheet } from "@/components/calendar/EventEditorSheet";
 import { LineupEditor } from "@/components/calendar/LineupEditor";
+import { LineupSummary } from "@/components/calendar/LineupSummary";
 import { RollCall } from "@/components/calendar/RollCall";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,49 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { resolveUidByName } from "@/lib/actions/team";
 import { sendAttendanceNotification } from "@/lib/actions/notify";
-import { RUGBY_POSITIONS, STARTER_POSITIONS } from "@/lib/lineup";
-import type { Lineup, Team, TrainingDay } from "@/lib/types";
-
-/** Alineación de solo lectura para el jugador — solo se llama cuando ya está publicada. */
-function LineupSummary({ lineup }: { lineup: Lineup }) {
-  const starters = STARTER_POSITIONS.map((pos) => [pos, lineup.starters[String(pos)]] as const).filter(
-    ([, name]) => name,
-  );
-  const bench = Object.entries(lineup.bench)
-    .map(([k, v]) => [Number(k), v] as const)
-    .sort((a, b) => a[0] - b[0]);
-
-  if (starters.length === 0 && bench.length === 0) return null;
-
-  return (
-    <div className="space-y-2">
-      <p className="font-medium">Alineación</p>
-      <div className="space-y-1 text-sm">
-        {starters.map(([pos, name]) => (
-          <div key={pos} className="flex items-center justify-between gap-2">
-            <span className="text-muted-foreground">
-              {pos}. {RUGBY_POSITIONS[pos]}
-            </span>
-            <span className="font-medium">{name}</span>
-          </div>
-        ))}
-      </div>
-      {bench.length > 0 && (
-        <>
-          <p className="text-xs font-medium text-muted-foreground">Suplentes</p>
-          <div className="space-y-1 text-sm">
-            {bench.map(([num, name]) => (
-              <div key={num} className="flex items-center justify-between gap-2">
-                <span className="text-muted-foreground">{num}</span>
-                <span className="font-medium">{name}</span>
-              </div>
-            ))}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
+import type { Team, TrainingDay } from "@/lib/types";
 
 /**
  * Panel del día seleccionado. Sin evento: mensaje claro para el jugador

@@ -1,7 +1,8 @@
 "use client";
 
 import { get, ref } from "firebase/database";
-import { Camera, Check, Copy, Flame, LogOut, Megaphone, ShieldCheck, Trash2, Users, X } from "lucide-react";
+import { Camera, Check, ClipboardList, Copy, Flame, LogOut, Megaphone, ShieldCheck, Trash2, Users, X } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -12,7 +13,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { TeamSkeleton } from "@/components/skeletons";
 import { JoinTeamForm } from "@/components/team/JoinTeamForm";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
@@ -42,6 +43,7 @@ import { resizeAndUpload } from "@/lib/storage";
 import { parseOr } from "@/lib/schemas/common";
 import { PublicProfileSchema } from "@/lib/schemas/user";
 import type { PublicProfile, Team } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 /**
  * Racha/% de asistencia de cada jugador — espejo de ListAdapterUser.kt, que
@@ -415,6 +417,25 @@ export function TeamManager({
       </div>
 
       {canManage && <GeneralMessageDialog team={team} />}
+
+      {/*
+        Sin viewingAsClubAdmin: el informe de asistencia (team/attendance)
+        de momento solo reconoce coach literal + ADMIN global (ver plan) —
+        mostrar el botón también al admin de club llevaría a un "Solo el
+        entrenador" confuso al tocarlo.
+      */}
+      {canManage && !viewingAsClubAdmin && (
+        <Link
+          href={
+            teamname
+              ? `/team/attendance?team=${encodeURIComponent(teamname)}`
+              : "/team/attendance"
+          }
+          className={cn(buttonVariants({ variant: "outline", size: "xl" }), "w-full")}
+        >
+          <ClipboardList className="size-4" /> Ver asistencia
+        </Link>
+      )}
 
       <Card>
         <CardHeader>

@@ -5,6 +5,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -13,6 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { saveLineup } from "@/lib/actions/team";
+import { parseKey } from "@/lib/calendar";
 import {
   findDuplicateName,
   nextBenchNumber,
@@ -21,6 +23,8 @@ import {
   takenNames,
 } from "@/lib/lineup";
 import type { Lineup, Team, TrainingDay } from "@/lib/types";
+
+const NO_TEMPLATE = "__none__";
 
 const NONE = "__none__";
 const MANUAL = "__manual__";
@@ -148,6 +152,14 @@ export function LineupEditor({ team, day }: { team: Team; day: TrainingDay }) {
       .sort((a, b) => a - b),
   );
   const [saving, setSaving] = useState(false);
+  // Cada LineupRow decide "roster o texto libre" una sola vez, al montar
+  // (ver LineupRow) — necesario para no saltar de vuelta al Select a mitad
+  // de escribir un nombre que coincide con uno del roster. Al copiar una
+  // plantilla (applyTemplate) hace falta lo contrario: que CADA fila
+  // vuelva a decidirlo de cero según el dato copiado. Cambiar la `key` de
+  // las filas al copiar fuerza ese remount — templateVersion es ese
+  // contador.
+  const [templateVersion, setTemplateVersion] = useState(0);
 
   const setStarter = (pos: number, name: string) => {
     setLineup((prev) => {
@@ -175,6 +187,34 @@ export function LineupEditor({ team, day }: { team: Team; day: TrainingDay }) {
   };
   const addBenchSlot = () => {
     setBenchOrder((prev) => [...prev, nextBenchNumber(prev)]);
+  };
+
+  // Partidos anteriores con alguna alineación ya hecha (publicada o
+  // borrador — esto solo lo ve el propio coach, así que da igual) para
+  // poder reutilizarla como punto de partida en vez de rehacerla cada
+  // partido. Más reciente primero.
+  const pastLineups = team.trainingdays
+    .filter(
+      (d): d is TrainingDay & { fecha: string; lineup: Lineup } =>
+        d.eventType === "MATCH" &&
+        d.fecha != null &&
+        d.fecha !== day.fecha &&
+        d.lineup != null &&
+        (Object.keys(d.lineup.starters).length > 0 || Object.keys(d.lineup.bench).length > 0),
+    )
+    .sort((a, b) => (parseKey(b.fecha)?.getTime() ?? 0) - (parseKey(a.fecha)?.getTime() ?? 0));
+
+  const applyTemplate = (fecha: string) => {
+    const source = pastLineups.find((d) => d.fecha === fecha);
+    if (!source) return;
+    // published:false — copiar no publica automáticamente, el coach sigue
+    // teniendo que revisar y pulsar "Publicada" él mismo.
+    setLineup({ ...source.lineup, published: false });
+    setBenchOrder(Object.keys(source.lineup.bench).map(Number).sort((a, b) => a - b));
+    setTemplateVersion((v) => v + 1);
+    toast.success(
+      `Alineación de "${source.nameTrainingDay || source.fecha}" copiada — revisa y guarda.`,
+    );
   };
 
   const save = async () => {
@@ -206,10 +246,29 @@ export function LineupEditor({ team, day }: { team: Team; day: TrainingDay }) {
 
   return (
     <div className="space-y-4">
+      {pastLineups.length > 0 && (
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">Copiar de un partido anterior</Label>
+          <Select value={NO_TEMPLATE} onValueChange={(v) => v && v !== NO_TEMPLATE && applyTemplate(v)}>
+            <SelectTrigger className="w-full" aria-label="Copiar de un partido anterior">
+              <SelectValue>Elegir partido…</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NO_TEMPLATE}>Elegir partido…</SelectItem>
+              {pastLineups.map((d) => (
+                <SelectItem key={d.fecha} value={d.fecha}>
+                  {d.fecha} · {d.nameTrainingDay || "Partido"}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
       <div className="space-y-1.5">
         {STARTER_POSITIONS.map((pos) => (
           <LineupRow
-            key={pos}
+            key={`${pos}-${templateVersion}`}
             rowKey={String(pos)}
             label={RUGBY_POSITIONS[pos]}
             value={lineup.starters[String(pos)] ?? ""}
@@ -224,7 +283,7 @@ export function LineupEditor({ team, day }: { team: Team; day: TrainingDay }) {
         <p className="text-xs font-medium text-muted-foreground">Suplentes</p>
         {benchOrder.map((num) => (
           <LineupRow
-            key={num}
+            key={`${num}-${templateVersion}`}
             rowKey={String(num)}
             label="Suplente"
             value={lineup.bench[String(num)] ?? ""}

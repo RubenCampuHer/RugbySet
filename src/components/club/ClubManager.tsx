@@ -1,7 +1,7 @@
 "use client";
 
 import { equalTo, get, onValue, orderByChild, query, ref } from "firebase/database";
-import { ArrowUpCircle, Check, LogOut, Plus, ShieldCheck, Trash2, Users, X } from "lucide-react";
+import { Check, LogOut, Plus, ShieldCheck, Trash2, Users, X } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -33,7 +33,6 @@ import { useProfilesByUid } from "@/hooks/useProfilesByUid";
 import {
   addTeamToClub,
   adminDeleteClub,
-  appointDirector,
   approveTeamJoin,
   rejectTeamJoin,
   removeDirector,
@@ -127,10 +126,13 @@ function useClubPendingContent(clubId: string) {
 /**
  * Sección "Directores" (rediseño multi-director 2026-09-03, mismo patrón
  * que CoachesSection en TeamManager): fundador + co-directores. Sin
- * pendientes — el nombramiento es directo (ver botón "Nombrar codirector"
- * en cada fila de equipo, más abajo), no una solicitud con aprobación.
- * "Quitar" solo lo ve el fundador sobre otro director, o cualquier
- * co-director sobre sí mismo (autoexclusión).
+ * pendientes — el nombramiento es directo, no una solicitud con
+ * aprobación. Separación de responsabilidades pedida explícitamente por el
+ * usuario: **ascender** a codirector solo se hace desde DENTRO del equipo
+ * (TeamManager → sección "Entrenadores" → "Nombrar codirector del club");
+ * esta sección de aquí es la única forma de **quitarlo** — "Quitar" solo lo
+ * ve el fundador sobre otro director, o cualquier co-director sobre sí
+ * mismo (autoexclusión).
  */
 function DirectorsSection({
   club,
@@ -300,18 +302,6 @@ export function ClubManager({ club, viewingAsAdmin = false }: { club: Club; view
     }
   };
 
-  const appoint = async (teamCoachUid: string, teamCoachName: string) => {
-    setBusy(teamCoachUid);
-    try {
-      await appointDirector(club, teamCoachUid);
-      toast.success(`${teamCoachName} nombrado codirector`);
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "No se pudo nombrar");
-    } finally {
-      setBusy(null);
-    }
-  };
-
   const decideContent = async (row: PendingContentRow, approve: boolean) => {
     const key = `${row.kind}-${row.name}`;
     setBusy(key);
@@ -362,11 +352,6 @@ export function ClubManager({ club, viewingAsAdmin = false }: { club: Club; view
       toast.error(e instanceof Error ? e.message : "No se pudo cambiar la categoría");
     }
   };
-
-  const teamCoachUids = Object.values(teamsPreview)
-    .map((t) => t?.usercoach)
-    .filter((u): u is string => Boolean(u));
-  const teamCoachProfiles = useProfilesByUid(teamCoachUids);
 
   return (
     <div className="space-y-4">
@@ -522,21 +507,6 @@ export function ClubManager({ club, viewingAsAdmin = false }: { club: Club; view
                         )}
                       </div>
                     </Link>
-                    {canManage &&
-                      team?.usercoach &&
-                      club.adminUserId !== team.usercoach &&
-                      club.directors[team.usercoach] !== true && (
-                        <Button
-                          size="icon-sm"
-                          variant="ghost"
-                          aria-label={`Nombrar codirector a ${teamCoachProfiles[team.usercoach]?.nameSurname ?? "el entrenador de " + name}`}
-                          title="Nombrar codirector"
-                          disabled={busy === team.usercoach}
-                          onClick={() => void appoint(team.usercoach!, teamCoachProfiles[team.usercoach!]?.nameSurname || "El entrenador")}
-                        >
-                          <ArrowUpCircle className="size-4" />
-                        </Button>
-                      )}
                     {canManage && (
                       <ConfirmDialog
                         trigger={

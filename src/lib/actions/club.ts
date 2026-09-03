@@ -4,8 +4,9 @@
 // Teams/{teamname} que ya tenía un ADMIN global, acotado a los equipos de
 // SU club (Clubs/{clubId}.adminUserId).
 import { equalTo, get, orderByChild, push, query, ref, update } from "firebase/database";
+import { httpsCallable } from "firebase/functions";
 import { PATHS } from "@/lib/constants";
-import { db } from "@/lib/firebase";
+import { db, functions } from "@/lib/firebase";
 import { parseOr } from "@/lib/schemas/common";
 import { ClubSchema } from "@/lib/schemas/club";
 import type { Club } from "@/lib/types";
@@ -187,4 +188,14 @@ export async function updateClubContentStatus(
 ): Promise<void> {
   const node = kind === "exercise" ? PATHS.EXERCISES : PATHS.TRAININGS;
   await update(ref(db, `${node}/${name}`), { approvalStatus: status });
+}
+
+/**
+ * Un ADMIN global o el fundador del club lo elimina, vía la Cloud Function
+ * adminDeleteClub: limpia el icono en Storage (bloqueado desde el cliente,
+ * ver storage.rules) y desvincula cada equipo del club (solo su clubId —
+ * el equipo en sí, roster/calendario/alineaciones, no se ve afectado).
+ */
+export async function adminDeleteClub(clubId: string): Promise<void> {
+  await httpsCallable(functions, "adminDeleteClub")({ clubId });
 }

@@ -346,6 +346,18 @@ export async function updateTeamIcon(teamname: string, iconUrl: string): Promise
 }
 
 /**
+ * Categoría del equipo dentro de su club ("Seniors", "Sub-18"...) — al
+ * crear un equipo+club solo se fijaba una vez (onboarding); esto permite
+ * cambiarla después desde ClubManager (director del club o ADMIN viendo el
+ * club). null = sin categoría (equipo aceptado en el club sin clasificar
+ * todavía). Ningún cambio de reglas RTDB hace falta: ya es una escritura
+ * normal a Teams/{teamname}, cubierta por el mismo .write que roster/icono.
+ */
+export async function updateTeamCategory(teamname: string, category: string | null): Promise<void> {
+  await update(ref(db, `${PATHS.TEAMS}/${teamname}`), { category });
+}
+
+/**
  * Un ADMIN elimina un equipo ajeno (o el suyo) vía la Cloud Function
  * adminDeleteTeam: a diferencia de deleteTeam (update client-side), también
  * limpia su icono en Storage — un delete de Storage está bloqueado

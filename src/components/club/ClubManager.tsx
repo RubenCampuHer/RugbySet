@@ -12,8 +12,17 @@ import { EmptyState } from "@/components/EmptyState";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useProfilesByUid } from "@/hooks/useProfilesByUid";
 import {
+  adminDeleteClub,
   appointDirector,
   approveTeamJoin,
   rejectTeamJoin,
@@ -21,14 +30,18 @@ import {
   removeTeamFromClub,
   updateClubContentStatus,
 } from "@/lib/actions/club";
+import { updateTeamCategory } from "@/lib/actions/team";
 import { PATHS } from "@/lib/constants";
 import { db } from "@/lib/firebase";
 import { parseMapOr, parseOr } from "@/lib/schemas/common";
 import { ExerciseSchema } from "@/lib/schemas/exercise";
 import { isAdmin } from "@/lib/permissions";
 import { TeamSchema } from "@/lib/schemas/team";
+import { CLUB_CATEGORIES } from "@/lib/team-validation";
 import { TrainingSchema } from "@/lib/schemas/training";
 import type { Club, Exercise, Team, Training } from "@/lib/types";
+
+const NO_CATEGORY = "__none__";
 
 /** Ficha ligera de cada equipo del club — lectura puntual, no en tiempo real (la lista completa se refresca al aceptar/rechazar/quitar). */
 function useTeamsPreview(names: string[]) {
@@ -193,6 +206,23 @@ export function ClubManager({ club, viewingAsAdmin = false }: { club: Club; view
   const isFounder = myUid === club.adminUserId;
   const isDirector = isFounder || club.directors[myUid ?? ""] === true;
   const canManage = isDirector || (viewingAsAdmin && isAdmin(profile));
+  // Borrar el club es más grave que gestionarlo día a día — igual que
+  // "Eliminar equipo" en TeamManager, nunca un co-director cualquiera, solo
+  // el fundador o un ADMIN viendo el club.
+  const canDeleteClub = isFounder || (viewingAsAdmin && isAdmin(profile));
+  const [deleting, setDeleting] = useState(false);
+
+  const removeClub = async () => {
+    setDeleting(true);
+    try {
+      await adminDeleteClub(club.clubId!);
+      toast.success(`Club "${club.clubname}" eliminado`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo eliminar el club");
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const appoint = async (teamCoachUid: string, teamCoachName: string) => {
     setBusy(teamCoachUid);
@@ -245,6 +275,15 @@ export function ClubManager({ club, viewingAsAdmin = false }: { club: Club; view
       toast.error(e instanceof Error ? e.message : "No se pudo quitar del club");
     } finally {
       setBusy(null);
+    }
+  };
+
+  const setCategory = async (teamname: string, category: string | null) => {
+    try {
+      await updateTeamCategory(teamname, category);
+      toast.success(`Categoría de ${teamname} actualizada`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo cambiar la categoría");
     }
   };
 
@@ -381,57 +420,89 @@ export function ClubManager({ club, viewingAsAdmin = false }: { club: Club; view
           ) : (
             club.teams.map((name) => {
               const team = teamsPreview[name];
+              // Viendo como admin (/admin/clubs/detail) el visitante no
+              // necesariamente dirige ESTE club, así que /club/teams/detail
+              // (gateado a "administro algún club") le daría un callejón sin
+              // salida — enlaza a /admin/teams/detail, que solo mira su rol.
+              const teamDetailHref = viewingAsAdmin
+                ? `/admin/teams/detail?name=${encodeURIComponent(name)}`
+                : `/club/teams/detail?name=${encodeURIComponent(name)}`;
               return (
-                <div key={name} className="flex items-center gap-3 py-2">
-                  <Link
-                    href={`/club/teams/detail?name=${encodeURIComponent(name)}`}
-                    className="flex flex-1 items-center gap-3 truncate rounded-lg py-1 pr-1 pl-1 hover:bg-muted/50"
-                  >
-                    <AvatarInitials name={name} src={team?.teamicon} size="sm" />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium">{name}</p>
-                      {team && (
-                        <p className="truncate text-xs text-muted-foreground">
-                          {team.userplayers.length} jugador{team.userplayers.length === 1 ? "" : "es"}
-                          {team.category && ` · ${team.category}`}
-                        </p>
-                      )}
-                    </div>
-                  </Link>
-                  {canManage &&
-                    team?.usercoach &&
-                    club.adminUserId !== team.usercoach &&
-                    club.directors[team.usercoach] !== true && (
-                      <Button
-                        size="icon-sm"
-                        variant="ghost"
-                        aria-label={`Nombrar codirector a ${teamCoachProfiles[team.usercoach]?.nameSurname ?? "el entrenador de " + name}`}
-                        title="Nombrar codirector"
-                        disabled={busy === team.usercoach}
-                        onClick={() => void appoint(team.usercoach!, teamCoachProfiles[team.usercoach!]?.nameSurname || "El entrenador")}
-                      >
-                        <ArrowUpCircle className="size-4" />
-                      </Button>
-                    )}
-                  {canManage && (
-                    <ConfirmDialog
-                      trigger={
+                <div key={name} className="space-y-1.5 py-2">
+                  <div className="flex items-center gap-3">
+                    <Link
+                      href={teamDetailHref}
+                      className="flex flex-1 items-center gap-3 truncate rounded-lg py-1 pr-1 pl-1 hover:bg-muted/50"
+                    >
+                      <AvatarInitials name={name} src={team?.teamicon} size="sm" />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium">{name}</p>
+                        {team && (
+                          <p className="truncate text-xs text-muted-foreground">
+                            {team.userplayers.length} jugador{team.userplayers.length === 1 ? "" : "es"}
+                            {team.category && ` · ${team.category}`}
+                          </p>
+                        )}
+                      </div>
+                    </Link>
+                    {canManage &&
+                      team?.usercoach &&
+                      club.adminUserId !== team.usercoach &&
+                      club.directors[team.usercoach] !== true && (
                         <Button
                           size="icon-sm"
                           variant="ghost"
-                          className="text-destructive hover:text-destructive"
-                          aria-label={`Quitar a ${name} del club`}
-                          disabled={busy === name}
+                          aria-label={`Nombrar codirector a ${teamCoachProfiles[team.usercoach]?.nameSurname ?? "el entrenador de " + name}`}
+                          title="Nombrar codirector"
+                          disabled={busy === team.usercoach}
+                          onClick={() => void appoint(team.usercoach!, teamCoachProfiles[team.usercoach!]?.nameSurname || "El entrenador")}
                         >
-                          <Trash2 className="size-4" />
+                          <ArrowUpCircle className="size-4" />
                         </Button>
-                      }
-                      title={`¿Quitar a ${name} del club?`}
-                      description="El equipo sigue existiendo, solo deja de pertenecer a este club."
-                      confirmLabel="Quitar del club"
-                      destructive
-                      onConfirm={() => remove(name)}
-                    />
+                      )}
+                    {canManage && (
+                      <ConfirmDialog
+                        trigger={
+                          <Button
+                            size="icon-sm"
+                            variant="ghost"
+                            className="text-destructive hover:text-destructive"
+                            aria-label={`Quitar a ${name} del club`}
+                            disabled={busy === name}
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        }
+                        title={`¿Quitar a ${name} del club?`}
+                        description="El equipo sigue existiendo, solo deja de pertenecer a este club."
+                        confirmLabel="Quitar del club"
+                        destructive
+                        onConfirm={() => remove(name)}
+                      />
+                    )}
+                  </div>
+                  {canManage && team && (
+                    <div className="flex items-center gap-2 pl-1">
+                      <Label className="shrink-0 text-xs text-muted-foreground">Categoría</Label>
+                      <Select
+                        value={team.category ?? NO_CATEGORY}
+                        onValueChange={(v) => void setCategory(name, v === NO_CATEGORY ? null : (v ?? null))}
+                      >
+                        <SelectTrigger size="sm" className="min-w-0 flex-1" aria-label={`Categoría de ${name}`}>
+                          <SelectValue className="min-w-0">
+                            <span className="truncate">{team.category || "Sin categoría"}</span>
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={NO_CATEGORY}>Sin categoría</SelectItem>
+                          {CLUB_CATEGORIES.map((c) => (
+                            <SelectItem key={c} value={c}>
+                              {c}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   )}
                 </div>
               );
@@ -439,6 +510,21 @@ export function ClubManager({ club, viewingAsAdmin = false }: { club: Club; view
           )}
         </CardContent>
       </Card>
+
+      {canDeleteClub && (
+        <ConfirmDialog
+          trigger={
+            <Button variant="ghost" className="w-full text-destructive hover:text-destructive" disabled={deleting}>
+              <Trash2 className="size-4" /> Eliminar club
+            </Button>
+          }
+          title={`¿Eliminar ${club.clubname}?`}
+          description="Los equipos del club siguen existiendo tal cual, solo dejan de pertenecer a un club."
+          confirmLabel="Eliminar club"
+          destructive
+          onConfirm={removeClub}
+        />
+      )}
     </div>
   );
 }

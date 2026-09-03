@@ -10,12 +10,18 @@ import { PATHS } from "@/lib/constants";
 import { db } from "@/lib/firebase";
 import { ClubSchema } from "@/lib/schemas/club";
 import { parseOr } from "@/lib/schemas/common";
-import { CLUB_CATEGORIES, validateTeamName } from "@/lib/team-validation";
+import {
+  CLUB_CATEGORIES,
+  randomCodeSuffix,
+  suggestTeamCode,
+  validateTeamCode,
+  validateTeamName,
+} from "@/lib/team-validation";
 import type { Club, Role, Team } from "@/lib/types";
 
 // Reexportados desde team-validation.ts (lógica pura, sin Firebase) para no
-// romper a quien ya importaba estos dos símbolos desde este módulo.
-export { CLUB_CATEGORIES, validateTeamName };
+// romper a quien ya importaba estos símbolos desde este módulo.
+export { CLUB_CATEGORIES, randomCodeSuffix, suggestTeamCode, validateTeamCode, validateTeamName };
 
 /**
  * Espejo de LoginViewModel.ensureGoogleUserProfile / UserRepository.createUser:

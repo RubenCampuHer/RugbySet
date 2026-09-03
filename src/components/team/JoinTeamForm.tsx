@@ -77,14 +77,19 @@ export function JoinTeamForm({ onJoined }: { onJoined?: () => void }) {
         </Button>
       </div>
       {preview && (
-        <div className="flex items-center justify-between gap-2 rounded-md bg-muted p-3">
-          <div className="flex items-center gap-2">
-            <AvatarInitials name={preview.teamname} src={preview.teamicon} size="sm" />
-            <span className="text-sm font-medium">{preview.teamname}</span>
+        <div className="space-y-1.5 rounded-md bg-muted p-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <AvatarInitials name={preview.teamname} src={preview.teamicon} size="sm" />
+              <span className="text-sm font-medium">{preview.teamname}</span>
+            </div>
+            <Button size="sm" disabled={busy} onClick={() => void join()}>
+              Solicitar ingreso
+            </Button>
           </div>
-          <Button size="sm" disabled={busy} onClick={() => void join()}>
-            Solicitar ingreso
-          </Button>
+          <p className="text-xs text-muted-foreground">
+            Tu entrenador deberá aceptar tu solicitud antes de que veas el equipo.
+          </p>
         </div>
       )}
     </div>

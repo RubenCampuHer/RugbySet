@@ -11,9 +11,36 @@
 const FORBIDDEN_KEY_CHARS = /[.#$[\]/]/;
 
 export function validateTeamName(name: string): string | null {
-  if (!name.trim()) return "Requerido";
+  if (!name.trim()) return "El nombre del equipo es obligatorio.";
   if (FORBIDDEN_KEY_CHARS.test(name)) return "No puede contener . # $ [ ] /";
   return null;
+}
+
+export function validateTeamCode(code: string): string | null {
+  if (!code.trim()) return "Elige un código para tu equipo.";
+  return null;
+}
+
+/**
+ * Sugerencia de código de equipo a partir del nombre — el entrenador
+ * confundía "Código de acceso" con algo que debía recibir, no inventar
+ * (ver plan onboarding 2026-09-03). Precargar un código plausible, editable,
+ * hace evidente que es él quien lo elige. `suffix` se genera aparte
+ * (Math.random en la UI) para poder testear esta función con un valor fijo.
+ */
+export function suggestTeamCode(teamName: string, suffix: string): string {
+  // Quitar todo lo que no sea A-Z0-9 ya descarta tildes/ñ de paso (una "Ñ"
+  // o una "Á" no son A-Z ASCII) — no hace falta normalizar NFD aparte.
+  const base = teamName
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "")
+    .slice(0, 10);
+  return `${base || "EQUIPO"}${suffix}`;
+}
+
+/** Sufijo aleatorio de 3 dígitos para suggestTeamCode — separado para poder testear con uno fijo. */
+export function randomCodeSuffix(): string {
+  return String(Math.floor(100 + Math.random() * 900));
 }
 
 /** Espejo de Club.CATEGORIES (Android). */

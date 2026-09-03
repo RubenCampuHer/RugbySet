@@ -1,6 +1,6 @@
 "use client";
 
-import { ImagePlus, Shield, User } from "lucide-react";
+import { Copy, ImagePlus, Shield, User } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -19,13 +19,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { joinTeamByCode } from "@/lib/actions/team";
 import {
   CLUB_CATEGORIES,
   createClubAndTeam,
   createStandaloneTeam,
   getClubByCode,
   markOnboardingComplete,
+  randomCodeSuffix,
   setUserRole,
+  suggestTeamCode,
+  validateTeamCode,
   validateTeamName,
 } from "@/lib/actions/onboarding";
 import { markOnboardingDone } from "@/lib/onboarding-flag";
@@ -37,7 +41,8 @@ type Step =
   | "coach-choice"
   | "team-standalone"
   | "club-info"
-  | "club-team";
+  | "club-team"
+  | "team-created";
 
 /**
  * Wizard post-login para usuarios nuevos (sobre todo primer login con
@@ -59,6 +64,21 @@ export default function OnboardingPage() {
     code: string;
     iconUrl: string | null;
   } | null>(null);
+
+  // Equipo recién creado — se muestra en el paso "team-created" para que el
+  // código quede repetido en algún sitio persistente (antes solo aparecía en
+  // un toast transitorio, sin decir nunca "compártelo con tus jugadores").
+  const [createdTeam, setCreatedTeam] = useState<{ name: string; code: string } | null>(null);
+
+  const copyCreatedCode = async () => {
+    if (!createdTeam) return;
+    try {
+      await navigator.clipboard.writeText(createdTeam.code);
+      toast.success("Código copiado");
+    } catch {
+      toast.error("No se pudo copiar el código");
+    }
+  };
 
   useEffect(() => {
     if (firebaseUser === null) router.replace("/login");
@@ -107,9 +127,10 @@ export default function OnboardingPage() {
             {step === "role" && "Antes de empezar, cuéntanos quién eres."}
             {step === "player" && "Únete a tu equipo con el código que te dio tu entrenador."}
             {step === "coach-choice" && "¿Cómo quieres organizar tu equipo?"}
-            {step === "team-standalone" && "Crea tu equipo. Serás su entrenador."}
+            {step === "team-standalone" && "Crea tu equipo y elige un código para que tus jugadores se unan."}
             {step === "club-info" && "Crea tu club. El primer equipo va después."}
-            {step === "club-team" && "El primer equipo del club. Serás su entrenador."}
+            {step === "club-team" && "El primer equipo del club. Elige un código para que tus jugadores se unan."}
+            {step === "team-created" && "¡Ya está! Comparte el código con tu equipo."}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -171,6 +192,18 @@ export default function OnboardingPage() {
               onSubmit={async ({ name, code, iconFile }) => {
                 setBusy(true);
                 try {
+                  // Las reglas RTDB no dejan a un no-miembro leer /Teams, así
+                  // que no se puede comprobar el código con una query directa
+                  // (a diferencia de los clubes, ver getClubByCode abajo) —
+                  // se reutiliza joinTeamByCode en modo dryRun, ya desplegada
+                  // y usada por JoinTeamForm para exactamente esta búsqueda.
+                  const dup = await joinTeamByCode(code, true);
+                  if (dup.found) {
+                    toast.error(
+                      'Ese código ya lo usa otro equipo. Prueba "Sugerir otro" o cámbialo.',
+                    );
+                    return;
+                  }
                   const iconUrl = iconFile
                     ? await resizeAndUpload(`team_images/${name}`, iconFile)
                     : null;
@@ -181,8 +214,8 @@ export default function OnboardingPage() {
                     coachName,
                     uid: firebaseUser.uid,
                   });
-                  toast.success(`Equipo "${name}" creado. ¡Bienvenido!`);
-                  await finish();
+                  setCreatedTeam({ name, code });
+                  setStep("team-created");
                 } catch (e) {
                   toast.error(e instanceof Error ? e.message : "Error al crear el equipo");
                 } finally {
@@ -200,7 +233,7 @@ export default function OnboardingPage() {
                 try {
                   const existing = await getClubByCode(code);
                   if (existing) {
-                    toast.error("Código de club ya en uso");
+                    toast.error("Este código de club ya está en uso. Elige otro.");
                     return;
                   }
                   const iconUrl = iconFile
@@ -225,6 +258,13 @@ export default function OnboardingPage() {
               onSubmit={async ({ name, code, iconFile, category }) => {
                 setBusy(true);
                 try {
+                  const dup = await joinTeamByCode(code, true);
+                  if (dup.found) {
+                    toast.error(
+                      'Ese código ya lo usa otro equipo. Prueba "Sugerir otro" o cámbialo.',
+                    );
+                    return;
+                  }
                   const iconUrl = iconFile
                     ? await resizeAndUpload(`team_images/${name}`, iconFile)
                     : null;
@@ -239,8 +279,8 @@ export default function OnboardingPage() {
                     coachName,
                     uid: firebaseUser.uid,
                   });
-                  toast.success(`Club "${pendingClub.name}" y equipo "${name}" creados. ¡Bienvenido!`);
-                  await finish();
+                  setCreatedTeam({ name, code });
+                  setStep("team-created");
                 } catch (e) {
                   toast.error(e instanceof Error ? e.message : "Error al crear el club y el equipo");
                 } finally {
@@ -248,6 +288,29 @@ export default function OnboardingPage() {
                 }
               }}
             />
+          )}
+
+          {step === "team-created" && createdTeam && (
+            <div className="space-y-4 text-center">
+              <p className="text-sm text-muted-foreground">
+                Equipo <span className="font-medium text-foreground">{createdTeam.name}</span> creado.
+              </p>
+              <button
+                type="button"
+                onClick={() => void copyCreatedCode()}
+                className="mx-auto flex items-center gap-2 rounded-lg border-2 border-dashed border-primary/40 px-4 py-3 font-mono text-lg font-bold tracking-wider hover:bg-muted"
+                aria-label="Copiar código de equipo"
+              >
+                {createdTeam.code}
+                <Copy className="size-4 text-muted-foreground" />
+              </button>
+              <p className="text-sm text-muted-foreground">
+                Comparte este código con tus jugadores para que se unan al equipo.
+              </p>
+              <Button className="w-full" onClick={() => void finish()}>
+                Continuar
+              </Button>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -338,17 +401,41 @@ function TeamForm({
   }) => void;
 }) {
   const [name, setName] = useState("");
-  const [code, setCode] = useState("");
+  // Código autosugerido desde el nombre — el entrenador confundía "Código
+  // de acceso" con algo que debía recibir, no inventar (ver plan onboarding
+  // 2026-09-03). Precargarlo, editable, deja claro que es él quien lo
+  // elige. Mientras no lo toque directamente (codeTouched=false), sigue al
+  // nombre en vivo; en cuanto lo edita o pide "Sugerir otro", deja de
+  // seguirlo para no pisar su elección.
+  const [suffix, setSuffix] = useState(() => randomCodeSuffix());
+  const [codeTouched, setCodeTouched] = useState(false);
+  const [code, setCode] = useState(() => suggestTeamCode("", suffix));
+  const [codeError, setCodeError] = useState<string | null>(null);
   const [category, setCategory] = useState<string>(CLUB_CATEGORIES[0]);
   const [iconFile, setIconFile] = useState<File | null>(null);
   const [iconPreview, setIconPreview] = useState<string | null>(null);
   const [nameError, setNameError] = useState<string | null>(null);
 
+  const handleNameChange = (value: string) => {
+    setName(value);
+    setNameError(null);
+    if (!codeTouched) setCode(suggestTeamCode(value, suffix));
+  };
+
+  const regenerateCode = () => {
+    const newSuffix = randomCodeSuffix();
+    setSuffix(newSuffix);
+    setCode(suggestTeamCode(name, newSuffix));
+    setCodeTouched(true);
+    setCodeError(null);
+  };
+
   const submit = () => {
-    const error = validateTeamName(name);
-    setNameError(error);
-    if (error) return;
-    if (!code.trim()) return;
+    const nameErr = validateTeamName(name);
+    setNameError(nameErr);
+    const codeErr = validateTeamCode(code);
+    setCodeError(codeErr);
+    if (nameErr || codeErr) return;
     onSubmit({ name: name.trim(), code: code.trim(), iconFile, category: withCategory ? category : undefined });
   };
 
@@ -359,14 +446,39 @@ function TeamForm({
         <Input
           id="team-name"
           value={name}
-          onChange={(e) => { setName(e.target.value); setNameError(null); }}
+          onChange={(e) => handleNameChange(e.target.value)}
           disabled={busy}
         />
         {nameError && <p className="text-sm text-destructive">{nameError}</p>}
       </div>
       <div className="space-y-1">
-        <Label htmlFor="team-code">Código de acceso</Label>
-        <Input id="team-code" value={code} onChange={(e) => setCode(e.target.value)} disabled={busy} />
+        <div className="flex items-center justify-between gap-2">
+          <Label htmlFor="team-code">Código de acceso</Label>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-auto p-0 text-xs font-normal text-muted-foreground hover:text-foreground"
+            disabled={busy}
+            onClick={regenerateCode}
+          >
+            🔄 Sugerir otro
+          </Button>
+        </div>
+        <Input
+          id="team-code"
+          value={code}
+          onChange={(e) => {
+            setCode(e.target.value);
+            setCodeTouched(true);
+            setCodeError(null);
+          }}
+          disabled={busy}
+        />
+        <p className="text-xs text-muted-foreground">
+          Lo eliges tú (o usa el sugerido) — se lo compartirás a tus jugadores para unirse.
+        </p>
+        {codeError && <p className="text-sm text-destructive">{codeError}</p>}
       </div>
       {withCategory && (
         <div className="space-y-1">

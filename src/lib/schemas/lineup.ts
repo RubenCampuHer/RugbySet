@@ -4,6 +4,12 @@
 // de trainingdays bajo el mismo nodo de equipo ya leído entero y en tiempo
 // real por useTeam() — sin reglas RTDB nuevas.
 //
+// La alineación NO sabe a qué partido está asignada (aclarado por el
+// usuario 2026-09-03: son objetos distintos) — esa referencia vive solo en
+// TrainingDay.lineupId, y esa asignación es una acción exclusiva del
+// Calendario (ver actions/lineup.ts → assignLineupToMatch). Por eso este
+// doc no lleva ningún campo de fecha.
+//
 // starters/bench: objeto por número de posición ("1".."15") o dorsal de
 // banquillo ("16", "17"...). ⚠️ RTDB devuelve esto como ARRAY (con `null`
 // en los huecos) en vez de objeto en cuanto hay 2+ claves puramente
@@ -21,8 +27,6 @@ export const LineupDocSchema = z.object({
   lineupId: z.string().nullish(),
   /** Etiqueta libre: "Plan A", "Titular vs Leones RC"... */
   name: z.string().nullish(),
-  /** "dd/MM/yyyy" del partido al que pertenece, o ausente = plantilla suelta sin fecha. */
-  matchFecha: z.string().nullish(),
   starters: rtdbRecord(z.string()).default({}),
   bench: rtdbRecord(z.string()).default({}),
   createdAt: z.number().nullish(),

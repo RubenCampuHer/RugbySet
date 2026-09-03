@@ -24,11 +24,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useTeam } from "@/hooks/useTeam";
 import { createLineup } from "@/lib/actions/lineup";
-import { inputValueToFecha } from "@/lib/calendar";
 import { isAdmin } from "@/lib/permissions";
 import type { LineupDoc } from "@/lib/types";
 
-/** Diálogo mínimo "+ Nueva alineación": nombre + fecha opcional, crea y abre el editor. */
+/** Diálogo mínimo "+ Nueva alineación": solo nombre, crea y abre el editor. */
 function NewLineupDialog({
   teamname,
   onCreated,
@@ -38,7 +37,6 @@ function NewLineupDialog({
 }) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
-  const [fechaInput, setFechaInput] = useState("");
   const [creating, setCreating] = useState(false);
 
   const create = async () => {
@@ -48,13 +46,9 @@ function NewLineupDialog({
     }
     setCreating(true);
     try {
-      const doc = await createLineup(teamname, {
-        name,
-        matchFecha: fechaInput ? inputValueToFecha(fechaInput) : null,
-      });
+      const doc = await createLineup(teamname, { name });
       setOpen(false);
       setName("");
-      setFechaInput("");
       onCreated(doc);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "No se pudo crear la alineación");
@@ -82,18 +76,6 @@ function NewLineupDialog({
               onChange={(e) => setName(e.target.value)}
             />
           </div>
-          <div className="space-y-1">
-            <Label htmlFor="new-lineup-fecha">Fecha del partido (opcional)</Label>
-            <Input
-              id="new-lineup-fecha"
-              type="date"
-              value={fechaInput}
-              onChange={(e) => setFechaInput(e.target.value)}
-            />
-            <p className="text-xs text-muted-foreground">
-              Puedes dejarla en blanco y usarla como plantilla suelta.
-            </p>
-          </div>
         </div>
         <DialogFooter>
           <Button disabled={creating} onClick={() => void create()}>
@@ -106,15 +88,11 @@ function NewLineupDialog({
 }
 
 /**
- * Centro de control de alineaciones (rediseño 2026-09-03 — antes esta
- * página solo listaba partidos con lineup.published, ahora la alineación
- * es una entidad propia en team.lineups, se puede crear/editar aquí
- * directamente sin pasar por el Calendario).
- *
- * "Publicadas": las lineups cuyo id coincide con algún
- * trainingdays[].lineupId — visibles a todo el equipo. "Borradores y
- * plantillas": el resto (con o sin fecha de partido) — solo
- * coach/ADMIN, igual que el propio LineupEditor.
+ * Biblioteca de alineaciones (rediseño 2026-09-03 — la alineación es una
+ * entidad propia en team.lineups, se crea/edita/borra aquí; asignarla a un
+ * partido concreto es una acción exclusiva del Calendario, esta página no
+ * tiene ningún control para eso, solo muestra a qué partido(s) está
+ * asignada cada una a modo informativo).
  */
 function TeamLineups() {
   const params = useSearchParams();
@@ -146,18 +124,19 @@ function TeamLineups() {
 
   const isManage = team.usercoach === firebaseUser?.uid || isAdmin(profile);
 
-  const all = Object.values(team.lineups);
-  const publishedIds = new Set(
-    team.trainingdays.map((d) => d.lineupId).filter((id): id is string => Boolean(id)),
+  // Por partido asignado a cada lineupId — solo informativo (ver
+  // LineupEditor: la asignación en sí es exclusiva del Calendario).
+  const assignedFechasByLineup = new Map<string, string[]>();
+  for (const d of team.trainingdays) {
+    if (!d.lineupId || !d.fecha) continue;
+    const list = assignedFechasByLineup.get(d.lineupId) ?? [];
+    list.push(d.fecha);
+    assignedFechasByLineup.set(d.lineupId, list);
+  }
+
+  const lineups = Object.values(team.lineups).sort(
+    (a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0),
   );
-  const published = all
-    .filter((l) => l.lineupId && publishedIds.has(l.lineupId))
-    .sort((a, b) => (a.matchFecha ?? "").localeCompare(b.matchFecha ?? ""));
-  const drafts = isManage
-    ? all
-        .filter((l) => !l.lineupId || !publishedIds.has(l.lineupId))
-        .sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0))
-    : [];
 
   return (
     <div className="mx-auto max-w-2xl space-y-4">
@@ -177,19 +156,24 @@ function TeamLineups() {
       )}
 
       <div className="space-y-2">
-        <p className="text-sm font-medium text-muted-foreground">Publicadas</p>
-        {published.length === 0 ? (
+        <p className="text-sm font-medium text-muted-foreground">Alineaciones</p>
+        {lineups.length === 0 ? (
           <EmptyState
             icon={Trophy}
-            title="Sin alineaciones publicadas"
-            hint="Aquí aparecerán en cuanto el entrenador publique una para un partido."
+            title="Sin alineaciones todavía"
+            hint={
+              isManage
+                ? "Crea la primera con el botón de arriba."
+                : "Aquí aparecerán en cuanto el entrenador cree alguna."
+            }
           />
         ) : (
           <Card>
             <CardContent className="divide-y divide-border p-0">
-              {published.map((l) => {
+              {lineups.map((l) => {
                 const key = l.lineupId!;
                 const isExpanded = expanded === key;
+                const fechas = assignedFechasByLineup.get(key) ?? [];
                 return (
                   <div key={key}>
                     <button
@@ -203,7 +187,7 @@ function TeamLineups() {
                         {l.name || "(sin nombre)"}
                       </span>
                       <span className="shrink-0 text-xs text-muted-foreground">
-                        {l.matchFecha}
+                        {fechas.length > 0 ? fechas.join(", ") : "sin partido asignado"}
                       </span>
                       {!isManage &&
                         (isExpanded ? (
@@ -225,34 +209,10 @@ function TeamLineups() {
         )}
       </div>
 
-      {isManage && (
-        <div className="space-y-2">
-          <p className="text-sm font-medium text-muted-foreground">Borradores y plantillas</p>
-          {drafts.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Ninguno por ahora.</p>
-          ) : (
-            <Card>
-              <CardContent className="divide-y divide-border p-0">
-                {drafts.map((l) => (
-                  <button
-                    key={l.lineupId}
-                    type="button"
-                    onClick={() => setEditing(l)}
-                    className="flex w-full items-center gap-3 p-3 text-left hover:bg-muted/50"
-                  >
-                    <span className="flex-1 truncate text-sm font-medium">
-                      {l.name || "(sin nombre)"}
-                    </span>
-                    <span className="shrink-0 text-xs text-muted-foreground">
-                      {l.matchFecha || "plantilla"}
-                    </span>
-                    <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-                  </button>
-                ))}
-              </CardContent>
-            </Card>
-          )}
-        </div>
+      {isManage && lineups.length > 0 && (
+        <p className="text-xs text-muted-foreground">
+          Para asignar una alineación a un partido, ábrelo desde el Calendario.
+        </p>
       )}
 
       <LineupEditorSheet

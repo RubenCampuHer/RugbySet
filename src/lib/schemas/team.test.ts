@@ -76,7 +76,6 @@ describe("TeamSchema.lineups", () => {
         "-Nabc123": {
           lineupId: "-Nabc123",
           name: "Plan A",
-          matchFecha: "10/09/2026",
           starters: { "1": "Juan Pérez" },
           bench: {},
         },

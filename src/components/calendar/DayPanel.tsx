@@ -13,10 +13,133 @@ import { RollCall } from "@/components/calendar/RollCall";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { assignLineupToMatch, createLineup } from "@/lib/actions/lineup";
 import { resolveUidByName } from "@/lib/actions/team";
 import { sendAttendanceNotification } from "@/lib/actions/notify";
 import type { Team, TrainingDay } from "@/lib/types";
+
+const NO_LINEUP = "__none__";
+const CREATE_LINEUP = "__create__";
+
+/**
+ * Elegir (o crear) qué alineación es la de ESTE partido — acción exclusiva
+ * del Calendario desde el rediseño 2026-09-03: la alineación (roster) y su
+ * asignación a un partido concreto son objetos distintos, y decidir cuál
+ * es la de un partido solo se hace aquí, nunca desde /team/lineups.
+ */
+function MatchLineupSection({ team, fecha, day }: { team: Team; fecha: string; day: TrainingDay }) {
+  const [assigning, setAssigning] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [newName, setNewName] = useState("");
+
+  const lineups = Object.values(team.lineups).sort(
+    (a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0),
+  );
+  const current = day.lineupId && team.lineups[day.lineupId] ? team.lineups[day.lineupId] : null;
+
+  const assign = async (lineupId: string | null) => {
+    setAssigning(true);
+    try {
+      await assignLineupToMatch(team.teamname!, fecha, lineupId, team.trainingdays);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo asignar la alineación");
+    } finally {
+      setAssigning(false);
+    }
+  };
+
+  const createAndAssign = async () => {
+    if (!newName.trim()) {
+      toast.error("Ponle un nombre a la alineación (p.ej. \"Plan A\", \"Titular vs Leones\")");
+      return;
+    }
+    setAssigning(true);
+    try {
+      const doc = await createLineup(team.teamname!, { name: newName });
+      await assignLineupToMatch(team.teamname!, fecha, doc.lineupId!, team.trainingdays);
+      setCreating(false);
+      setNewName("");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo crear la alineación");
+    } finally {
+      setAssigning(false);
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="space-y-1">
+        <Label className="text-xs text-muted-foreground">Alineación de este partido</Label>
+        <Select
+          value={day.lineupId ?? NO_LINEUP}
+          disabled={assigning}
+          onValueChange={(v) => {
+            if (!v) return;
+            if (v === CREATE_LINEUP) {
+              setCreating(true);
+              return;
+            }
+            void assign(v === NO_LINEUP ? null : v);
+          }}
+        >
+          <SelectTrigger className="min-w-0 w-full" aria-label="Alineación de este partido">
+            <SelectValue className="min-w-0">
+              <span className="truncate">{current ? current.name || "(sin nombre)" : "Sin alineación"}</span>
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={NO_LINEUP}>Sin alineación</SelectItem>
+            {lineups.map((l) => (
+              <SelectItem key={l.lineupId} value={l.lineupId!}>
+                {l.name || "(sin nombre)"}
+              </SelectItem>
+            ))}
+            <SelectItem value={CREATE_LINEUP}>+ Crear nueva…</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {creating && (
+        <div className="flex items-center gap-2">
+          <Input
+            autoFocus
+            value={newName}
+            placeholder="p.ej. Plan A, Titular vs Leones RC…"
+            aria-label="Nombre de la nueva alineación"
+            onChange={(e) => setNewName(e.target.value)}
+            className="flex-1"
+          />
+          <Button size="sm" disabled={assigning} onClick={() => void createAndAssign()}>
+            Crear
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              setCreating(false);
+              setNewName("");
+            }}
+          >
+            Cancelar
+          </Button>
+        </div>
+      )}
+
+      {current && <LineupEditor team={team} lineup={current} />}
+    </div>
+  );
+}
 
 /**
  * Panel del día seleccionado. Sin evento: mensaje claro para el jugador
@@ -180,18 +303,7 @@ export function DayPanel({
             </TabsContent>
             {isMatch && (
               <TabsContent value="lineup" className="pt-3">
-                {day.lineupId && team.lineups[day.lineupId] ? (
-                  <LineupEditor team={team} lineup={team.lineups[day.lineupId]} />
-                ) : (
-                  <div className="space-y-3 text-center">
-                    <p className="text-sm text-muted-foreground">
-                      Este partido todavía no tiene ninguna alineación publicada.
-                    </p>
-                    <Button className="w-full" render={<Link href="/team/lineups" />}>
-                      Crear o elegir alineación
-                    </Button>
-                  </div>
-                )}
+                <MatchLineupSection team={team} fecha={fecha} day={day} />
               </TabsContent>
             )}
           </Tabs>

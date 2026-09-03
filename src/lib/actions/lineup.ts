@@ -3,22 +3,27 @@
 // Viven en Teams/{teamname}/lineups/{lineupId}, hermana de trainingdays
 // bajo el mismo nodo de equipo — mismo .write/.read de Teams/{teamname}
 // que ya cubre todo lo demás, sin reglas RTDB nuevas.
+//
+// La alineación (nombre + titulares + banquillo) y su asignación a un
+// partido concreto son objetos distintos (aclarado por el usuario
+// 2026-09-03): crear/editar/borrar una alineación vive en cualquier
+// sitio (biblioteca en /team/lineups, o el propio Calendario); decidir
+// QUÉ alineación es la de un partido concreto (assignLineupToMatch) es
+// una acción exclusiva del Calendario — la alineación no sabe ni le
+// importa a qué partido está asignada, esa referencia vive solo en
+// TrainingDay.lineupId.
 import { push, ref, update } from "firebase/database";
 import { PATHS } from "@/lib/constants";
 import { db } from "@/lib/firebase";
 import type { LineupDoc, TrainingDay } from "@/lib/types";
 
-/** Crea una alineación nueva (plantilla suelta si matchFecha es null). */
-export async function createLineup(
-  teamname: string,
-  data: { name: string; matchFecha: string | null },
-): Promise<LineupDoc> {
+/** Crea una alineación nueva — solo nombre, sin ningún partido asociado todavía. */
+export async function createLineup(teamname: string, data: { name: string }): Promise<LineupDoc> {
   const lineupId = push(ref(db, `${PATHS.TEAMS}/${teamname}/lineups`)).key;
   if (!lineupId) throw new Error("No se pudo crear la alineación");
   const doc: LineupDoc = {
     lineupId,
     name: data.name.trim() || null,
-    matchFecha: data.matchFecha,
     starters: {},
     bench: {},
     createdAt: Date.now(),
@@ -27,20 +32,18 @@ export async function createLineup(
   return doc;
 }
 
-/** Actualiza nombre/fecha/titulares/banquillo de una alineación existente — merge parcial. */
+/** Actualiza nombre/titulares/banquillo de una alineación existente — merge parcial. */
 export async function updateLineup(
   teamname: string,
   lineupId: string,
   patch: {
     name?: string;
-    matchFecha?: string | null;
     starters?: Record<string, string>;
     bench?: Record<string, string>;
   },
 ): Promise<void> {
   const updates: Record<string, unknown> = {};
   if (patch.name !== undefined) updates.name = patch.name.trim() || null;
-  if (patch.matchFecha !== undefined) updates.matchFecha = patch.matchFecha;
   if (patch.starters !== undefined) updates.starters = patch.starters;
   if (patch.bench !== undefined) updates.bench = patch.bench;
   await update(ref(db, `${PATHS.TEAMS}/${teamname}/lineups/${lineupId}`), updates);
@@ -51,7 +54,7 @@ export async function updateLineup(
  * reescribir trainingdays entero — un día leído de RTDB puede traer algún
  * campo nullish ausente (undefined tras el parseo de Zod) si es antiguo, y
  * Firebase rechaza cualquier undefined en el objeto que se escribe. Mismo
- * criterio que upsertTrainingDay/el saveLineup anterior (ver team.ts).
+ * criterio que upsertTrainingDay (ver team.ts).
  */
 function rebuildDay(day: TrainingDay, overrides: Partial<TrainingDay>): TrainingDay {
   return {
@@ -70,62 +73,30 @@ function rebuildDay(day: TrainingDay, overrides: Partial<TrainingDay>): Training
 }
 
 /**
- * Hace que `lineupId` sea LA alineación oficial de ese partido — publicarla.
- * Si el día no existe todavía en el calendario, lo crea (Partido mínimo,
- * horas por defecto). Si existe pero no es un Partido, se niega en vez de
- * pisar un Entrenamiento ya programado con su entreno adjunto.
+ * Asigna (o quita, con lineupId=null) qué alineación es la de un partido
+ * YA EXISTENTE en el calendario — acción exclusiva de DayPanel, que
+ * siempre opera sobre un TrainingDay confirmado (nunca hace falta crear
+ * el día aquí: si no existe, es un error de uso, no un caso a resolver).
  */
-export async function publishLineup(
+export async function assignLineupToMatch(
   teamname: string,
-  lineupId: string,
-  matchFecha: string,
-  lineupName: string | null,
+  fecha: string,
+  lineupId: string | null,
   existing: TrainingDay[],
 ): Promise<void> {
-  const existingDay = existing.find((d) => d.fecha === matchFecha);
-  if (existingDay && existingDay.eventType !== "MATCH") {
-    throw new Error(
-      "Ese día ya tiene un entreno programado — cámbialo a Partido desde el Calendario antes de publicar.",
-    );
-  }
-  const newDay: TrainingDay = existingDay
-    ? rebuildDay(existingDay, { lineupId })
-    : {
-        fecha: matchFecha,
-        horaInicio: "18:00",
-        horaFin: "19:30",
-        nameTrainingDay: lineupName ?? "",
-        training: null,
-        eventType: "MATCH",
-        location: null,
-        accepted_players: [],
-        declined_players: [],
-        lineupId,
-      };
-  const rest = existing.filter((d) => d.fecha !== matchFecha);
-  await update(ref(db, `${PATHS.TEAMS}/${teamname}`), {
-    trainingdays: [...rest, newDay],
-  });
-}
-
-/** Deja de mostrar una alineación al equipo para ese partido, sin borrarla (sigue en Borradores). */
-export async function unpublishLineup(
-  teamname: string,
-  matchFecha: string,
-  existing: TrainingDay[],
-): Promise<void> {
-  const existingDay = existing.find((d) => d.fecha === matchFecha);
-  if (!existingDay) return;
-  const newDay = rebuildDay(existingDay, { lineupId: null });
-  const rest = existing.filter((d) => d.fecha !== matchFecha);
+  const existingDay = existing.find((d) => d.fecha === fecha);
+  if (!existingDay) throw new Error(`No existe ningún partido el ${fecha}`);
+  const newDay = rebuildDay(existingDay, { lineupId });
+  const rest = existing.filter((d) => d.fecha !== fecha);
   await update(ref(db, `${PATHS.TEAMS}/${teamname}`), {
     trainingdays: [...rest, newDay],
   });
 }
 
 /**
- * Borra una alineación. Si algún partido la tenía publicada, limpia esa
- * referencia en la misma escritura multi-path para no dejarla colgando.
+ * Borra una alineación. Si algún partido (o varios — la misma alineación
+ * puede reutilizarse en más de un partido) la tenía asignada, limpia esa
+ * referencia en la misma escritura para no dejarla colgando.
  */
 export async function deleteLineup(
   teamname: string,
@@ -135,13 +106,13 @@ export async function deleteLineup(
   const updates: Record<string, unknown> = {
     [`lineups/${lineupId}`]: null,
   };
-  const referencingDay = existing.find((d) => d.lineupId === lineupId);
-  if (referencingDay?.fecha) {
-    const newDay = rebuildDay(referencingDay, { lineupId: null });
-    updates.trainingdays = [
-      ...existing.filter((d) => d.fecha !== referencingDay.fecha),
-      newDay,
-    ];
+  const referencingFechas = new Set(
+    existing.filter((d) => d.lineupId === lineupId).map((d) => d.fecha),
+  );
+  if (referencingFechas.size > 0) {
+    updates.trainingdays = existing.map((d) =>
+      referencingFechas.has(d.fecha) ? rebuildDay(d, { lineupId: null }) : d,
+    );
   }
   await update(ref(db, `${PATHS.TEAMS}/${teamname}`), updates);
 }

@@ -47,3 +47,22 @@ export function nextBenchNumber(lineup: Lineup | null | undefined): number {
   const keys = Object.keys((lineup ?? EMPTY_LINEUP).bench).map(Number);
   return keys.length === 0 ? 16 : Math.max(...keys) + 1;
 }
+
+/**
+ * Primer nombre duplicado en la alineación (dos filas distintas con la
+ * misma persona), o null si no hay ninguno. takenNames ya evita elegir dos
+ * veces del roster en el Select, pero un nombre escrito a mano en dos
+ * filas distintas no pasa por ningún roster que lo impida — se valida
+ * aquí, al guardar. Comparación sin mayúsculas ni espacios extra (mismo
+ * "Juan Pérez" escrito con distinto formato en dos filas también cuenta).
+ */
+export function findDuplicateName(lineup: Lineup): string | null {
+  const seen = new Set<string>();
+  for (const name of [...Object.values(lineup.starters), ...Object.values(lineup.bench)]) {
+    const key = name.trim().toLowerCase();
+    if (!key) continue;
+    if (seen.has(key)) return name;
+    seen.add(key);
+  }
+  return null;
+}

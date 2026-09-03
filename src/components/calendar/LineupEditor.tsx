@@ -13,7 +13,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { saveLineup } from "@/lib/actions/team";
-import { nextBenchNumber, RUGBY_POSITIONS, STARTER_POSITIONS, takenNames } from "@/lib/lineup";
+import {
+  findDuplicateName,
+  nextBenchNumber,
+  RUGBY_POSITIONS,
+  STARTER_POSITIONS,
+  takenNames,
+} from "@/lib/lineup";
 import type { Lineup, Team, TrainingDay } from "@/lib/types";
 
 const NONE = "__none__";
@@ -161,15 +167,23 @@ export function LineupEditor({ team, day }: { team: Team; day: TrainingDay }) {
   };
 
   const save = async () => {
+    // Defensivo: una fila de banquillo recién añadida y nunca asignada no
+    // debe persistirse vacía.
+    const clean: Lineup = {
+      ...lineup,
+      starters: Object.fromEntries(Object.entries(lineup.starters).filter(([, v]) => v)),
+      bench: Object.fromEntries(Object.entries(lineup.bench).filter(([, v]) => v)),
+    };
+    // Un nombre escrito a mano en dos filas distintas no pasa por ningún
+    // roster que lo impida (a diferencia de elegir dos veces del equipo,
+    // que el Select ya evita) — se valida aquí antes de guardar.
+    const duplicate = findDuplicateName(clean);
+    if (duplicate) {
+      toast.error(`"${duplicate}" está asignado en más de una posición`);
+      return;
+    }
     setSaving(true);
     try {
-      // Defensivo: una fila de banquillo recién añadida y nunca asignada no
-      // debe persistirse vacía.
-      const clean: Lineup = {
-        ...lineup,
-        starters: Object.fromEntries(Object.entries(lineup.starters).filter(([, v]) => v)),
-        bench: Object.fromEntries(Object.entries(lineup.bench).filter(([, v]) => v)),
-      };
       await saveLineup(team.teamname!, day.fecha!, clean, team.trainingdays);
       toast.success(clean.published ? "Alineación publicada" : "Alineación guardada como borrador");
     } catch (e) {

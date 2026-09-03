@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { nextBenchNumber, RUGBY_POSITIONS, STARTER_POSITIONS, takenNames } from "./lineup";
+import {
+  findDuplicateName,
+  nextBenchNumber,
+  RUGBY_POSITIONS,
+  STARTER_POSITIONS,
+  takenNames,
+} from "./lineup";
 import type { Lineup } from "./types";
 
 describe("RUGBY_POSITIONS / STARTER_POSITIONS", () => {
@@ -44,6 +50,44 @@ describe("takenNames", () => {
       bench: {},
     };
     expect(takenNames(lineup, "9").has("Invitado Sin Cuenta")).toBe(true);
+  });
+});
+
+describe("findDuplicateName", () => {
+  it("sin duplicados devuelve null", () => {
+    const lineup: Lineup = {
+      published: false,
+      starters: { "1": "Juan Pérez", "9": "Ana García" },
+      bench: { "16": "Marc López" },
+    };
+    expect(findDuplicateName(lineup)).toBeNull();
+  });
+
+  it("detecta el mismo nombre manual repetido en dos filas (titular y banquillo)", () => {
+    const lineup: Lineup = {
+      published: false,
+      starters: { "1": "Invitado Sin Cuenta" },
+      bench: { "16": "Invitado Sin Cuenta" },
+    };
+    expect(findDuplicateName(lineup)).toBe("Invitado Sin Cuenta");
+  });
+
+  it("ignora mayúsculas y espacios extra al comparar", () => {
+    const lineup: Lineup = {
+      published: false,
+      starters: { "1": "Juan Pérez", "2": "  juan pérez  " },
+      bench: {},
+    };
+    expect(findDuplicateName(lineup)).not.toBeNull();
+  });
+
+  it("no confunde huecos vacíos entre sí (nunca hay strings vacíos en starters/bench en la práctica, pero por si acaso)", () => {
+    const lineup: Lineup = {
+      published: false,
+      starters: { "1": "", "2": "" },
+      bench: {},
+    };
+    expect(findDuplicateName(lineup)).toBeNull();
   });
 });
 

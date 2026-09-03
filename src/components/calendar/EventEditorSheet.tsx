@@ -54,6 +54,8 @@ export function EventEditorSheet({
   const [pickerOpen, setPickerOpen] = useState(false);
   const selectedTraining = trainings.find((t) => t.name === trainingName);
 
+  const isMatch = eventType === "MATCH";
+
   const save = async () => {
     if (!TIME_RE.test(horaInicio) || !TIME_RE.test(horaFin)) {
       toast.error("Horas inválidas");
@@ -63,10 +65,16 @@ export function EventEditorSheet({
       toast.error("La hora de inicio debe ser anterior a la de fin");
       return;
     }
-    const training = trainings.find((t) => t.name === trainingName);
-    if (!training) {
-      toast.error("Elige un entreno");
-      return;
+    // El entreno (plantilla de ejercicios) solo tiene sentido para un
+    // Entrenamiento — un Partido no lleva ninguno adjunto (Android ya lo
+    // permitía así, la web lo forzaba solo aquí).
+    let training;
+    if (!isMatch) {
+      training = trainings.find((t) => t.name === trainingName);
+      if (!training) {
+        toast.error("Elige un entreno");
+        return;
+      }
     }
     setBusy(true);
     try {
@@ -75,7 +83,15 @@ export function EventEditorSheet({
         { fecha, horaInicio, horaFin, training, nameTrainingDay: eventName, eventType, location },
         team.trainingdays,
       );
-      toast.success(day ? "Entreno actualizado" : "Entreno creado");
+      toast.success(
+        day
+          ? isMatch
+            ? "Partido actualizado"
+            : "Entreno actualizado"
+          : isMatch
+            ? "Partido creado"
+            : "Entreno creado",
+      );
       onOpenChange(false);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "No se pudo guardar");
@@ -86,7 +102,7 @@ export function EventEditorSheet({
 
   const remove = async () => {
     await deleteTrainingDay(team.teamname!, fecha, team.trainingdays);
-    toast.success("Entreno borrado");
+    toast.success(isMatch ? "Partido borrado" : "Entreno borrado");
     onOpenChange(false);
   };
 
@@ -161,38 +177,42 @@ export function EventEditorSheet({
             />
           </div>
 
-          <div className="space-y-1">
-            <Label className="text-xs">Entreno</Label>
-            <Button
-              type="button"
-              variant="outline"
-              size="xl"
-              className="w-full justify-between font-normal"
-              onClick={() => setPickerOpen(true)}
-            >
-              <span className={cn("line-clamp-1 text-left", !selectedTraining && "text-muted-foreground")}>
-                {selectedTraining
-                  ? `${selectedTraining.name} (${selectedTraining.tiempoTotal ?? "?"} min)`
-                  : "Elegir entreno…"}
-              </span>
-              <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-            </Button>
-          </div>
+          {!isMatch && (
+            <div className="space-y-1">
+              <Label className="text-xs">Entreno</Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="xl"
+                className="w-full justify-between font-normal"
+                onClick={() => setPickerOpen(true)}
+              >
+                <span className={cn("line-clamp-1 text-left", !selectedTraining && "text-muted-foreground")}>
+                  {selectedTraining
+                    ? `${selectedTraining.name} (${selectedTraining.tiempoTotal ?? "?"} min)`
+                    : "Elegir entreno…"}
+                </span>
+                <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+              </Button>
+            </div>
+          )}
         </div>
 
-        <TrainingPickerSheet
-          open={pickerOpen}
-          onOpenChange={setPickerOpen}
-          value={trainingName}
-          onConfirm={(name) => {
-            setTrainingName(name);
-            setPickerOpen(false);
-          }}
-        />
+        {!isMatch && (
+          <TrainingPickerSheet
+            open={pickerOpen}
+            onOpenChange={setPickerOpen}
+            value={trainingName}
+            onConfirm={(name) => {
+              setTrainingName(name);
+              setPickerOpen(false);
+            }}
+          />
+        )}
 
         <SheetFooter>
           <Button size="xl" disabled={busy} onClick={() => void save()}>
-            {day ? "Guardar cambios" : "Crear entreno"}
+            {day ? "Guardar cambios" : isMatch ? "Crear partido" : "Crear entreno"}
           </Button>
           {day && (
             <ConfirmDialog
@@ -201,7 +221,7 @@ export function EventEditorSheet({
                   <Trash2 className="size-4" /> Borrar día
                 </Button>
               }
-              title={`¿Borrar el entreno del ${fecha}?`}
+              title={`¿Borrar el ${isMatch ? "partido" : "entreno"} del ${fecha}?`}
               confirmLabel="Borrar"
               destructive
               onConfirm={remove}

@@ -148,6 +148,12 @@ export async function setAttendance(opts: {
  * nameTrainingDay/eventType/location son aditivos (2026-07-13, ver
  * TrainingDay.kt): antes nameTrainingDay siempre se guardaba "" — ahora se
  * persiste el valor real si se pasa.
+ *
+ * `training` es opcional: un Partido puede no llevar ningún entreno
+ * adjunto (Android ya lo permitía, la web lo forzaba solo en la UI — ver
+ * EventEditorSheet). `lineup` se preserva del día existente igual que
+ * accepted_players/declined_players — este upsert lo usa el editor de
+ * evento (horas/ubicación/entreno), que nunca toca la alineación.
  */
 export async function upsertTrainingDay(
   teamname: string,
@@ -155,13 +161,14 @@ export async function upsertTrainingDay(
     fecha: string;
     horaInicio: string;
     horaFin: string;
-    training: Training;
+    training?: Training;
     nameTrainingDay?: string;
     eventType?: "TRAINING" | "MATCH";
     location?: string | null;
   },
   existing: TrainingDay[],
 ) {
+  const existingDay = existing.find((d) => d.fecha === day.fecha);
   const newDay: TrainingDay = {
     fecha: day.fecha,
     horaInicio: day.horaInicio,
@@ -170,12 +177,31 @@ export async function upsertTrainingDay(
     training: day.training,
     eventType: day.eventType ?? "TRAINING",
     location: day.location?.trim() ? day.location.trim() : null,
-    accepted_players:
-      existing.find((d) => d.fecha === day.fecha)?.accepted_players ?? [],
-    declined_players:
-      existing.find((d) => d.fecha === day.fecha)?.declined_players ?? [],
+    accepted_players: existingDay?.accepted_players ?? [],
+    declined_players: existingDay?.declined_players ?? [],
+    lineup: existingDay?.lineup,
   };
   const rest = existing.filter((d) => d.fecha !== day.fecha);
+  await update(ref(db, `${PATHS.TEAMS}/${teamname}`), {
+    trainingdays: [...rest, newDay],
+  });
+}
+
+/**
+ * Coach guarda/publica la alineación de un Partido — mismo patrón de upsert
+ * por fecha que upsertTrainingDay, pero solo toca `lineup` (preserva todo
+ * lo demás del día: horas, ubicación, entreno, asistencia).
+ */
+export async function saveLineup(
+  teamname: string,
+  fecha: string,
+  lineup: TrainingDay["lineup"],
+  existing: TrainingDay[],
+) {
+  const existingDay = existing.find((d) => d.fecha === fecha);
+  if (!existingDay) throw new Error(`No existe ningún evento el ${fecha}`);
+  const newDay: TrainingDay = { ...existingDay, lineup };
+  const rest = existing.filter((d) => d.fecha !== fecha);
   await update(ref(db, `${PATHS.TEAMS}/${teamname}`), {
     trainingdays: [...rest, newDay],
   });

@@ -24,8 +24,10 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { useClub } from "@/hooks/useClub";
 import { useProfilesByUid } from "@/hooks/useProfilesByUid";
 import { useTeam } from "@/hooks/useTeam";
+import { appointDirector } from "@/lib/actions/club";
 import {
   acceptPendingCoach,
   acceptPendingPlayer,
@@ -47,7 +49,7 @@ import { isAdmin, isTeamCoach, isTeamFounder } from "@/lib/permissions";
 import { resizeAndUpload } from "@/lib/storage";
 import { parseOr } from "@/lib/schemas/common";
 import { PublicProfileSchema } from "@/lib/schemas/user";
-import type { PublicProfile, Team } from "@/lib/types";
+import type { Club, PublicProfile, Team } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 /**
@@ -255,15 +257,25 @@ function PendingSection({ team, canManage }: { team: Team; canManage: boolean })
  * de un ADMIN/admin de club viendo el equipo (canRemoveCoach — mismo
  * criterio que canDeleteTeam: un ADMIN viendo un equipo ajeno nunca es el
  * fundador literal, así que sin este bypass el botón no aparecía nunca).
+ *
+ * "Nombrar codirector del club" (2026-09-03, pedido explícito: hacerlo
+ * también desde DENTRO del equipo, no solo desde la lista de equipos del
+ * club) — visible en cada fila (fundador o co-entrenador) si este equipo
+ * pertenece a un club (`club` no null) y quien mira dirige ESE club o es
+ * ADMIN (`canAppointDirector`); oculto si ese entrenador ya es director.
  */
 function CoachesSection({
   team,
+  club,
   canManage,
   canRemoveCoach,
+  canAppointDirector,
 }: {
   team: Team;
+  club: Club | null;
   canManage: boolean;
   canRemoveCoach: boolean;
+  canAppointDirector: boolean;
 }) {
   const [busy, setBusy] = useState<string | null>(null);
   const founderUid = team.usercoach;
@@ -302,6 +314,22 @@ function CoachesSection({
     }
   };
 
+  const appoint = async (uid: string, name: string) => {
+    if (!club) return;
+    setBusy(uid);
+    try {
+      await appointDirector(club, uid);
+      toast.success(`${name} nombrado codirector del club`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo nombrar");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const canOfferDirector = (uid: string) =>
+    canAppointDirector && Boolean(club) && club!.adminUserId !== uid && club!.directors[uid] !== true;
+
   return (
     <Card>
       <CardHeader>
@@ -318,6 +346,18 @@ function CoachesSection({
               )}
             </div>
             <Badge variant="outline">Fundador</Badge>
+            {canOfferDirector(founderUid) && (
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                aria-label={`Nombrar codirector del club a ${profiles[founderUid]?.nameSurname ?? "el entrenador"}`}
+                title="Nombrar codirector del club"
+                disabled={busy === founderUid}
+                onClick={() => void appoint(founderUid, profiles[founderUid]?.nameSurname || "El entrenador")}
+              >
+                <ArrowUpCircle className="size-4" />
+              </Button>
+            )}
           </div>
         )}
         {coCoachUids.map((uid) => (
@@ -325,17 +365,33 @@ function CoachesSection({
             key={uid}
             name={profiles[uid]?.nameSurname || "Entrenador"}
             action={
-              canRemoveCoach ? (
-                <Button
-                  size="icon-xl"
-                  variant="ghost"
-                  className="rounded-full text-destructive hover:text-destructive"
-                  aria-label={`Quitar a ${profiles[uid]?.nameSurname ?? "este co-entrenador"}`}
-                  disabled={busy === uid}
-                  onClick={() => void remove(uid)}
-                >
-                  <Trash2 className="size-4" />
-                </Button>
+              canRemoveCoach || canOfferDirector(uid) ? (
+                <span className="flex gap-1">
+                  {canOfferDirector(uid) && (
+                    <Button
+                      size="icon-xl"
+                      variant="ghost"
+                      aria-label={`Nombrar codirector del club a ${profiles[uid]?.nameSurname ?? "este entrenador"}`}
+                      title="Nombrar codirector del club"
+                      disabled={busy === uid}
+                      onClick={() => void appoint(uid, profiles[uid]?.nameSurname || "El entrenador")}
+                    >
+                      <ArrowUpCircle className="size-4" />
+                    </Button>
+                  )}
+                  {canRemoveCoach && (
+                    <Button
+                      size="icon-xl"
+                      variant="ghost"
+                      className="rounded-full text-destructive hover:text-destructive"
+                      aria-label={`Quitar a ${profiles[uid]?.nameSurname ?? "este co-entrenador"}`}
+                      disabled={busy === uid}
+                      onClick={() => void remove(uid)}
+                    >
+                      <Trash2 className="size-4" />
+                    </Button>
+                  )}
+                </span>
               ) : undefined
             }
           />
@@ -397,6 +453,11 @@ export function TeamManager({
 }) {
   const { firebaseUser, profile } = useAuth();
   const { team, hasTeam, loading } = useTeam(teamname ?? undefined);
+  // Club de ESTE equipo (si tiene), no el que yo administro — clubId
+  // explícito (aunque sea null) para que useClub nunca caiga al fallback de
+  // "mi propio club" (ver useClub.ts). Solo importa para "Nombrar
+  // codirector del club" en CoachesSection, más abajo.
+  const { club } = useClub(team?.clubId ?? null);
   const [kicking, setKicking] = useState<string | null>(null);
   const [leaving, setLeaving] = useState(false);
   const [uploadingIcon, setUploadingIcon] = useState(false);
@@ -439,6 +500,15 @@ export function TeamManager({
   // alguien que está mirando un equipo ajeno del que no forma parte, y el
   // fundador no puede salir (debe eliminar el equipo); un co-entrenador sí.
   const canLeave = !viewingAsSomeAdmin && !isFounder;
+  // "Nombrar codirector del club" (pedido 2026-09-03: hacerlo también desde
+  // dentro del equipo) — solo si este equipo pertenece a un club Y quien
+  // mira dirige ESE club (fundador o codirector) o es ADMIN global. Un
+  // admin de OTRO club viendo este equipo (viewingAsClubAdmin) no cuenta:
+  // sería el director de un club ajeno al de este equipo en concreto.
+  const isDirectorOfTeamClub = Boolean(
+    club && firebaseUser?.uid && (club.adminUserId === firebaseUser.uid || club.directors[firebaseUser.uid] === true),
+  );
+  const canAppointDirector = Boolean(club) && (isDirectorOfTeamClub || (viewingAsAdmin && isAdmin(profile)));
 
   const kick = async (name: string) => {
     setKicking(name);
@@ -614,7 +684,13 @@ export function TeamManager({
 
       <PendingSection team={team} canManage={canManage} />
 
-      <CoachesSection team={team} canManage={canManage} canRemoveCoach={canDeleteTeam} />
+      <CoachesSection
+        team={team}
+        club={club}
+        canManage={canManage}
+        canRemoveCoach={canDeleteTeam}
+        canAppointDirector={canAppointDirector}
+      />
 
       <Card>
         <CardHeader>

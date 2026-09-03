@@ -24,14 +24,20 @@ import type { Club } from "@/lib/types";
  * de siempre — compatibilidad con clubes ya existentes cuyo fundador no lo
  * tiene todavía (nunca hizo falta backfill, ver plan).
  *
- * `clubId` explícito (panel admin, ver un club ajeno) sustituye a ambos —
- * las reglas RTDB ya dan lectura total de cualquier club a un ADMIN.
+ * `clubId` explícito (panel admin, ver un club ajeno; o el clubId — quizá
+ * `null` — de un equipo concreto en TeamManager) sustituye a ambos — las
+ * reglas RTDB ya dan lectura total de cualquier club a un ADMIN. Se
+ * distingue `undefined` (parámetro OMITIDO del todo → resolver "mi propio
+ * club") de `null` (parámetro pasado explícitamente, p.ej. team.clubId de
+ * un equipo sin club → no hay nada que cargar, sin caer al fallback de "mi
+ * propio club", que sería un club completamente distinto y equivocado).
  */
-export function useClub(clubId?: string) {
+export function useClub(clubId?: string | null) {
   const { profile } = useAuth();
   const uid = profile?.userId ?? null;
   const pointerClubId = profile?.directorOfClubId ?? null;
-  const resolvedClubId = clubId ?? pointerClubId;
+  const explicit = clubId !== undefined;
+  const resolvedClubId = explicit ? clubId : pointerClubId;
   const [club, setClub] = useState<Club | null | undefined>(undefined);
 
   useEffect(() => {
@@ -45,6 +51,10 @@ export function useClub(clubId?: string) {
         },
       );
     }
+    // clubId explícito (aunque sea null/vacío) — nada que suscribir aquí;
+    // el resultado final ("sin club") se deriva más abajo sin pasar por
+    // este estado, para no llamar a setState síncronamente en el efecto.
+    if (explicit) return;
     // Sin clubId explícito ni puntero propio: fallback de compatibilidad
     // (fundadores de clubes creados antes de este puntero).
     if (!uid) return;
@@ -63,9 +73,12 @@ export function useClub(clubId?: string) {
         setClub(null);
       },
     );
-  }, [resolvedClubId, uid]);
+  }, [resolvedClubId, uid, explicit]);
 
-  // club: undefined = cargando, null = no administra ninguno, Club = el suyo
-  const loading = profile === null || (Boolean(resolvedClubId || uid) && club === undefined);
-  return { club: club ?? null, loading };
+  // clubId explícito sin valor (p.ej. team.clubId===null): nada que cargar,
+  // "sin club" es un hecho conocido de antemano, no un resultado async.
+  const finalClub = explicit && !resolvedClubId ? null : club;
+  // club: undefined = cargando, null = no administra ninguno / sin club, Club = el resuelto
+  const loading = profile === null || (Boolean(resolvedClubId || (!explicit && uid)) && finalClub === undefined);
+  return { club: finalClub ?? null, loading };
 }

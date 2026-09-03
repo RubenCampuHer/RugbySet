@@ -1,7 +1,7 @@
 "use client";
 
 import { equalTo, get, onValue, orderByChild, query, ref } from "firebase/database";
-import { ArrowUpCircle, Check, LogOut, ShieldCheck, Trash2, Users, X } from "lucide-react";
+import { ArrowUpCircle, Check, LogOut, Plus, ShieldCheck, Trash2, Users, X } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -12,6 +12,14 @@ import { EmptyState } from "@/components/EmptyState";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -20,8 +28,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useAllTeams } from "@/hooks/useAllTeams";
 import { useProfilesByUid } from "@/hooks/useProfilesByUid";
 import {
+  addTeamToClub,
   adminDeleteClub,
   appointDirector,
   approveTeamJoin,
@@ -182,6 +192,74 @@ function DirectorsSection({
         ))}
       </CardContent>
     </Card>
+  );
+}
+
+/**
+ * "+ Añadir equipo existente" — SOLO ADMIN global (2026-09-03, "los equipos
+ * que yo quiera"): un director normal no puede añadir un equipo arbitrario
+ * sin su consentimiento (la .validate de clubId se lo impide salvo que sea
+ * su propio equipo o ya hubiera pedido unirse — anti-abuso, QA 2026-08-21),
+ * solo un ADMIN global la salta. Por eso este control no aparece para un
+ * director cualquiera, solo con viewingAsAdmin. Lista equipos SIN club
+ * todavía — mover un equipo de un club a otro no es lo que pide esto.
+ */
+function AddTeamDialog({ club }: { club: Club }) {
+  const [open, setOpen] = useState(false);
+  const { teams } = useAllTeams();
+  const availableTeams = teams.filter(({ team }) => !team.clubId);
+  const [teamname, setTeamname] = useState("");
+  const [adding, setAdding] = useState(false);
+
+  const add = async () => {
+    if (!teamname) return;
+    setAdding(true);
+    try {
+      await addTeamToClub(club, teamname);
+      toast.success(`${teamname} añadido al club`);
+      setOpen(false);
+      setTeamname("");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo añadir el equipo");
+    } finally {
+      setAdding(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger render={<Button variant="outline" size="sm" />}>
+        <Plus className="size-3.5" /> Añadir equipo
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Añadir equipo a {club.clubname}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-1">
+          <Label>Equipo (sin club todavía)</Label>
+          <Select value={teamname} onValueChange={(v) => setTeamname(v ?? "")}>
+            <SelectTrigger className="w-full">
+              <SelectValue>{teamname || "Elegir equipo…"}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {availableTeams.map(({ name }) => (
+                <SelectItem key={name} value={name}>
+                  {name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {availableTeams.length === 0 && (
+            <p className="text-xs text-muted-foreground">No hay equipos sin club todavía.</p>
+          )}
+        </div>
+        <DialogFooter>
+          <Button disabled={adding || !teamname} onClick={() => void add()}>
+            {adding ? "Añadiendo…" : "Añadir"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -411,8 +489,9 @@ export function ClubManager({ club, viewingAsAdmin = false }: { club: Club; view
       )}
 
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between gap-2">
           <CardTitle className="text-lg">Equipos ({club.teams.length})</CardTitle>
+          {viewingAsAdmin && isAdmin(profile) && <AddTeamDialog club={club} />}
         </CardHeader>
         <CardContent className="divide-y divide-border">
           {club.teams.length === 0 ? (

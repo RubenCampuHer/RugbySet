@@ -140,6 +140,23 @@ export async function rejectTeamJoin(club: Club, teamname: string): Promise<void
 }
 
 /**
+ * Un ADMIN global añade directamente un equipo (sin club todavía) a este
+ * club, sin pasar por pendingTeams — "los equipos que yo quiera" (pedido
+ * 2026-09-03). A diferencia de approveTeamJoin, esto NO funciona para un
+ * director normal: la .validate de clubId exige que sea su propio equipo o
+ * que ya hubiera una solicitud real en pendingTeams (anti-abuso, QA
+ * 2026-08-21) — un ADMIN global la salta por completo. Por eso este botón
+ * solo se muestra viendo el club como ADMIN, nunca a un director cualquiera.
+ */
+export async function addTeamToClub(club: Club, teamname: string): Promise<void> {
+  const clubId = club.clubId!;
+  await update(ref(db, `${PATHS.TEAMS}/${teamname}`), { clubId });
+  await update(ref(db, `${PATHS.CLUBS}/${clubId}`), {
+    teams: club.teams.includes(teamname) ? club.teams : [...club.teams, teamname],
+  });
+}
+
+/**
  * El admin del club expulsa a un equipo de su club (sin borrarlo, solo lo
  * desvincula) — quita de teams y limpia Teams/{teamname}/clubId.
  *

@@ -14,6 +14,9 @@ import {
 import { httpsCallable } from "firebase/functions";
 import { PATHS } from "@/lib/constants";
 import { db, functions } from "@/lib/firebase";
+import { parseOr } from "@/lib/schemas/common";
+import { UserTeamsSchema } from "@/lib/schemas/user";
+import { nextActiveTeam } from "@/lib/teams";
 import type { Team, Training, TrainingDay } from "@/lib/types";
 
 /** nameSurname → uid, vía publicProfiles (indexOn nameSurname). */
@@ -34,19 +37,69 @@ export async function resolveUidByName(nameSurname: string): Promise<string | nu
 }
 
 /**
- * Autorreparación de UserTeams/{uid}/{teamname} (varios equipos, fase 1
- * 2026-09-04): garantiza que el equipo ACTIVO del perfil
- * (Users/{uid}/teamname) figure también en el mapa de pertenencias. Cubre
- * las altas hechas desde Android (que solo escribe teamname) y las cuentas
- * anteriores al backfill. La regla permite al propio usuario esta escritura
- * únicamente cuando $teamname coincide con su teamname — no sirve para
- * auto-añadirse a otro equipo. Idempotente: un get y, como mucho, un set.
+ * Autorreparación entre el equipo ACTIVO (Users/{uid}/teamname) y las
+ * pertenencias (UserTeams/{uid}) — varios equipos, fases 1-2 (2026-09-04).
+ * Se llama desde AuthProvider cada vez que cambia el perfil propio:
+ *
+ * - Con activo: garantiza que figure en UserTeams. Cubre altas hechas desde
+ *   Android (que solo escribe teamname) y cuentas anteriores al backfill.
+ *   La regla permite al propio usuario esta escritura únicamente cuando
+ *   $teamname coincide con su teamname — no sirve para auto-añadirse a
+ *   otro equipo.
+ * - Sin activo pero con pertenencias (p. ej. el coach me expulsó del equipo
+ *   que tenía activo, o lo borró): pasa a activo el siguiente por orden
+ *   alfabético (nextActiveTeam). Quien expulsa no puede leer mis UserTeams
+ *   (regla: solo dueño/ADMIN), así que esta recolocación tiene que hacerla
+ *   el propio usuario al volver a cargar el perfil.
+ *
+ * Idempotente y barata: un get y, como mucho, una escritura.
  */
-export async function ensureUserTeamMembership(uid: string, teamname: string): Promise<void> {
-  const membershipRef = ref(db, `${PATHS.USER_TEAMS}/${uid}/${teamname}`);
-  const snap = await get(membershipRef);
-  if (snap.val() === true) return;
-  await set(membershipRef, true);
+export async function reconcileActiveTeam(uid: string, teamname: string | null): Promise<void> {
+  if (teamname) {
+    const membershipRef = ref(db, `${PATHS.USER_TEAMS}/${uid}/${teamname}`);
+    const snap = await get(membershipRef);
+    if (snap.val() === true) return;
+    await set(membershipRef, true);
+    return;
+  }
+  const snap = await get(ref(db, `${PATHS.USER_TEAMS}/${uid}`));
+  if (!snap.exists()) return;
+  const memberships = parseOr(UserTeamsSchema, snap.val(), `UserTeams/${uid}`) ?? {};
+  const next = nextActiveTeam(Object.keys(memberships));
+  if (next) await setActiveTeam(uid, next);
+}
+
+/**
+ * Cambia el equipo ACTIVO (el que ven todas las pantallas vía useTeam()).
+ * Solo escribe Users/{uid}/teamname; el cliente solo ofrece equipos de
+ * UserTeams (TeamSwitcher). Android lee este mismo campo → también le
+ * cambia el equipo que muestra.
+ */
+export async function setActiveTeam(uid: string, teamname: string): Promise<void> {
+  await update(ref(db, `${PATHS.USERS}/${uid}`), { teamname });
+}
+
+/**
+ * ¿Es `teamname` el equipo ACTIVO de ese usuario? Vía publicProfiles (el
+ * coach no puede leer Users/{otro}); es una proyección asíncrona
+ * (mirrorPublicProfile), así que puede ir un instante por detrás — se usa
+ * solo para decidir si tocar o no el puntero activo de otro usuario.
+ */
+async function isActiveTeamOf(uid: string, teamname: string): Promise<boolean> {
+  const snap = await get(ref(db, `${PATHS.PUBLIC_PROFILES}/${uid}/teamname`));
+  const active = snap.val();
+  // Sin proyección todavía (usuario nuevo, mirror en camino): asumir que SÍ
+  // era su activo y limpiarlo — comportamiento anterior a la fase 2. Lo
+  // contrario dejaría un teamname colgando hacia un equipo del que ya no es
+  // miembro, con el que seguiría pudiendo leerlo (regla Users.teamname).
+  if (typeof active !== "string" || active.length === 0) return true;
+  return active === teamname;
+}
+
+/** ¿Tiene ese usuario algún equipo activo? (misma fuente que isActiveTeamOf). */
+async function hasActiveTeam(uid: string): Promise<boolean> {
+  const snap = await get(ref(db, `${PATHS.PUBLIC_PROFILES}/${uid}/teamname`));
+  return typeof snap.val() === "string" && snap.val().length > 0;
 }
 
 /**
@@ -65,13 +118,15 @@ export async function acceptPendingPlayer(team: Team, playerName: string) {
     ? team.userplayers
     : [...team.userplayers, playerName];
 
-  await update(ref(db), {
+  // Varios equipos (fase 2): el activo del jugador NO cambia si ya tenía
+  // uno — aceptarle en un segundo equipo no le cambia la pantalla.
+  const updates: Record<string, unknown> = {
     [`${PATHS.TEAMS}/${teamname}/pendingplayers`]: pending,
     [`${PATHS.TEAMS}/${teamname}/userplayers`]: players,
-    [`${PATHS.USERS}/${playerUid}/teamname`]: teamname,
-    // Varios equipos (fase 1): toda alta mantiene también UserTeams.
     [`${PATHS.USER_TEAMS}/${playerUid}/${teamname}`]: true,
-  });
+  };
+  if (!(await hasActiveTeam(playerUid))) updates[`${PATHS.USERS}/${playerUid}/teamname`] = teamname;
+  await update(ref(db), updates);
 }
 
 /** Coach rechaza a un pendiente — escribe solo pendingplayers. */
@@ -90,12 +145,14 @@ export async function rejectPendingPlayer(team: Team, playerName: string) {
  */
 export async function acceptPendingCoach(team: Team, uid: string) {
   const teamname = team.teamname!;
-  await update(ref(db), {
+  const updates: Record<string, unknown> = {
     [`${PATHS.TEAMS}/${teamname}/pendingCoaches/${uid}`]: null,
     [`${PATHS.TEAMS}/${teamname}/coaches/${uid}`]: true,
-    [`${PATHS.USERS}/${uid}/teamname`]: teamname,
     [`${PATHS.USER_TEAMS}/${uid}/${teamname}`]: true,
-  });
+  };
+  // Fase 2: solo pasa a activo si no tenía ninguno (ver acceptPendingPlayer).
+  if (!(await hasActiveTeam(uid))) updates[`${PATHS.USERS}/${uid}/teamname`] = teamname;
+  await update(ref(db), updates);
 }
 
 /** Rechaza una solicitud de co-entrenador — solo limpia pendingCoaches. */
@@ -112,12 +169,17 @@ export async function rejectPendingCoach(team: Team, uid: string) {
  */
 export async function removeCoach(team: Team, uid: string) {
   const teamname = team.teamname!;
-  await update(ref(db), {
+  const updates: Record<string, unknown> = {
     [`${PATHS.TEAMS}/${teamname}/coaches/${uid}`]: null,
-    [`${PATHS.USERS}/${uid}/teamname`]: null,
-    [`${PATHS.USERS}/${uid}/assistedTrainingDays`]: null,
     [`${PATHS.USER_TEAMS}/${uid}/${teamname}`]: null,
-  });
+  };
+  // Fase 2: solo se toca su activo si ERA este equipo — si le quedan otros,
+  // su propio AuthProvider recoloca el activo (reconcileActiveTeam).
+  if (await isActiveTeamOf(uid, teamname)) {
+    updates[`${PATHS.USERS}/${uid}/teamname`] = null;
+    updates[`${PATHS.USERS}/${uid}/assistedTrainingDays`] = null;
+  }
+  await update(ref(db), updates);
 }
 
 /**
@@ -173,9 +235,12 @@ export async function removePlayer(team: Team, playerName: string) {
     ),
   };
   if (playerUid) {
-    updates[`${PATHS.USERS}/${playerUid}/teamname`] = null;
-    updates[`${PATHS.USERS}/${playerUid}/assistedTrainingDays`] = null;
     updates[`${PATHS.USER_TEAMS}/${playerUid}/${teamname}`] = null;
+    // Fase 2: su activo solo se limpia si era ESTE equipo (ver removeCoach).
+    if (await isActiveTeamOf(playerUid, teamname)) {
+      updates[`${PATHS.USERS}/${playerUid}/teamname`] = null;
+      updates[`${PATHS.USERS}/${playerUid}/assistedTrainingDays`] = null;
+    }
   }
   await update(ref(db), updates);
 }
@@ -326,6 +391,8 @@ export type JoinByCodeResult = {
   status?: "pending" | "pending_coach" | "joined" | "already_member";
   teamname?: string;
   teamicon?: string | null;
+  /** Solo con status "joined" (fase 2): true si pasó a ser el equipo activo (no tenía ninguno). */
+  activeChanged?: boolean;
 };
 
 /**
@@ -350,12 +417,16 @@ export async function joinTeamByCode(
 }
 
 /**
- * El propio usuario abandona su equipo, vía la Cloud Function leaveTeam: un
+ * El propio usuario abandona UN equipo, vía la Cloud Function leaveTeam: un
  * PLAYER no tiene permiso para escribir su propio Teams/{t}/userplayers. El
- * coach no puede abandonar (debe eliminar el equipo, ver deleteTeam).
+ * fundador no puede abandonar (debe eliminar el equipo, ver deleteTeam).
+ * Fase 2: se indica de cuál se sale; si era el activo, la función recoloca
+ * el activo al siguiente de UserTeams (o null) y lo devuelve.
  */
-export async function leaveTeam(): Promise<void> {
-  await httpsCallable(functions, "leaveTeam")();
+export async function leaveTeam(teamname: string): Promise<{ activeTeam: string | null }> {
+  const result = await httpsCallable(functions, "leaveTeam")({ teamname });
+  const data = result.data as { activeTeam?: string | null } | undefined;
+  return { activeTeam: data?.activeTeam ?? null };
 }
 
 /**
@@ -379,11 +450,15 @@ export async function deleteTeam(team: Team): Promise<void> {
   );
 
   const updates: Record<string, unknown> = { [`${PATHS.TEAMS}/${teamname}`]: null };
-  for (const uid of uids) {
-    updates[`${PATHS.USERS}/${uid}/teamname`] = null;
-    updates[`${PATHS.USERS}/${uid}/assistedTrainingDays`] = null;
+  const activeFlags = await Promise.all(uids.map((uid) => isActiveTeamOf(uid, teamname)));
+  uids.forEach((uid, i) => {
     updates[`${PATHS.USER_TEAMS}/${uid}/${teamname}`] = null;
-  }
+    // Fase 2: el activo solo se limpia a quien tenía ESTE equipo activo.
+    if (activeFlags[i]) {
+      updates[`${PATHS.USERS}/${uid}/teamname`] = null;
+      updates[`${PATHS.USERS}/${uid}/assistedTrainingDays`] = null;
+    }
+  });
   await update(ref(db), updates);
 }
 

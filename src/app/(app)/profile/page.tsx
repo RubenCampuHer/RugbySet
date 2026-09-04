@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { useMyTeams } from "@/hooks/useMyTeams";
 import { useTeam } from "@/hooks/useTeam";
 import {
   calculateAttendanceRate,
@@ -37,6 +38,7 @@ function AttendanceBar({ percent }: { percent: number }) {
 export default function ProfilePage() {
   const { profile, logout } = useAuth();
   const { team } = useTeam();
+  const { teams: myTeams } = useMyTeams();
   const router = useRouter();
 
   if (profile === null) {
@@ -67,7 +69,22 @@ export default function ProfilePage() {
           <p>
             <Badge>{getRoleDisplayName(profile.role)}</Badge>
           </p>
-          {profile.teamname && <p>Equipo: {profile.teamname}</p>}
+          {myTeams.length > 1 ? (
+            <p>
+              Equipos:{" "}
+              {myTeams.map((t, i) => (
+                <span key={t}>
+                  {i > 0 && ", "}
+                  <span className={t === profile.teamname ? "font-medium" : undefined}>{t}</span>
+                  {t === profile.teamname && (
+                    <span className="text-muted-foreground"> (activo)</span>
+                  )}
+                </span>
+              ))}
+            </p>
+          ) : (
+            profile.teamname && <p>Equipo: {profile.teamname}</p>
+          )}
           {profile.mail && <p>Email: {profile.mail}</p>}
           <p>Entrenos asistidos: {profile.assistedTrainingDays.length}</p>
         </CardContent>

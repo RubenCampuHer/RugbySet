@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/PageHeader";
 import { ListRowsSkeleton } from "@/components/skeletons";
+import { useMyTeams } from "@/hooks/useMyTeams";
 import { useNotifications } from "@/hooks/useNotifications";
 import { keyToParam } from "@/lib/calendar";
 import { cn } from "@/lib/utils";
@@ -37,6 +38,9 @@ function formatTimestamp(ms: number): string {
 export default function NotificationsPage() {
   const { notifications, loading, unreadCount, markAllAsRead, markAsRead } =
     useNotifications();
+  // Con varios equipos (fase 2) cada aviso dice de qué equipo viene.
+  const { teams: myTeams } = useMyTeams();
+  const showTeam = myTeams.length > 1;
   const router = useRouter();
 
   if (loading) {
@@ -101,9 +105,14 @@ export default function NotificationsPage() {
                           )}
                           {n.title}
                         </p>
-                        <Badge variant="outline" className="shrink-0">
-                          {TYPE_LABEL[n.type] ?? n.type}
-                        </Badge>
+                        <span className="flex shrink-0 gap-1">
+                          {showTeam && n.teamName && (
+                            <Badge variant="secondary" className="max-w-[8rem] truncate">
+                              {n.teamName}
+                            </Badge>
+                          )}
+                          <Badge variant="outline">{TYPE_LABEL[n.type] ?? n.type}</Badge>
+                        </span>
                       </div>
                       <p className="text-sm text-muted-foreground">{n.message}</p>
                       <div className="flex flex-wrap gap-x-3 text-xs text-muted-foreground">

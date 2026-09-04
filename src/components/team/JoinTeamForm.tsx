@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { AvatarInitials } from "@/components/AvatarInitials";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { joinTeamByCode } from "@/lib/actions/team";
+import { joinTeamByCode, setActiveTeam } from "@/lib/actions/team";
 
 /**
  * Formulario de ingreso por código para quien todavía no tiene equipo.
@@ -17,6 +18,7 @@ import { joinTeamByCode } from "@/lib/actions/team";
  * onboarding (rama Jugador, mirror de SetupJoinTeamFragment en Android).
  */
 export function JoinTeamForm({ onJoined }: { onJoined?: () => void }) {
+  const { firebaseUser } = useAuth();
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [preview, setPreview] = useState<{ teamname: string; teamicon: string | null } | null>(null);
@@ -56,7 +58,23 @@ export function JoinTeamForm({ onJoined }: { onJoined?: () => void }) {
             : result.status === "pending_coach"
               ? `Solicitud de co-entrenador enviada a ${result.teamname}. El entrenador debe aceptarte.`
               : `Solicitud enviada a ${result.teamname}. Tu entrenador debe aceptarte.`;
-      toast.success(message);
+      // Varios equipos (fase 2): entrar en otro equipo no cambia el activo —
+      // se ofrece cambiar desde el propio aviso.
+      const teamname = result.teamname;
+      const offerSwitch =
+        result.status === "joined" && result.activeChanged === false && firebaseUser && teamname;
+      toast.success(
+        message,
+        offerSwitch
+          ? {
+              duration: 8000,
+              action: {
+                label: `Cambiar a ${teamname}`,
+                onClick: () => void setActiveTeam(firebaseUser.uid, teamname),
+              },
+            }
+          : undefined,
+      );
       onJoined?.();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "No se pudo enviar la solicitud");

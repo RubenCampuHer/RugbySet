@@ -23,6 +23,7 @@ import { AvatarInitials } from "@/components/AvatarInitials";
 import { BrandMark } from "@/components/Brand";
 import { BrandLoader } from "@/components/BrandLoader";
 import { OfflineBanner } from "@/components/OfflineBanner";
+import { TeamSwitcher } from "@/components/team/TeamSwitcher";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -117,6 +118,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               </Link>
             ))}
           </nav>
+
+          {/* Selector de equipo activo — solo con más de un equipo (fase 2). */}
+          <TeamSwitcher className="min-w-0" />
 
           <DropdownMenu>
             <DropdownMenuTrigger

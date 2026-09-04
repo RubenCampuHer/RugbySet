@@ -139,6 +139,57 @@ export async function createStandaloneTeam(opts: {
 }
 
 /**
+ * Un entrenador que YA tiene equipo crea otro más (varios equipos, fase 2 —
+ * 2026-09-04), desde la pestaña Equipo: suelto o dentro de un club que ya
+ * dirige (nunca crea un club nuevo aquí — directorOfClubId es un puntero
+ * único, "varios clubes por director" no está en alcance). El equipo activo
+ * solo cambia si el usuario no tenía ninguno (decisión de producto: entrar
+ * en otro equipo nunca te cambia la pantalla; el cliente ofrece "Cambiar").
+ *
+ * Con club: Teams/{t}/clubId pasa la .validate porque quien escribe dirige
+ * ese club Y es usercoach del equipo en la misma escritura (root ya
+ * combinado); Clubs/{id}/teams se actualiza aparte, como addTeamToClub.
+ */
+export async function createAdditionalTeam(opts: {
+  teamName: string;
+  teamCode: string;
+  iconUrl: string | null;
+  coachName: string;
+  uid: string;
+  alsoPlayer?: boolean;
+  club?: Club | null;
+  category?: string;
+  setActive: boolean;
+}): Promise<void> {
+  const error = validateTeamName(opts.teamName);
+  if (error) throw new Error(error);
+
+  const team = buildTeam({
+    teamName: opts.teamName,
+    teamCode: opts.teamCode,
+    iconUrl: opts.iconUrl,
+    coachName: opts.coachName,
+    uid: opts.uid,
+    clubId: opts.club?.clubId ?? undefined,
+    category: opts.club ? opts.category : undefined,
+    alsoPlayer: opts.alsoPlayer,
+  });
+  const updates: Record<string, unknown> = {
+    [`${PATHS.TEAMS}/${opts.teamName}`]: team,
+    [`${PATHS.USER_TEAMS}/${opts.uid}/${opts.teamName}`]: true,
+  };
+  if (opts.setActive) updates[`${PATHS.USERS}/${opts.uid}/teamname`] = opts.teamName;
+  await update(ref(db), updates);
+
+  if (opts.club?.clubId) {
+    const teams = opts.club.teams.includes(opts.teamName)
+      ? opts.club.teams
+      : [...opts.club.teams, opts.teamName];
+    await update(ref(db, `${PATHS.CLUBS}/${opts.club.clubId}`), { teams });
+  }
+}
+
+/**
  * Mirror de SetupCreateTeamFragment.createClubAndTeam +
  * SetupCreateClubFragment: crea el club (push id) y su primer equipo,
  * vincula al coach.

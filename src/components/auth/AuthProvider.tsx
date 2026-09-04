@@ -4,7 +4,7 @@ import { onAuthStateChanged, signOut, type User as FirebaseUser } from "firebase
 import { onValue, ref } from "firebase/database";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { ensureUserProfile } from "@/lib/actions/onboarding";
-import { ensureUserTeamMembership } from "@/lib/actions/team";
+import { reconcileActiveTeam } from "@/lib/actions/team";
 import { PATHS } from "@/lib/constants";
 import { auth, db } from "@/lib/firebase";
 import { parseOr } from "@/lib/schemas/common";
@@ -61,16 +61,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       const parsed = parseOr(UserSchema, snap.val(), `Users/${firebaseUser.uid}`);
       setProfileState(parsed);
-      // Varios equipos (fase 1, 2026-09-04): el equipo ACTIVO del perfil debe
-      // figurar en UserTeams/{uid}. Se autocura aquí — mismo sitio que
-      // ensureUserProfile — para cubrir altas hechas desde Android (que solo
-      // escribe teamname) y cuentas anteriores al backfill, sin tocar Android.
-      if (parsed?.teamname) {
-        const key = `${firebaseUser.uid}/${parsed.teamname}`;
+      // Varios equipos (fases 1-2, 2026-09-04): activo ↔ UserTeams. Con
+      // activo, garantiza que figure en UserTeams (altas desde Android, que
+      // solo escribe teamname; cuentas previas al backfill). Sin activo pero
+      // con pertenencias (me expulsaron del activo), recoloca el activo —
+      // ver reconcileActiveTeam. Mismo sitio que ensureUserProfile. Una vez
+      // por (uid, activo) y sesión: onValue dispara con cada cambio.
+      if (parsed) {
+        const key = `${firebaseUser.uid}/${parsed.teamname ?? ""}`;
         if (!reconciledTeams.current.has(key)) {
           reconciledTeams.current.add(key);
-          ensureUserTeamMembership(firebaseUser.uid, parsed.teamname).catch((error) =>
-            console.error("ensureUserTeamMembership:", error),
+          reconcileActiveTeam(firebaseUser.uid, parsed.teamname ?? null).catch((error) =>
+            console.error("reconcileActiveTeam:", error),
           );
         }
       }

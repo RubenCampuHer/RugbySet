@@ -24,6 +24,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useLoadingTimeout } from "@/hooks/useLoadingTimeout";
+import { useMyTeams } from "@/hooks/useMyTeams";
 import { useTeam } from "@/hooks/useTeam";
 import { createLineup } from "@/lib/actions/lineup";
 import { isAdmin, isTeamCoach } from "@/lib/permissions";
@@ -102,6 +103,7 @@ function TeamLineups() {
   const router = useRouter();
   const { firebaseUser, profile } = useAuth();
   const { team, hasTeam, loading } = useTeam(teamParam ?? undefined);
+  const { teams: myTeams } = useMyTeams();
   const [expanded, setExpanded] = useState<string | null>(null);
   const [editing, setEditing] = useState<LineupDoc | null>(null);
   const stuck = useLoadingTimeout(profile === null || loading);
@@ -133,7 +135,9 @@ function TeamLineups() {
     );
   }
 
-  const isMember = profile.teamname === team.teamname;
+  // Miembro = activo o cualquiera de mis equipos (varios equipos, fase 2).
+  const isMember =
+    profile.teamname === team.teamname || (team.teamname != null && myTeams.includes(team.teamname));
   const canView = isMember || isAdmin(profile);
   if (!canView) {
     return (

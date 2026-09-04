@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarDays } from "lucide-react";
+import { CalendarDays, TriangleAlert } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -12,6 +12,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/PageHeader";
 import { CalendarSkeleton } from "@/components/skeletons";
 import { Button } from "@/components/ui/button";
+import { useLoadingTimeout } from "@/hooks/useLoadingTimeout";
 import { useTeam } from "@/hooks/useTeam";
 import { setAttendance } from "@/lib/actions/team";
 import { paramToKey, todayKey } from "@/lib/calendar";
@@ -54,7 +55,20 @@ function CalendarContent() {
     [profile],
   );
 
-  if (loading) return <CalendarSkeleton />;
+  const stuck = useLoadingTimeout(loading);
+  if (loading) {
+    if (stuck) {
+      return (
+        <EmptyState
+          icon={TriangleAlert}
+          title="Tarda más de lo normal"
+          hint="Puede ser un problema de conexión — vuelve a intentarlo."
+          action={<Button onClick={() => location.reload()}>Reintentar</Button>}
+        />
+      );
+    }
+    return <CalendarSkeleton />;
+  }
   if (!hasTeam || team === null) {
     return (
       <div className="space-y-2">

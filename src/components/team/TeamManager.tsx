@@ -1,7 +1,7 @@
 "use client";
 
 import { get, ref } from "firebase/database";
-import { ArrowUpCircle, Camera, Check, ClipboardList, Copy, Flame, LogOut, Megaphone, ShieldCheck, Trash2, Trophy, Users, X } from "lucide-react";
+import { ArrowUpCircle, Camera, Check, ClipboardList, Copy, Flame, LogOut, Megaphone, ShieldCheck, Trash2, TriangleAlert, Trophy, Users, X } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { useClub } from "@/hooks/useClub";
+import { useLoadingTimeout } from "@/hooks/useLoadingTimeout";
 import { useProfilesByUid } from "@/hooks/useProfilesByUid";
 import { useTeam } from "@/hooks/useTeam";
 import { appointDirector } from "@/lib/actions/club";
@@ -464,8 +465,23 @@ export function TeamManager({
   const iconInputRef = useRef<HTMLInputElement>(null);
   const playerStats = usePlayerStats(team?.userplayers ?? []);
   const viewingAsSomeAdmin = viewingAsAdmin || viewingAsClubAdmin;
+  // Bug real reportado 2026-09-04: la pantalla se quedaba "pensando" sin fin
+  // (sin ningún error visible) — un listener de RTDB que por lo que sea
+  // nunca dispara ni éxito ni error deja a `loading` en true para siempre.
+  // Pasado este tiempo, ofrecer recargar en vez de un esqueleto indefinido.
+  const stuck = useLoadingTimeout(loading);
 
   if (loading) {
+    if (stuck) {
+      return (
+        <EmptyState
+          icon={TriangleAlert}
+          title="Tarda más de lo normal"
+          hint="Puede ser un problema de conexión — vuelve a intentarlo."
+          action={<Button onClick={() => location.reload()}>Reintentar</Button>}
+        />
+      );
+    }
     return <TeamSkeleton />;
   }
   if (!hasTeam || team === null) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, ChevronLeft, ChevronRight, Lock, Plus, Trophy } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Lock, Plus, TriangleAlert, Trophy } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { toast } from "sonner";
@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useLoadingTimeout } from "@/hooks/useLoadingTimeout";
 import { useTeam } from "@/hooks/useTeam";
 import { createLineup } from "@/lib/actions/lineup";
 import { isAdmin, isTeamCoach } from "@/lib/permissions";
@@ -102,8 +103,19 @@ function TeamLineups() {
   const { team, hasTeam, loading } = useTeam(teamParam ?? undefined);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [editing, setEditing] = useState<LineupDoc | null>(null);
+  const stuck = useLoadingTimeout(profile === null || loading);
 
   if (profile === null || loading) {
+    if (stuck) {
+      return (
+        <EmptyState
+          icon={TriangleAlert}
+          title="Tarda más de lo normal"
+          hint="Puede ser un problema de conexión — vuelve a intentarlo."
+          action={<Button onClick={() => location.reload()}>Reintentar</Button>}
+        />
+      );
+    }
     return <ListRowsSkeleton />;
   }
   if (!hasTeam || team === null) {

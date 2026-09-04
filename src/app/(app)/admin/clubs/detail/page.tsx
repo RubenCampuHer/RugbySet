@@ -1,13 +1,15 @@
 "use client";
 
-import { Lock } from "lucide-react";
+import { Lock, TriangleAlert } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { ClubManager } from "@/components/club/ClubManager";
 import { EmptyState } from "@/components/EmptyState";
 import { TeamSkeleton } from "@/components/skeletons";
+import { Button } from "@/components/ui/button";
 import { useClub } from "@/hooks/useClub";
+import { useLoadingTimeout } from "@/hooks/useLoadingTimeout";
 import { isAdmin } from "@/lib/permissions";
 
 // Detalle por query param (?id=): mismo patrón que /admin/teams/detail —
@@ -17,8 +19,19 @@ function AdminClubDetail() {
   const id = params.get("id");
   const { profile } = useAuth();
   const { club, loading } = useClub(id ?? undefined);
+  const stuck = useLoadingTimeout(profile === null || loading);
 
   if (profile === null || loading) {
+    if (stuck) {
+      return (
+        <EmptyState
+          icon={TriangleAlert}
+          title="Tarda más de lo normal"
+          hint="Puede ser un problema de conexión — vuelve a intentarlo."
+          action={<Button onClick={() => location.reload()}>Reintentar</Button>}
+        />
+      );
+    }
     return <TeamSkeleton />;
   }
   if (!isAdmin(profile)) {

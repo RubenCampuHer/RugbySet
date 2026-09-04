@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ChevronDown, ChevronLeft, ChevronRight, Download, Flame, Lock, Users, X } from "lucide-react";
+import { Check, ChevronDown, ChevronLeft, ChevronRight, Download, Flame, Lock, TriangleAlert, Users, X } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -19,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useLoadingTimeout } from "@/hooks/useLoadingTimeout";
 import { useTeam } from "@/hooks/useTeam";
 import {
   ATTENDANCE_PRESET_LABELS,
@@ -57,6 +58,7 @@ function TeamAttendance() {
   const router = useRouter();
   const { firebaseUser, profile } = useAuth();
   const { team, hasTeam, loading } = useTeam(teamParam ?? undefined);
+  const stuck = useLoadingTimeout(profile === null || loading);
 
   const [preset, setPreset] = useState<AttendancePreset | "custom">("month");
   const [customFrom, setCustomFrom] = useState("");
@@ -64,6 +66,16 @@ function TeamAttendance() {
   const [expanded, setExpanded] = useState<string | null>(null);
 
   if (profile === null || loading) {
+    if (stuck) {
+      return (
+        <EmptyState
+          icon={TriangleAlert}
+          title="Tarda más de lo normal"
+          hint="Puede ser un problema de conexión — vuelve a intentarlo."
+          action={<Button onClick={() => location.reload()}>Reintentar</Button>}
+        />
+      );
+    }
     return <ListRowsSkeleton />;
   }
   if (!hasTeam || team === null) {

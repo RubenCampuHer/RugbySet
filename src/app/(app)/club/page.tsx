@@ -1,13 +1,15 @@
 "use client";
 
-import { Shield } from "lucide-react";
+import { Shield, TriangleAlert } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { ClubManager } from "@/components/club/ClubManager";
 import { ClubMembershipCard } from "@/components/club/ClubMembershipCard";
 import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/PageHeader";
 import { TeamSkeleton } from "@/components/skeletons";
+import { Button } from "@/components/ui/button";
 import { useClub } from "@/hooks/useClub";
+import { useLoadingTimeout } from "@/hooks/useLoadingTimeout";
 import { useTeam } from "@/hooks/useTeam";
 import { isTeamCoach } from "@/lib/permissions";
 
@@ -22,8 +24,19 @@ export default function ClubPage() {
   const { firebaseUser, profile } = useAuth();
   const { club, loading: loadingClub } = useClub();
   const { team, hasTeam, loading: loadingTeam } = useTeam();
+  const stuck = useLoadingTimeout(profile === null || loadingClub || loadingTeam);
 
   if (profile === null || loadingClub || loadingTeam) {
+    if (stuck) {
+      return (
+        <EmptyState
+          icon={TriangleAlert}
+          title="Tarda más de lo normal"
+          hint="Puede ser un problema de conexión — vuelve a intentarlo."
+          action={<Button onClick={() => location.reload()}>Reintentar</Button>}
+        />
+      );
+    }
     return <TeamSkeleton />;
   }
 

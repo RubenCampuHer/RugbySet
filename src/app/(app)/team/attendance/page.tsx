@@ -223,7 +223,7 @@ function TeamAttendance() {
                     onClick={() => setExpanded(expanded === s.uid ? null : s.uid)}
                     className="flex w-full items-center gap-3 p-3 text-left hover:bg-muted/50"
                   >
-                    <AvatarInitials name={name} size="sm" />
+                    <AvatarInitials name={name} src={playerProfiles[s.uid]?.usericon} size="sm" />
                     <span className="flex-1 truncate text-sm font-medium">{name}</span>
                     <span className="shrink-0 text-xs text-muted-foreground">
                       {s.attended}/{s.total}

@@ -32,7 +32,11 @@ export function RollCall({ team, day }: { team: Team; day: TrainingDay }) {
   const players = useMemo(
     () =>
       uids
-        .map((uid) => ({ uid, name: profiles[uid]?.nameSurname || "" }))
+        .map((uid) => ({
+          uid,
+          name: profiles[uid]?.nameSurname || "",
+          icon: profiles[uid]?.usericon ?? null,
+        }))
         .filter(({ name }) => name.toLowerCase().includes(search.toLowerCase())),
     [uids, profiles, search],
   );
@@ -60,12 +64,12 @@ export function RollCall({ team, day }: { team: Team; day: TrainingDay }) {
       )}
       <ScrollArea className="h-72 pr-2">
         <div className="space-y-1">
-          {players.map(({ uid, name }) => (
+          {players.map(({ uid, name, icon }) => (
             <div
               key={uid}
               className="flex items-center gap-2 rounded-lg py-1 pr-1 pl-2 hover:bg-muted/50"
             >
-              <AvatarInitials name={name || "Jugador"} size="sm" />
+              <AvatarInitials name={name || "Jugador"} src={icon} size="sm" />
               <span className="flex-1 truncate text-sm">{name || "Jugador"}</span>
               <AttendanceToggle
                 value={status(uid)}

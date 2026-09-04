@@ -6,7 +6,8 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { AvatarInitials } from "@/components/AvatarInitials";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { joinTeamByCode, setActiveTeam } from "@/lib/actions/team";
+import { joinTeamByCode, setActiveTeam, type JoinAs } from "@/lib/actions/team";
+import { cn } from "@/lib/utils";
 
 /**
  * Formulario de ingreso por código para quien todavía no tiene equipo.
@@ -16,12 +17,20 @@ import { joinTeamByCode, setActiveTeam } from "@/lib/actions/team";
  *
  * Extraído de team/page.tsx para reutilizarlo también en el wizard de
  * onboarding (rama Jugador, mirror de SetupJoinTeamFragment en Android).
+ *
+ * Coach en un equipo y jugador en otro (2026-09-04): un COACH/ADMIN elige
+ * como qué entra (antes un COACH solo podía pedir ser co-entrenador). El
+ * rol global no cambia — sigue pudiendo crear contenido.
  */
 export function JoinTeamForm({ onJoined }: { onJoined?: () => void }) {
-  const { firebaseUser } = useAuth();
+  const { firebaseUser, profile } = useAuth();
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [preview, setPreview] = useState<{ teamname: string; teamicon: string | null } | null>(null);
+  const canChooseRole = profile?.role === "COACH" || profile?.role === "ADMIN";
+  const defaultJoinAs: JoinAs = profile?.role === "COACH" ? "coach" : "player";
+  const [joinAsOverride, setJoinAsOverride] = useState<JoinAs | null>(null);
+  const joinAs = joinAsOverride ?? defaultJoinAs;
 
   const search = async () => {
     const trimmed = code.trim();
@@ -45,7 +54,7 @@ export function JoinTeamForm({ onJoined }: { onJoined?: () => void }) {
   const join = async () => {
     setBusy(true);
     try {
-      const result = await joinTeamByCode(code.trim(), false);
+      const result = await joinTeamByCode(code.trim(), false, canChooseRole ? joinAs : undefined);
       if (!result.found) {
         toast.error("Código no encontrado");
         return;
@@ -107,8 +116,35 @@ export function JoinTeamForm({ onJoined }: { onJoined?: () => void }) {
               Solicitar ingreso
             </Button>
           </div>
+          {canChooseRole && (
+            <div className="flex items-center gap-2 text-xs">
+              <span className="text-muted-foreground">Entrar como</span>
+              <div className="inline-flex rounded-md border" role="radiogroup" aria-label="Entrar como">
+                {(["player", "coach"] as JoinAs[]).map((option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    role="radio"
+                    aria-checked={joinAs === option}
+                    disabled={busy}
+                    onClick={() => setJoinAsOverride(option)}
+                    className={cn(
+                      "px-2.5 py-1 font-medium first:rounded-l-md last:rounded-r-md",
+                      joinAs === option ? "bg-primary text-primary-foreground" : "hover:bg-muted",
+                    )}
+                  >
+                    {option === "player" ? "Jugador" : "Entrenador"}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <p className="text-xs text-muted-foreground">
-            Tu entrenador deberá aceptar tu solicitud antes de que veas el equipo.
+            {profile?.role === "ADMIN"
+              ? "Como administrador entras directamente, sin aprobación."
+              : joinAs === "coach"
+                ? "El entrenador del equipo deberá aceptarte como co-entrenador."
+                : "Tu entrenador deberá aceptar tu solicitud antes de que veas el equipo."}
           </p>
         </div>
       )}

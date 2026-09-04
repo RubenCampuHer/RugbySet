@@ -186,6 +186,22 @@ export async function promoteToCoach(team: Team, uid: string) {
 }
 
 /**
+ * Inverso de promoteToCoach (2026-09-04): un co-entrenador (nunca el
+ * fundador — para eso está transferTeamOwnership) baja a jugador del mismo
+ * equipo. Sigue en el equipo (UserTeams y equipo activo intactos); solo
+ * cambia de coaches a userplayers. El rol global (Users.role) no se toca,
+ * misma decisión que promoteToCoach/acceptPendingCoach.
+ */
+export async function demoteCoachToPlayer(team: Team, uid: string) {
+  const teamname = team.teamname!;
+  if (team.usercoach === uid) throw new Error("El entrenador principal no se puede descender; transfiere primero.");
+  await update(ref(db), {
+    [`${PATHS.TEAMS}/${teamname}/coaches/${uid}`]: null,
+    [`${PATHS.TEAMS}/${teamname}/userplayers/${uid}`]: true,
+  });
+}
+
+/**
  * Coach expulsa a un jugador — multi-path atómico (espejo de
  * TeamRepository.removePlayer): fuera de userplayers y se limpian su
  * teamname y asistencia (escrituras por hijo, permitidas al coach).
@@ -355,14 +371,18 @@ export type JoinByCodeResult = {
  * query+update de cliente puro — la vía anterior (`requestJoinTeam`, ya
  * eliminada) tenía justo esa carrera.
  */
+export type JoinAs = "player" | "coach";
+
 export async function joinTeamByCode(
   teamcode: string,
   dryRun = false,
+  /** Coach en un equipo y jugador en otro (2026-09-04): como qué se entra. Sin valor, decide el rol global (comportamiento histórico). */
+  as?: JoinAs,
 ): Promise<JoinByCodeResult> {
   const result = await httpsCallable(
     functions,
     "joinTeamByCode",
-  )({ teamcode, dryRun });
+  )(as ? { teamcode, dryRun, as } : { teamcode, dryRun });
   return result.data as JoinByCodeResult;
 }
 

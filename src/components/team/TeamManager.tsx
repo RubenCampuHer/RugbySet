@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowUpCircle, Camera, Check, ClipboardList, Copy, Crown, Flame, LogOut, Megaphone, Pencil, ShieldCheck, Trash2, TriangleAlert, Trophy, UserPlus, Users, X } from "lucide-react";
+import { ArrowDownCircle, ArrowUpCircle, Camera, Check, ClipboardList, Copy, Crown, Flame, LogOut, Megaphone, Pencil, ShieldCheck, Trash2, TriangleAlert, Trophy, UserPlus, Users, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useRef, useState } from "react";
@@ -40,6 +40,7 @@ import {
   acceptPendingPlayer,
   adminDeleteTeam,
   deleteTeam,
+  demoteCoachToPlayer,
   leaveTeam,
   promoteToCoach,
   rejectPendingCoach,
@@ -219,16 +220,19 @@ function statsForTeam(profile: PublicProfile | null | undefined, teamname: strin
 /** Fila de jugador en la lista del equipo — objetivo táctil 44px en las acciones. */
 function PlayerRow({
   name,
+  src,
   stats,
   action,
 }: {
   name: string;
+  /** usericon de publicProfiles — sin él no se veía la foto de nadie (bug real 2026-09-04). */
+  src?: string | null;
   stats?: AttendanceStats | null;
   action?: React.ReactNode;
 }) {
   return (
     <div className="flex items-center gap-3 rounded-lg py-2 pr-1 pl-2 hover:bg-muted/50">
-      <AvatarInitials name={name} size="sm" />
+      <AvatarInitials name={name} src={src} size="sm" />
       <span className="flex-1 truncate text-sm">{name}</span>
       {stats && (typeof stats.streak === "number" || typeof stats.attendanceRate === "number") && (
         <span className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
@@ -289,6 +293,7 @@ function PendingSection({ team, canManage }: { team: Team; canManage: boolean })
             <PlayerRow
               key={uid}
               name={name}
+              src={profiles[uid]?.usericon}
               action={
                 canManage ? (
                   <span className="flex gap-1">
@@ -391,6 +396,21 @@ function CoachesSection({
     }
   };
 
+  // Inverso de "Ascender a co-entrenador" (2026-09-04): sigue en el equipo,
+  // solo pasa de coaches a userplayers. Mismo gate que quitarle (fundador /
+  // ADMIN / admin del club — un co-entrenador no desciende a otro).
+  const demote = async (uid: string, name: string) => {
+    setBusy(uid);
+    try {
+      await demoteCoachToPlayer(team, uid);
+      toast.success(`${name} ahora es jugador`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo descender");
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const appoint = async (uid: string, name: string) => {
     if (!club) return;
     setBusy(uid);
@@ -435,7 +455,11 @@ function CoachesSection({
       <CardContent className="divide-y divide-border">
         {founderUid && (
           <div className="flex items-center gap-3 rounded-lg py-2 pr-1 pl-2">
-            <AvatarInitials name={profiles[founderUid]?.nameSurname || "Entrenador"} size="sm" />
+            <AvatarInitials
+              name={profiles[founderUid]?.nameSurname || "Entrenador"}
+              src={profiles[founderUid]?.usericon}
+              size="sm"
+            />
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm">{profiles[founderUid]?.nameSurname || "Entrenador"}</p>
               {profiles[founderUid]?.username && (
@@ -463,6 +487,7 @@ function CoachesSection({
           <PlayerRow
             key={uid}
             name={profiles[uid]?.nameSurname || "Entrenador"}
+            src={profiles[uid]?.usericon}
             action={
               canRemoveCoach || canOfferDirector(uid) ? (
                 <span className="flex gap-1">
@@ -483,6 +508,25 @@ function CoachesSection({
                       description="El entrenador actual pasará a ser co-entrenador — para salir del equipo, hazlo aparte con «Salir del equipo»."
                       confirmLabel="Transferir"
                       onConfirm={() => transfer(uid, name)}
+                    />
+                  )}
+                  {canRemoveCoach && (
+                    <ConfirmDialog
+                      trigger={
+                        <Button
+                          size="icon-xl"
+                          variant="ghost"
+                          aria-label={`Descender a ${name} a jugador`}
+                          title="Descender a jugador"
+                          disabled={busy === uid}
+                        >
+                          <ArrowDownCircle className="size-4" />
+                        </Button>
+                      }
+                      title={`¿Descender a ${name} a jugador?`}
+                      description="Deja de gestionar el equipo pero sigue en él como jugador. Podrás volver a ascenderle cuando quieras."
+                      confirmLabel="Descender"
+                      onConfirm={() => demote(uid, name)}
                     />
                   )}
                   {canOfferDirector(uid) && (
@@ -519,6 +563,7 @@ function CoachesSection({
           <PlayerRow
             key={uid}
             name={profiles[uid]?.nameSurname || "Solicitud pendiente"}
+            src={profiles[uid]?.usericon}
             action={
               canManage ? (
                 <span className="flex gap-1">
@@ -893,6 +938,7 @@ export function TeamManager({
                   <PlayerRow
                     key={uid}
                     name={name}
+                    src={playerProfiles[uid]?.usericon}
                     stats={statsForTeam(playerProfiles[uid], team.teamname!)}
                     action={
                       canManage ? (

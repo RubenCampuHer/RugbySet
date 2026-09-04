@@ -1,9 +1,9 @@
 "use client";
 
 import { equalTo, get, onValue, orderByChild, query, ref } from "firebase/database";
-import { Check, Crown, LogOut, Plus, ShieldCheck, Trash2, Users, X } from "lucide-react";
+import { Camera, Check, Crown, LogOut, Pencil, Plus, ShieldCheck, Trash2, Users, X } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { AvatarInitials } from "@/components/AvatarInitials";
@@ -20,6 +20,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -39,15 +40,18 @@ import {
   removeTeamFromClub,
   transferClubOwnership,
   updateClubContentStatus,
+  updateClubIcon,
+  updateClubName,
 } from "@/lib/actions/club";
 import { updateTeamCategory } from "@/lib/actions/team";
+import { resizeAndUpload } from "@/lib/storage";
 import { PATHS } from "@/lib/constants";
 import { db } from "@/lib/firebase";
 import { parseMapOr, parseOr } from "@/lib/schemas/common";
 import { ExerciseSchema } from "@/lib/schemas/exercise";
 import { isAdmin } from "@/lib/permissions";
 import { TeamSchema } from "@/lib/schemas/team";
-import { CLUB_CATEGORIES } from "@/lib/team-validation";
+import { CLUB_CATEGORIES, validateClubName } from "@/lib/team-validation";
 import { TrainingSchema } from "@/lib/schemas/training";
 import type { Club, Exercise, Team, Training } from "@/lib/types";
 
@@ -125,6 +129,78 @@ function useClubPendingContent(clubId: string) {
 }
 
 /**
+ * Renombrar el club (2026-09-04, director o ADMIN) — Clubs/{clubId} usa un
+ * id opaco, así que es un campo normal (nada de mover claves como con los
+ * equipos). De uso único aquí, patrón local como ChangeTeamCodeDialog.
+ */
+function RenameClubDialog({ clubId, currentName }: { clubId: string; currentName: string }) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState(currentName);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const onOpenChange = (next: boolean) => {
+    setOpen(next);
+    if (next) {
+      setName(currentName);
+      setError(null);
+    }
+  };
+
+  const save = async () => {
+    const err = validateClubName(name);
+    setError(err);
+    if (err) return;
+    if (name.trim() === currentName) {
+      setOpen(false);
+      return;
+    }
+    setBusy(true);
+    try {
+      await updateClubName(clubId, name);
+      toast.success("Nombre del club actualizado");
+      setOpen(false);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo renombrar el club");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogTrigger render={<Button size="icon-sm" variant="ghost" aria-label="Renombrar club" />}>
+        <Pencil className="size-4" />
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Renombrar club</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-1">
+          <Label htmlFor="rename-club-input">Nombre del club</Label>
+          <Input
+            id="rename-club-input"
+            value={name}
+            autoFocus
+            disabled={busy}
+            onChange={(e) => {
+              setName(e.target.value);
+              setError(null);
+            }}
+          />
+          {error && <p className="text-sm text-destructive">{error}</p>}
+        </div>
+        <DialogFooter>
+          <Button disabled={busy} onClick={() => void save()}>
+            {busy ? "Guardando…" : "Guardar"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/**
  * Sección "Directores" (rediseño multi-director 2026-09-03, mismo patrón
  * que CoachesSection en TeamManager): fundador + co-directores. Sin
  * pendientes — el nombramiento es directo, no una solicitud con
@@ -189,7 +265,11 @@ function DirectorsSection({
       </CardHeader>
       <CardContent className="divide-y divide-border">
         <div className="flex items-center gap-3 py-2">
-          <AvatarInitials name={profiles[club.adminUserId ?? ""]?.nameSurname || "Fundador"} size="sm" />
+          <AvatarInitials
+            name={profiles[club.adminUserId ?? ""]?.nameSurname || "Fundador"}
+            src={profiles[club.adminUserId ?? ""]?.usericon}
+            size="sm"
+          />
           <span className="flex-1 truncate text-sm">
             {profiles[club.adminUserId ?? ""]?.nameSurname || "Fundador"}
           </span>
@@ -199,7 +279,11 @@ function DirectorsSection({
           const name = profiles[uid]?.nameSurname || "este codirector";
           return (
             <div key={uid} className="flex items-center gap-3 py-2">
-              <AvatarInitials name={profiles[uid]?.nameSurname || "Codirector"} size="sm" />
+              <AvatarInitials
+                name={profiles[uid]?.nameSurname || "Codirector"}
+                src={profiles[uid]?.usericon}
+                size="sm"
+              />
               <span className="flex-1 truncate text-sm">{profiles[uid]?.nameSurname || "Codirector"}</span>
               {canRemoveDirector && (
                 <ConfirmDialog
@@ -221,16 +305,40 @@ function DirectorsSection({
                 />
               )}
               {(canRemoveDirector || uid === myUid) && (
-                <Button
-                  size="icon-xl"
-                  variant="ghost"
-                  className="rounded-full text-destructive hover:text-destructive"
-                  aria-label={uid === myUid ? "Salir de la dirección" : `Quitar a ${name}`}
-                  disabled={busy === uid}
-                  onClick={() => void remove(uid)}
-                >
-                  {uid === myUid ? <LogOut className="size-4" /> : <Trash2 className="size-4" />}
-                </Button>
+                // Con confirmación explícita (2026-09-04): el icono de papelera
+                // sugería "echar del club"; solo le quita la DIRECCIÓN — sigue
+                // en su equipo como entrenador.
+                <ConfirmDialog
+                  trigger={
+                    <Button
+                      size="icon-xl"
+                      variant="ghost"
+                      className="rounded-full text-destructive hover:text-destructive"
+                      aria-label={
+                        uid === myUid
+                          ? "Dejar la dirección del club (sigues en tu equipo)"
+                          : `Quitar a ${name} de la dirección (sigue en su equipo)`
+                      }
+                      title={uid === myUid ? "Dejar la dirección" : "Quitar de la dirección"}
+                      disabled={busy === uid}
+                    >
+                      {uid === myUid ? <LogOut className="size-4" /> : <Trash2 className="size-4" />}
+                    </Button>
+                  }
+                  title={
+                    uid === myUid
+                      ? "¿Dejar la dirección del club?"
+                      : `¿Quitar a ${name} de la dirección del club?`
+                  }
+                  description={
+                    uid === myUid
+                      ? "Seguirás en tu equipo como entrenador. Solo dejas de dirigir el club."
+                      : "Seguirá en su equipo como entrenador. Solo deja de dirigir el club."
+                  }
+                  confirmLabel={uid === myUid ? "Dejar la dirección" : "Quitar de la dirección"}
+                  destructive
+                  onConfirm={() => remove(uid)}
+                />
               )}
             </div>
           );
@@ -334,6 +442,23 @@ export function ClubManager({ club, viewingAsAdmin = false }: { club: Club; view
   // el fundador o un ADMIN viendo el club.
   const canDeleteClub = isFounder || (viewingAsAdmin && isAdmin(profile));
   const [deleting, setDeleting] = useState(false);
+  const [uploadingIcon, setUploadingIcon] = useState(false);
+  const iconInputRef = useRef<HTMLInputElement>(null);
+
+  // Icono del club (2026-09-04, director o ADMIN) — mismo patrón que el
+  // icono de equipo en TeamManager; misma carpeta que usa el onboarding.
+  const uploadIcon = async (file: File) => {
+    setUploadingIcon(true);
+    try {
+      const url = await resizeAndUpload(`club_icons/${club.clubname}`, file);
+      await updateClubIcon(club.clubId!, url);
+      toast.success("Icono del club actualizado");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo subir el icono");
+    } finally {
+      setUploadingIcon(false);
+    }
+  };
 
   const removeClub = async () => {
     setDeleting(true);
@@ -406,9 +531,40 @@ export function ClubManager({ club, viewingAsAdmin = false }: { club: Club; view
         </Badge>
       )}
       <div className="flex items-center gap-4">
-        <AvatarInitials name={club.clubname} src={club.clubicon} className="size-16" fallbackClassName="text-lg" />
+        <div className="relative">
+          <AvatarInitials name={club.clubname} src={club.clubicon} className="size-16" fallbackClassName="text-lg" />
+          {canManage && (
+            <>
+              <input
+                ref={iconInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  e.target.value = "";
+                  if (file) void uploadIcon(file);
+                }}
+              />
+              <Button
+                type="button"
+                size="icon-sm"
+                variant="secondary"
+                className="absolute -right-1 -bottom-1 rounded-full"
+                aria-label="Cambiar icono del club"
+                disabled={uploadingIcon}
+                onClick={() => iconInputRef.current?.click()}
+              >
+                <Camera className="size-3.5" />
+              </Button>
+            </>
+          )}
+        </div>
         <div>
-          <h1 className="text-2xl font-bold">{club.clubname}</h1>
+          <div className="flex items-center gap-1">
+            <h1 className="text-2xl font-bold">{club.clubname}</h1>
+            {canManage && <RenameClubDialog clubId={club.clubId!} currentName={club.clubname ?? ""} />}
+          </div>
           <div className="flex flex-wrap items-center gap-1">
             {club.clubcode && (
               <span className="text-sm text-muted-foreground">Código: {club.clubcode}</span>

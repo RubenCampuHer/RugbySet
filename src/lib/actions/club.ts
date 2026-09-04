@@ -231,6 +231,21 @@ export async function updateClubContentStatus(
 }
 
 /**
+ * Nombre e icono del club (2026-09-04, director o ADMIN). Clubs/{clubId}
+ * usa un id opaco, así que renombrar es un campo normal (a diferencia de
+ * Teams/{nombre}, que necesitó una Cloud Function). Cubierto por el .write
+ * de Clubs/$clubId (adminUserId/directors/ADMIN), sin cambio de reglas.
+ */
+export async function updateClubName(clubId: string, clubname: string): Promise<void> {
+  await update(ref(db, `${PATHS.CLUBS}/${clubId}`), { clubname: clubname.trim() });
+}
+
+/** Espejo de updateTeamIcon — la subida a club_icons/... la hace el caller con resizeAndUpload. */
+export async function updateClubIcon(clubId: string, iconUrl: string): Promise<void> {
+  await update(ref(db, `${PATHS.CLUBS}/${clubId}`), { clubicon: iconUrl });
+}
+
+/**
  * Un ADMIN global o el fundador del club lo elimina, vía la Cloud Function
  * adminDeleteClub: limpia el icono en Storage (bloqueado desde el cliente,
  * ver storage.rules) y desvincula cada equipo del club (solo su clubId —

@@ -2,9 +2,29 @@ import { describe, expect, it } from "vitest";
 import {
   CLUB_CATEGORIES,
   suggestTeamCode,
+  validateClubName,
   validateTeamCode,
   validateTeamName,
 } from "./team-validation";
+
+describe("validateClubName", () => {
+  it("un nombre válido no da error", () => {
+    expect(validateClubName("Club Rugby Granollers")).toBeNull();
+  });
+
+  it("vacío o solo espacios es obligatorio", () => {
+    expect(validateClubName("")).not.toBeNull();
+    expect(validateClubName("   ")).not.toBeNull();
+  });
+
+  it("acepta caracteres de clave RTDB — el club no usa el nombre como clave", () => {
+    expect(validateClubName("C.R. Sant Cugat / Sec. B")).toBeNull();
+  });
+
+  it("rechaza más de 80 caracteres", () => {
+    expect(validateClubName("a".repeat(81))).not.toBeNull();
+  });
+});
 
 describe("validateTeamName", () => {
   it("un nombre válido no da error", () => {

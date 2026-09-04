@@ -16,6 +16,13 @@ export function validateTeamName(name: string): string | null {
   return null;
 }
 
+/** Nombre de club — solo display (Clubs/{clubId} usa un id opaco), sin caracteres prohibidos que vigilar. */
+export function validateClubName(name: string): string | null {
+  if (!name.trim()) return "El nombre del club es obligatorio.";
+  if (name.trim().length > 80) return "Máximo 80 caracteres.";
+  return null;
+}
+
 export function validateTeamCode(code: string): string | null {
   if (!code.trim()) return "Elige un código para tu equipo.";
   return null;

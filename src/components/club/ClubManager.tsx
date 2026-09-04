@@ -436,11 +436,13 @@ export function ClubManager({ club, viewingAsAdmin = false }: { club: Club; view
   const myUid = firebaseUser?.uid;
   const isFounder = myUid === club.adminUserId;
   const isDirector = isFounder || club.directors[myUid ?? ""] === true;
-  const canManage = isDirector || (viewingAsAdmin && isAdmin(profile));
+  // 2026-09-04: un ADMIN gestiona siempre, no solo entrando por /admin
+  // (viewingAsAdmin queda para el badge) — mismo criterio que TeamManager.
+  const canManage = isDirector || isAdmin(profile);
   // Borrar el club es más grave que gestionarlo día a día — igual que
   // "Eliminar equipo" en TeamManager, nunca un co-director cualquiera, solo
-  // el fundador o un ADMIN viendo el club.
-  const canDeleteClub = isFounder || (viewingAsAdmin && isAdmin(profile));
+  // el fundador o un ADMIN.
+  const canDeleteClub = isFounder || isAdmin(profile);
   const [deleting, setDeleting] = useState(false);
   const [uploadingIcon, setUploadingIcon] = useState(false);
   const iconInputRef = useRef<HTMLInputElement>(null);

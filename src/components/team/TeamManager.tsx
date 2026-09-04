@@ -698,8 +698,13 @@ export function TeamManager({
   // quien fundó el equipo o un admin).
   const isFounder = isTeamFounder(team, firebaseUser?.uid);
   const isMyCoach = isTeamCoach(team, firebaseUser?.uid);
-  const canManage = isMyCoach || (viewingAsAdmin && isAdmin(profile)) || viewingAsClubAdmin;
-  const canDeleteTeam = isFounder || (viewingAsAdmin && isAdmin(profile)) || viewingAsClubAdmin;
+  // 2026-09-04: un ADMIN gestiona SIEMPRE, también en su propio /team donde
+  // solo es jugador (antes exigía entrar por /admin/teams/detail —
+  // viewingAsAdmin — y en su equipo no veía ni "aceptar"). Las reglas RTDB
+  // ya le daban permiso; era solo la UI. viewingAs* sigue valiendo para el
+  // badge y para el admin de club, que no es ADMIN global.
+  const canManage = isMyCoach || isAdmin(profile) || viewingAsClubAdmin;
+  const canDeleteTeam = isFounder || isAdmin(profile) || viewingAsClubAdmin;
   // "Salir del equipo" es una acción de MIEMBRO — nunca tiene sentido para
   // alguien que está mirando un equipo ajeno del que no forma parte, y el
   // fundador no puede salir (debe eliminar el equipo); un co-entrenador sí.
@@ -712,7 +717,7 @@ export function TeamManager({
   const isDirectorOfTeamClub = Boolean(
     club && firebaseUser?.uid && (club.adminUserId === firebaseUser.uid || club.directors[firebaseUser.uid] === true),
   );
-  const canAppointDirector = Boolean(club) && (isDirectorOfTeamClub || (viewingAsAdmin && isAdmin(profile)));
+  const canAppointDirector = Boolean(club) && (isDirectorOfTeamClub || isAdmin(profile));
 
   const kick = async (uid: string, name: string) => {
     setKicking(uid);
@@ -756,9 +761,11 @@ export function TeamManager({
   // el nombre nuevo. En una vista explícita (?team=viejo, admin/club-admin
   // mirando un equipo ajeno) hay que corregir la URL a mano.
   const onTeamRenamed = (newTeamname: string) => {
-    if (searchParams.get("team") === team.teamname) {
+    // /admin/teams/detail y /club/teams/detail usan ?name= (no ?team=, que es
+    // el de /team/attendance y /team/lineups).
+    if (searchParams.get("name") === team.teamname) {
       const params = new URLSearchParams(searchParams);
-      params.set("team", newTeamname);
+      params.set("name", newTeamname);
       router.replace(`${pathname}?${params.toString()}`);
     }
   };

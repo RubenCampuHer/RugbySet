@@ -1,7 +1,7 @@
 "use client";
 
 import { equalTo, get, onValue, orderByChild, query, ref } from "firebase/database";
-import { Check, LogOut, Plus, ShieldCheck, Trash2, Users, X } from "lucide-react";
+import { Check, Crown, LogOut, Plus, ShieldCheck, Trash2, Users, X } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -37,6 +37,7 @@ import {
   rejectTeamJoin,
   removeDirector,
   removeTeamFromClub,
+  transferClubOwnership,
   updateClubContentStatus,
 } from "@/lib/actions/club";
 import { updateTeamCategory } from "@/lib/actions/team";
@@ -130,18 +131,29 @@ function useClubPendingContent(clubId: string) {
  * aprobación. Separación de responsabilidades pedida explícitamente por el
  * usuario: **ascender** a codirector solo se hace desde DENTRO del equipo
  * (TeamManager → sección "Entrenadores" → "Nombrar codirector del club");
- * esta sección de aquí es la única forma de **quitarlo** — "Quitar" solo lo
- * ve el fundador sobre otro director, o cualquier co-director sobre sí
- * mismo (autoexclusión).
+ * esta sección de aquí es la única forma de **quitarlo** — "Quitar" lo ve
+ * quien puede gestionar el club (`canRemoveDirector`: el fundador o un
+ * ADMIN viendo un club ajeno — antes solo el fundador, hueco real
+ * arreglado 2026-09-04) o cualquier co-director sobre sí mismo
+ * (autoexclusión, sin pedir permiso a nadie).
+ *
+ * "Hacer fundador" (2026-09-04, "poder abandonar el club dejando a alguien
+ * al mando"): reasigna adminUserId a un codirector ya existente. Si quien
+ * lo hace ES el fundador actual, se autoexcluye a continuación en el mismo
+ * clic (removeDirector ya funciona para cualquier codirector, y tras la
+ * transferencia el fundador saliente pasa a serlo); si lo hace un ADMIN,
+ * solo transfiere — el ex-fundador decide salir él mismo cuando quiera.
  */
 function DirectorsSection({
   club,
   myUid,
   isFounder,
+  canRemoveDirector,
 }: {
   club: Club;
   myUid: string | null | undefined;
   isFounder: boolean;
+  canRemoveDirector: boolean;
 }) {
   const [busy, setBusy] = useState<string | null>(null);
   const directorUids = Object.keys(club.directors).filter((uid) => uid !== club.adminUserId);
@@ -154,6 +166,23 @@ function DirectorsSection({
       toast.success(uid === myUid ? "Has dejado la dirección del club" : "Codirector eliminado");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "No se pudo completar");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const transfer = async (uid: string, name: string) => {
+    setBusy(uid);
+    try {
+      await transferClubOwnership(club, uid);
+      if (isFounder && myUid) {
+        await removeDirector(club, myUid);
+        toast.success(`${name} es ahora el fundador del club. Has dejado la dirección.`);
+      } else {
+        toast.success(`${name} es ahora el fundador del club`);
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo transferir");
     } finally {
       setBusy(null);
     }
@@ -172,24 +201,51 @@ function DirectorsSection({
           </span>
           <Badge variant="outline">Fundador</Badge>
         </div>
-        {directorUids.map((uid) => (
-          <div key={uid} className="flex items-center gap-3 py-2">
-            <AvatarInitials name={profiles[uid]?.nameSurname || "Codirector"} size="sm" />
-            <span className="flex-1 truncate text-sm">{profiles[uid]?.nameSurname || "Codirector"}</span>
-            {(isFounder || uid === myUid) && (
-              <Button
-                size="icon-xl"
-                variant="ghost"
-                className="rounded-full text-destructive hover:text-destructive"
-                aria-label={uid === myUid ? "Salir de la dirección" : `Quitar a ${profiles[uid]?.nameSurname ?? "este codirector"}`}
-                disabled={busy === uid}
-                onClick={() => void remove(uid)}
-              >
-                {uid === myUid ? <LogOut className="size-4" /> : <Trash2 className="size-4" />}
-              </Button>
-            )}
-          </div>
-        ))}
+        {directorUids.map((uid) => {
+          const name = profiles[uid]?.nameSurname || "este codirector";
+          return (
+            <div key={uid} className="flex items-center gap-3 py-2">
+              <AvatarInitials name={profiles[uid]?.nameSurname || "Codirector"} size="sm" />
+              <span className="flex-1 truncate text-sm">{profiles[uid]?.nameSurname || "Codirector"}</span>
+              {canRemoveDirector && (
+                <ConfirmDialog
+                  trigger={
+                    <Button
+                      size="icon-sm"
+                      variant="ghost"
+                      aria-label={`Hacer a ${name} fundador del club`}
+                      title="Hacer fundador"
+                      disabled={busy === uid}
+                    >
+                      <Crown className="size-4" />
+                    </Button>
+                  }
+                  title={isFounder ? `¿Transferir el club a ${name} y dejar la dirección?` : `¿Hacer a ${name} fundador del club?`}
+                  description={
+                    isFounder
+                      ? "Pasarás a ser codirector y dejarás la dirección en el mismo paso."
+                      : "El fundador actual pasará a ser codirector."
+                  }
+                  confirmLabel={isFounder ? "Transferir y salir" : "Transferir"}
+                  destructive={isFounder}
+                  onConfirm={() => transfer(uid, name)}
+                />
+              )}
+              {(canRemoveDirector || uid === myUid) && (
+                <Button
+                  size="icon-xl"
+                  variant="ghost"
+                  className="rounded-full text-destructive hover:text-destructive"
+                  aria-label={uid === myUid ? "Salir de la dirección" : `Quitar a ${name}`}
+                  disabled={busy === uid}
+                  onClick={() => void remove(uid)}
+                >
+                  {uid === myUid ? <LogOut className="size-4" /> : <Trash2 className="size-4" />}
+                </Button>
+              )}
+            </div>
+          );
+        })}
       </CardContent>
     </Card>
   );
@@ -382,7 +438,7 @@ export function ClubManager({ club, viewingAsAdmin = false }: { club: Club; view
         </div>
       </div>
 
-      <DirectorsSection club={club} myUid={myUid} isFounder={isFounder} />
+      <DirectorsSection club={club} myUid={myUid} isFounder={isFounder} canRemoveDirector={canDeleteClub} />
 
       {pendingContent.length > 0 && (
         <Card>

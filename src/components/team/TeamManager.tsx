@@ -1,7 +1,7 @@
 "use client";
 
 import { get, ref } from "firebase/database";
-import { ArrowUpCircle, Camera, Check, ClipboardList, Copy, Flame, LogOut, Megaphone, ShieldCheck, Trash2, TriangleAlert, Trophy, Users, X } from "lucide-react";
+import { ArrowUpCircle, Camera, Check, ClipboardList, Copy, Crown, Flame, LogOut, Megaphone, ShieldCheck, Trash2, TriangleAlert, Trophy, Users, X } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -41,6 +41,7 @@ import {
   removeCoach,
   removePlayer,
   resolveUidByName,
+  transferTeamOwnership,
   updateTeamIcon,
 } from "@/lib/actions/team";
 import { PATHS } from "@/lib/constants";
@@ -271,12 +272,16 @@ function CoachesSection({
   canManage,
   canRemoveCoach,
   canAppointDirector,
+  myUid,
+  isFounder,
 }: {
   team: Team;
   club: Club | null;
   canManage: boolean;
   canRemoveCoach: boolean;
   canAppointDirector: boolean;
+  myUid: string | null | undefined;
+  isFounder: boolean;
 }) {
   const [busy, setBusy] = useState<string | null>(null);
   const founderUid = team.usercoach;
@@ -331,6 +336,31 @@ function CoachesSection({
   const canOfferDirector = (uid: string) =>
     canAppointDirector && Boolean(club) && club!.adminUserId !== uid && club!.directors[uid] !== true;
 
+  // Reasignar el entrenador principal a un co-entrenador ya existente
+  // (pedido 2026-09-04: poder abandonar el equipo "dejando a alguien al
+  // mando"). Si quien lo hace ES el fundador actual, se sale a continuación
+  // en el mismo clic (leaveTeam ya funciona para cualquier co-entrenador,
+  // y tras la transferencia el fundador saliente pasa a serlo); si lo hace
+  // un ADMIN sobre un equipo ajeno, solo transfiere — el ex-fundador decide
+  // salir él mismo cuando quiera con "Salir del equipo" (ya disponible en
+  // cuanto deja de ser el fundador literal).
+  const transfer = async (uid: string, name: string) => {
+    setBusy(uid);
+    try {
+      await transferTeamOwnership(team, uid);
+      if (isFounder && myUid) {
+        await leaveTeam();
+        toast.success(`${name} es ahora el entrenador principal. Has salido del equipo.`);
+      } else {
+        toast.success(`${name} es ahora el entrenador principal`);
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo transferir");
+    } finally {
+      setBusy(null);
+    }
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -361,13 +391,39 @@ function CoachesSection({
             )}
           </div>
         )}
-        {coCoachUids.map((uid) => (
+        {coCoachUids.map((uid) => {
+          const name = profiles[uid]?.nameSurname || "este entrenador";
+          return (
           <PlayerRow
             key={uid}
             name={profiles[uid]?.nameSurname || "Entrenador"}
             action={
               canRemoveCoach || canOfferDirector(uid) ? (
                 <span className="flex gap-1">
+                  {canRemoveCoach && (
+                    <ConfirmDialog
+                      trigger={
+                        <Button
+                          size="icon-xl"
+                          variant="ghost"
+                          aria-label={`Hacer a ${name} entrenador principal`}
+                          title="Hacer entrenador principal"
+                          disabled={busy === uid}
+                        >
+                          <Crown className="size-4" />
+                        </Button>
+                      }
+                      title={isFounder ? `¿Transferir el equipo a ${name} y salir?` : `¿Hacer a ${name} entrenador principal?`}
+                      description={
+                        isFounder
+                          ? "Pasarás a ser co-entrenador y saldrás del equipo en el mismo paso."
+                          : "El entrenador actual pasará a ser co-entrenador."
+                      }
+                      confirmLabel={isFounder ? "Transferir y salir" : "Transferir"}
+                      destructive={isFounder}
+                      onConfirm={() => transfer(uid, name)}
+                    />
+                  )}
                   {canOfferDirector(uid) && (
                     <Button
                       size="icon-xl"
@@ -396,7 +452,8 @@ function CoachesSection({
               ) : undefined
             }
           />
-        ))}
+          );
+        })}
         {pendingUids.map((uid) => (
           <PlayerRow
             key={uid}
@@ -706,6 +763,8 @@ export function TeamManager({
         canManage={canManage}
         canRemoveCoach={canDeleteTeam}
         canAppointDirector={canAppointDirector}
+        myUid={firebaseUser?.uid}
+        isFounder={isFounder}
       />
 
       <Card>

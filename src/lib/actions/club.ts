@@ -92,14 +92,37 @@ export async function appointDirector(club: Club, uid: string): Promise<void> {
 /**
  * Quita a un co-director — lo hace el fundador (sobre cualquier
  * co-director) o el propio director sobre sí mismo (autoexclusión, sin
- * pedir permiso a nadie). Nunca al fundador (para eso no hay borrado de
- * club todavía — fuera de alcance).
+ * pedir permiso a nadie). Nunca al fundador directamente — para eso está
+ * transferClubOwnership primero (pasa a ser un codirector más) y luego
+ * esta misma acción, ya sobre sí mismo.
  */
 export async function removeDirector(club: Club, uid: string): Promise<void> {
   const clubId = club.clubId!;
   await update(ref(db), {
     [`${PATHS.CLUBS}/${clubId}/directors/${uid}`]: null,
     [`${PATHS.USERS}/${uid}/directorOfClubId`]: null,
+  });
+}
+
+/**
+ * Reasigna quién es el fundador (adminUserId) del club a un codirector YA
+ * existente — pedido explícito 2026-09-04: un fundador quiere poder
+ * abandonar el club "siempre que deje a alguien al mando". En cuanto el
+ * fundador actual pasa a ser un codirector más (este intercambio), ya
+ * puede autoexcluirse con removeDirector (arriba) — sin acción de
+ * "abandonar" nueva.
+ */
+export async function transferClubOwnership(club: Club, newFounderUid: string): Promise<void> {
+  const clubId = club.clubId!;
+  const currentFounderUid = club.adminUserId;
+  if (!currentFounderUid) throw new Error("Este club no tiene fundador");
+  if (club.directors[newFounderUid] !== true) {
+    throw new Error("Solo puedes transferir a alguien que ya sea codirector");
+  }
+  await update(ref(db), {
+    [`${PATHS.CLUBS}/${clubId}/adminUserId`]: newFounderUid,
+    [`${PATHS.CLUBS}/${clubId}/directors/${newFounderUid}`]: null,
+    [`${PATHS.CLUBS}/${clubId}/directors/${currentFounderUid}`]: true,
   });
 }
 

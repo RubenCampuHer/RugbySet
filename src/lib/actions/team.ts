@@ -100,6 +100,30 @@ export async function removeCoach(team: Team, uid: string) {
 }
 
 /**
+ * Reasigna quién es el entrenador principal (fundador) del equipo a un
+ * co-entrenador YA existente — pedido explícito 2026-09-04: un fundador
+ * quiere poder abandonar el equipo "siempre que deje a alguien al mando".
+ * No hace falta ninguna acción de "abandonar" nueva: en cuanto el fundador
+ * actual pasa a ser un co-entrenador más (este intercambio), la vía de
+ * salida que YA tiene cualquier co-entrenador (leaveTeam, Cloud Function)
+ * empieza a funcionar para él sin tocar nada más — antes esa función
+ * bloqueaba explícitamente a quien fuera team.usercoach.
+ */
+export async function transferTeamOwnership(team: Team, newFounderUid: string): Promise<void> {
+  const teamname = team.teamname!;
+  const currentFounderUid = team.usercoach;
+  if (!currentFounderUid) throw new Error("Este equipo no tiene entrenador fundador");
+  if (team.coaches[newFounderUid] !== true) {
+    throw new Error("Solo puedes transferir a alguien que ya sea co-entrenador");
+  }
+  await update(ref(db), {
+    [`${PATHS.TEAMS}/${teamname}/usercoach`]: newFounderUid,
+    [`${PATHS.TEAMS}/${teamname}/coaches/${newFounderUid}`]: null,
+    [`${PATHS.TEAMS}/${teamname}/coaches/${currentFounderUid}`]: true,
+  });
+}
+
+/**
  * Un jugador YA en el roster se sube a co-entrenador de un tirón — sin pasar
  * por pendingCoaches (el coach que lo asciende ya lo conoce, no hace falta
  * que "se solicite" a sí mismo). Sale de userplayers, entra en coaches.

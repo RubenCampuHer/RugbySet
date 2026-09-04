@@ -428,6 +428,21 @@ export async function updateTeamCategory(teamname: string, category: string | nu
 }
 
 /**
+ * Cambia el código de acceso del equipo — campo normal de
+ * Teams/{teamname}, cubierto por el mismo .write que roster/icono/
+ * categoría (ningún cambio de reglas). Antes de escribir comprueba que el
+ * código nuevo no colisione con el de OTRO equipo, con el mismo dryRun de
+ * joinTeamByCode que ya usan onboarding/CreateTeamDialog al crear un
+ * equipo — las reglas no dejan a nadie leer /Teams por su cuenta para
+ * comprobarlo de otra forma.
+ */
+export async function updateTeamCode(teamname: string, newCode: string): Promise<void> {
+  const dup = await joinTeamByCode(newCode, true);
+  if (dup.found) throw new Error("Ese código ya lo usa otro equipo.");
+  await update(ref(db, `${PATHS.TEAMS}/${teamname}`), { teamcode: newCode });
+}
+
+/**
  * Un ADMIN elimina un equipo ajeno (o el suyo) vía la Cloud Function
  * adminDeleteTeam: a diferencia de deleteTeam (update client-side), también
  * limpia su icono en Storage — un delete de Storage está bloqueado
@@ -438,4 +453,18 @@ export async function updateTeamCategory(teamname: string, category: string | nu
  */
 export async function adminDeleteTeam(teamname: string): Promise<void> {
   await httpsCallable(functions, "adminDeleteTeam")({ teamname });
+}
+
+/**
+ * Renombra el equipo — vía la Cloud Function renameTeam: Teams/{teamname}
+ * usa el nombre como clave RTDB, mover una clave no es expresable como un
+ * update() de cliente (hay que leer el árbol viejo para escribirlo bajo la
+ * clave nueva) — mismo motivo por el que adminDeleteTeam es función.
+ * Corrige UserTeams/Users.teamname/Clubs.teams de cada miembro en el mismo
+ * paso; devuelve el nombre final para que el caller navegue a la URL
+ * correcta (?team=... si venía con uno).
+ */
+export async function renameTeam(teamname: string, newTeamname: string): Promise<{ teamname: string }> {
+  const result = await httpsCallable(functions, "renameTeam")({ teamname, newTeamname });
+  return result.data as { teamname: string };
 }

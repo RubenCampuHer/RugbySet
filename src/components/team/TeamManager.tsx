@@ -1,7 +1,8 @@
 "use client";
 
-import { ArrowUpCircle, Camera, Check, ClipboardList, Copy, Crown, Flame, LogOut, Megaphone, ShieldCheck, Trash2, TriangleAlert, Trophy, UserPlus, Users, X } from "lucide-react";
+import { ArrowUpCircle, Camera, Check, ClipboardList, Copy, Crown, Flame, LogOut, Megaphone, Pencil, ShieldCheck, Trash2, TriangleAlert, Trophy, UserPlus, Users, X } from "lucide-react";
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -10,6 +11,7 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/PageHeader";
 import { RenamePersonDialog } from "@/components/RenamePersonDialog";
+import { RenameTeamDialog } from "@/components/team/RenameTeamDialog";
 import { TeamSkeleton } from "@/components/skeletons";
 import { CreateTeamDialog } from "@/components/team/CreateTeamDialog";
 import { JoinTeamForm } from "@/components/team/JoinTeamForm";
@@ -24,6 +26,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useClub } from "@/hooks/useClub";
 import { useLoadingTimeout } from "@/hooks/useLoadingTimeout";
@@ -43,11 +47,13 @@ import {
   removeCoach,
   removePlayer,
   transferTeamOwnership,
+  updateTeamCode,
   updateTeamIcon,
 } from "@/lib/actions/team";
 import { sendGeneralMessage } from "@/lib/actions/notify";
 import { isAdmin, isCoach, isTeamCoach, isTeamFounder } from "@/lib/permissions";
 import { resizeAndUpload } from "@/lib/storage";
+import { validateTeamCode } from "@/lib/team-validation";
 import type { AttendanceStats, Club, PublicProfile, Team } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -109,6 +115,84 @@ function GeneralMessageDialog({ team }: { team: Team }) {
         <DialogFooter>
           <Button disabled={!message.trim() || sending} onClick={() => void send()}>
             {sending ? "Enviando…" : "Enviar"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/**
+ * Cambiar el código de acceso — campo normal de Teams/{teamname} (cubierto
+ * por el mismo .write que roster/icono/categoría, sin Cloud Function). De
+ * uso único aquí, mismo patrón local que GeneralMessageDialog arriba.
+ */
+function ChangeTeamCodeDialog({ teamname, currentCode }: { teamname: string; currentCode: string }) {
+  const [open, setOpen] = useState(false);
+  const [code, setCode] = useState(currentCode);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const onOpenChange = (next: boolean) => {
+    setOpen(next);
+    if (next) {
+      setCode(currentCode);
+      setError(null);
+    }
+  };
+
+  const save = async () => {
+    const err = validateTeamCode(code);
+    setError(err);
+    if (err) return;
+    const trimmed = code.trim();
+    if (trimmed === currentCode) {
+      setOpen(false);
+      return;
+    }
+    setBusy(true);
+    try {
+      await updateTeamCode(teamname, trimmed);
+      toast.success("Código actualizado");
+      setOpen(false);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo actualizar el código");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogTrigger
+        render={<Button size="icon-sm" variant="ghost" aria-label="Cambiar código de acceso" />}
+      >
+        <Pencil className="size-4" />
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Código de acceso</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-1">
+          <Label htmlFor="change-team-code-input">Código</Label>
+          <Input
+            id="change-team-code-input"
+            value={code}
+            autoFocus
+            disabled={busy}
+            onChange={(e) => {
+              setCode(e.target.value);
+              setError(null);
+            }}
+          />
+          <p className="text-xs text-muted-foreground">
+            Los jugadores que ya se unieron no necesitan volver a introducirlo.
+          </p>
+          {error && <p className="text-sm text-destructive">{error}</p>}
+        </div>
+        <DialogFooter>
+          <Button disabled={busy} onClick={() => void save()}>
+            {busy ? "Guardando…" : "Guardar"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -488,6 +572,9 @@ export function TeamManager({
 }) {
   const { firebaseUser, profile } = useAuth();
   const { team, hasTeam, loading } = useTeam(teamname ?? undefined);
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   // Club de ESTE equipo (si tiene), no el que yo administro — clubId
   // explícito (aunque sea null) para que useClub nunca caiga al fallback de
   // "mi propio club" (ver useClub.ts). Solo importa para "Nombrar
@@ -618,6 +705,19 @@ export function TeamManager({
     }
   };
 
+  // El nombre viejo con el que se montó esta pantalla ya no existe tras
+  // renombrar. En la vista propia (/team, sin ?team= en la URL) no hace
+  // falta navegar: el perfil (useAuth) se actualiza solo y re-renderiza con
+  // el nombre nuevo. En una vista explícita (?team=viejo, admin/club-admin
+  // mirando un equipo ajeno) hay que corregir la URL a mano.
+  const onTeamRenamed = (newTeamname: string) => {
+    if (searchParams.get("team") === team.teamname) {
+      const params = new URLSearchParams(searchParams);
+      params.set("team", newTeamname);
+      router.replace(`${pathname}?${params.toString()}`);
+    }
+  };
+
   const uploadIcon = async (file: File) => {
     setUploadingIcon(true);
     try {
@@ -691,7 +791,10 @@ export function TeamManager({
           )}
         </div>
         <div>
-          <h1 className="text-2xl font-bold">{team.teamname}</h1>
+          <div className="flex items-center gap-1">
+            <h1 className="text-2xl font-bold">{team.teamname}</h1>
+            {canManage && <RenameTeamDialog teamname={team.teamname!} onRenamed={onTeamRenamed} />}
+          </div>
           <div className="flex flex-wrap items-center gap-1">
             {team.category && <Badge variant="outline">{team.category}</Badge>}
             {team.teamcode && (
@@ -705,6 +808,7 @@ export function TeamManager({
                 <Copy className="size-3" />
               </button>
             )}
+            {canManage && <ChangeTeamCodeDialog teamname={team.teamname!} currentCode={team.teamcode ?? ""} />}
             {isFounder && (
               <Badge className="border-transparent bg-primary/15 text-brand">
                 Eres el entrenador

@@ -20,6 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useClub } from "@/hooks/useClub";
 import { useLoadingTimeout } from "@/hooks/useLoadingTimeout";
 import { useProfilesByUid } from "@/hooks/useProfilesByUid";
 import { useTeam } from "@/hooks/useTeam";
@@ -60,6 +61,9 @@ function TeamAttendance() {
   const router = useRouter();
   const { firebaseUser, profile } = useAuth();
   const { team, hasTeam, loading } = useTeam(teamParam ?? undefined);
+  // Club de ESTE equipo (clubId explícito, aunque sea null — ver useClub):
+  // su director también puede ver el informe (2026-09-04, vista única).
+  const { club } = useClub(team?.clubId ?? null);
   const stuck = useLoadingTimeout(profile === null || loading);
   // Rosters por uid (2026-09-04): attendanceSummaryByPlayer ya no conoce
   // nombres (es lógica pura, sin Firebase) — se resuelven aquí vía
@@ -100,13 +104,17 @@ function TeamAttendance() {
     );
   }
 
-  const canView = isTeamCoach(team, firebaseUser?.uid) || isAdmin(profile);
+  const uid = firebaseUser?.uid;
+  const isDirectorOfTeamClub = Boolean(
+    club && uid && (club.adminUserId === uid || club.directors[uid] === true),
+  );
+  const canView = isTeamCoach(team, uid) || isAdmin(profile) || isDirectorOfTeamClub;
   if (!canView) {
     return (
       <EmptyState
         icon={Lock}
-        title="Solo el entrenador"
-        hint="La asistencia del equipo solo la puede ver el entrenador."
+        title="Solo entrenadores y dirección del club"
+        hint="La asistencia del equipo solo la pueden ver sus entrenadores y la dirección de su club."
       />
     );
   }

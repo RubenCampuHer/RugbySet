@@ -30,7 +30,9 @@ function AdminTeamDetail() {
     );
   }
 
-  return <TeamManager teamname={name} viewingAsAdmin />;
+  // Los permisos los deriva TeamManager de la relación real (ADMIN, coach,
+  // director del club, miembro) — sin flag de ruta (2026-09-04).
+  return <TeamManager teamname={name} />;
 }
 
 export default function AdminTeamDetailPage() {

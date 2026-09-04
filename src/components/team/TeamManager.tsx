@@ -254,7 +254,7 @@ function PlayerRow({
 
 // Gestión visible para el coach (o un ADMIN viendo el equipo, ver canManage
 // en TeamManager) — mismo discriminador que Android (ReadTeam: usercoach ==
-// uid), no el rol, salvo cuando viewingAsAdmin lo amplía explícitamente.
+// uid), no el rol, ampliado a ADMIN y al director del club del equipo.
 /** Rosters por uid (2026-09-04): pendingplayers es {uid: true} — el nombre se resuelve vía useProfilesByUid, como CoachesSection. */
 function PendingSection({ team, canManage }: { team: Team; canManage: boolean }) {
   const [busy, setBusy] = useState<string | null>(null);
@@ -609,22 +609,17 @@ function CoachesSection({
 /**
  * Cuerpo de la pantalla de equipo, parametrizado por `teamname` explícito en
  * vez de derivarlo siempre de `profile.teamname` — así lo reutilizan
- * `/team` (el equipo propio), `/admin/teams/detail` (un equipo ajeno, con
- * `viewingAsAdmin`) y `/club/teams/detail` (un equipo del club que
- * administras, con `viewingAsClubAdmin`). Las reglas RTDB ya dan a ADMIN y
- * al admin del club lectura/escritura completa de los equipos que les
- * corresponden, así que ningún cambio de reglas hace falta aquí — ver
- * database.rules.json.
+ * `/team` (el equipo propio), `/admin/teams/detail` y `/club/teams/detail`.
+ *
+ * 2026-09-04: TODO lo que se muestra se deriva de lo que el usuario ES
+ * respecto a ESTE equipo (coach, fundador, director de su club, ADMIN,
+ * miembro) — nunca de por qué ruta entró. Antes había flags
+ * `viewingAsAdmin`/`viewingAsClubAdmin` y la misma persona veía el mismo
+ * equipo con opciones distintas según la puerta (reporte real). Las
+ * reglas RTDB ya dan a ADMIN y al admin/director del club lectura/escritura
+ * de los equipos que les corresponden — ningún cambio de reglas aquí.
  */
-export function TeamManager({
-  teamname,
-  viewingAsAdmin = false,
-  viewingAsClubAdmin = false,
-}: {
-  teamname: string | null;
-  viewingAsAdmin?: boolean;
-  viewingAsClubAdmin?: boolean;
-}) {
+export function TeamManager({ teamname }: { teamname: string | null }) {
   const { firebaseUser, profile } = useAuth();
   const { team, hasTeam, loading } = useTeam(teamname ?? undefined);
   const router = useRouter();
@@ -646,7 +641,9 @@ export function TeamManager({
   // Rosters por uid (2026-09-04): mismo hook que ya usa CoachesSection para
   // entrenadores — sin nombre que resolver a mano, publicProfiles ya lo trae.
   const playerProfiles = useProfilesByUid(Object.keys(team?.userplayers ?? {}));
-  const viewingAsSomeAdmin = viewingAsAdmin || viewingAsClubAdmin;
+  // ¿Estoy mirando un equipo que NO es mi activo (admin/club-admin por
+  // ?name=)? Solo decide qué estado vacío enseñar si el equipo no existe.
+  const viewingOther = Boolean(teamname) && teamname !== profile?.teamname;
   // Bug real reportado 2026-09-04: la pantalla se quedaba "pensando" sin fin
   // (sin ningún error visible) — un listener de RTDB que por lo que sea
   // nunca dispara ni éxito ni error deja a `loading` en true para siempre.
@@ -667,7 +664,7 @@ export function TeamManager({
     return <TeamSkeleton />;
   }
   if (!hasTeam || team === null) {
-    if (viewingAsSomeAdmin) {
+    if (viewingOther) {
       return <EmptyState icon={Users} title="Equipo no encontrado" />;
     }
     // Sin activo pero con pertenencias (p. ej. recién expulsado del que
@@ -699,35 +696,40 @@ export function TeamManager({
     );
   }
 
-  // Fundador (isFounder, el usercoach histórico — único que no puede
-  // "salir" y único que puede quitar a un co-entrenador) vs "gestiona este
-  // equipo" (isMyCoach, fundador O co-entrenador aceptado — mismos permisos
-  // de gestión día a día, rediseño multi-coach 2026-09-03). canManage
-  // además incluye al ADMIN global o al admin del club viendo un equipo
-  // ajeno; canDeleteTeam es más estricto (nunca un co-entrenador, solo
-  // quien fundó el equipo o un admin).
-  const isFounder = isTeamFounder(team, firebaseUser?.uid);
-  const isMyCoach = isTeamCoach(team, firebaseUser?.uid);
-  // 2026-09-04: un ADMIN gestiona SIEMPRE, también en su propio /team donde
-  // solo es jugador (antes exigía entrar por /admin/teams/detail —
-  // viewingAsAdmin — y en su equipo no veía ni "aceptar"). Las reglas RTDB
-  // ya le daban permiso; era solo la UI. viewingAs* sigue valiendo para el
-  // badge y para el admin de club, que no es ADMIN global.
-  const canManage = isMyCoach || isAdmin(profile) || viewingAsClubAdmin;
-  const canDeleteTeam = isFounder || isAdmin(profile) || viewingAsClubAdmin;
-  // "Salir del equipo" es una acción de MIEMBRO — nunca tiene sentido para
-  // alguien que está mirando un equipo ajeno del que no forma parte, y el
-  // fundador no puede salir (debe eliminar el equipo); un co-entrenador sí.
-  const canLeave = !viewingAsSomeAdmin && !isFounder;
+  // Relaciones REALES con este equipo (2026-09-04, vista única por
+  // relación, no por ruta):
+  // - isFounder: el usercoach histórico — único que no puede "salir" (debe
+  //   transferir primero) y único que quita/desciende co-entrenadores.
+  // - isMyCoach: fundador O co-entrenador aceptado (gestión día a día).
+  // - isDirectorOfTeamClub: dirijo el club de ESTE equipo (fundador o
+  //   codirector) — un director de OTRO club no cuenta.
+  // - isMemberHere: formo parte (jugador, co-entrenador o fundador) — lo
+  //   único que da "Salir" y la tarjeta "Más equipos".
+  const uid = firebaseUser?.uid;
+  const isFounder = isTeamFounder(team, uid);
+  const isMyCoach = isTeamCoach(team, uid);
+  const isDirectorOfTeamClub = Boolean(
+    club && uid && (club.adminUserId === uid || club.directors[uid] === true),
+  );
+  const isPlayerHere = Boolean(uid && team.userplayers[uid] === true);
+  const isMemberHere = isPlayerHere || isMyCoach;
+  const canManage = isMyCoach || isAdmin(profile) || isDirectorOfTeamClub;
+  // Borrar es más grave que gestionar: nunca un co-entrenador cualquiera.
+  const canDeleteTeam = isFounder || isAdmin(profile) || isDirectorOfTeamClub;
+  const canLeave = isMemberHere && !isFounder;
+  // Badge informativo cuando gestiono un equipo del que NO soy miembro.
+  const viewingAsLabel = !isMemberHere
+    ? isAdmin(profile)
+      ? "Viendo como administrador"
+      : isDirectorOfTeamClub
+        ? "Viendo como director del club"
+        : null
+    : null;
   // "Nombrar codirector del club" (pedido 2026-09-03: hacerlo también desde
   // dentro del equipo) — solo si este equipo pertenece a un club Y quien
-  // mira dirige ESE club (fundador o codirector) o es ADMIN global. Un
-  // admin de OTRO club viendo este equipo (viewingAsClubAdmin) no cuenta:
-  // sería el director de un club ajeno al de este equipo en concreto.
-  const isDirectorOfTeamClub = Boolean(
-    club && firebaseUser?.uid && (club.adminUserId === firebaseUser.uid || club.directors[firebaseUser.uid] === true),
-  );
+  // mira dirige ESE club o es ADMIN global.
   const canAppointDirector = Boolean(club) && (isDirectorOfTeamClub || isAdmin(profile));
+  const teamQuery = `?team=${encodeURIComponent(team.teamname!)}`;
 
   const kick = async (uid: string, name: string) => {
     setKicking(uid);
@@ -816,10 +818,10 @@ export function TeamManager({
 
   return (
     <div className="mx-auto max-w-2xl space-y-4">
-      {viewingAsSomeAdmin && (
+      {viewingAsLabel && (
         <Badge className="border-transparent bg-primary/15 text-brand">
           <ShieldCheck className="size-3" />
-          {viewingAsClubAdmin ? "Viendo como admin del club" : "Viendo como administrador"}
+          {viewingAsLabel}
         </Badge>
       )}
       <div className="flex items-center gap-4">
@@ -887,35 +889,23 @@ export function TeamManager({
 
       {canManage && <GeneralMessageDialog team={team} />}
 
-      {/*
-        Sin viewingAsClubAdmin: el informe de asistencia (team/attendance)
-        de momento solo reconoce coach literal + ADMIN global (ver plan) —
-        mostrar el botón también al admin de club llevaría a un "Solo el
-        entrenador" confuso al tocarlo.
-      */}
-      {canManage && !viewingAsClubAdmin && (
+      {/* Informe de asistencia: quien gestiona el equipo (coach, ADMIN,
+          director del club — team/attendance reconoce a los tres). Siempre
+          con ?team= — sin él la página resuelve al equipo ACTIVO, que no es
+          este si lo miro como admin/director. */}
+      {canManage && (
         <Link
-          href={
-            teamname
-              ? `/team/attendance?team=${encodeURIComponent(teamname)}`
-              : "/team/attendance"
-          }
+          href={`/team/attendance${teamQuery}`}
           className={cn(buttonVariants({ variant: "outline", size: "xl" }), "w-full")}
         >
           <ClipboardList className="size-4" /> Ver asistencia
         </Link>
       )}
 
-      {/*
-        A diferencia de "Ver asistencia" (solo coach/ADMIN), las
-        alineaciones publicadas son para todo el equipo — sin gate de
-        canManage. Se oculta viendo un equipo ajeno (admin/admin de club)
-        porque team/lineups solo reconoce miembro literal + ADMIN global
-        (mismo criterio que "Ver asistencia" evita el enlace roto).
-      */}
-      {!viewingAsAdmin && !viewingAsClubAdmin && (
+      {/* Alineaciones: para todo miembro y para quien gestiona. */}
+      {(isMemberHere || canManage) && (
         <Link
-          href="/team/lineups"
+          href={`/team/lineups${teamQuery}`}
           className={cn(buttonVariants({ variant: "outline", size: "xl" }), "w-full")}
         >
           <Trophy className="size-4" /> Ver alineaciones
@@ -1000,8 +990,9 @@ export function TeamManager({
       </Card>
 
       {/* Varios equipos (fase 2): unirse a más equipos / crear otro, sin
-          perder el actual. Nunca viendo un equipo ajeno como admin. */}
-      {!viewingAsSomeAdmin && (
+          perder el actual. Es sobre MI cuenta, no sobre este equipo: solo
+          cuando soy miembro (no mirándolo como admin/director). */}
+      {isMemberHere && (
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Más equipos</CardTitle>
@@ -1051,7 +1042,7 @@ export function TeamManager({
       {/* El fundador no tiene "Salir" (el equipo necesita un entrenador
           principal): decirlo, en vez de que el botón simplemente no esté
           (pregunta real 2026-09-04: "¿cuál es el botón de salir?"). */}
-      {isFounder && !viewingAsSomeAdmin && (
+      {isFounder && (
         <p className="text-center text-xs text-muted-foreground">
           Para salir del equipo, primero haz entrenador principal a un co-entrenador (corona en
           «Entrenadores»); después te aparecerá aquí «Salir de {team.teamname}».

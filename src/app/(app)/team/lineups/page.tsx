@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useClub } from "@/hooks/useClub";
 import { useLoadingTimeout } from "@/hooks/useLoadingTimeout";
 import { useMyTeams } from "@/hooks/useMyTeams";
 import { useTeam } from "@/hooks/useTeam";
@@ -104,6 +105,9 @@ function TeamLineups() {
   const { firebaseUser, profile } = useAuth();
   const { team, hasTeam, loading } = useTeam(teamParam ?? undefined);
   const { teams: myTeams } = useMyTeams();
+  // Club de ESTE equipo: su director también ve/gestiona alineaciones
+  // (2026-09-04, vista única por relación, no por ruta).
+  const { club } = useClub(team?.clubId ?? null);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [editing, setEditing] = useState<LineupDoc | null>(null);
   const stuck = useLoadingTimeout(profile === null || loading);
@@ -138,18 +142,22 @@ function TeamLineups() {
   // Miembro = activo o cualquiera de mis equipos (varios equipos, fase 2).
   const isMember =
     profile.teamname === team.teamname || (team.teamname != null && myTeams.includes(team.teamname));
-  const canView = isMember || isAdmin(profile);
+  const uid = firebaseUser?.uid;
+  const isDirectorOfTeamClub = Boolean(
+    club && uid && (club.adminUserId === uid || club.directors[uid] === true),
+  );
+  const canView = isMember || isAdmin(profile) || isTeamCoach(team, uid) || isDirectorOfTeamClub;
   if (!canView) {
     return (
       <EmptyState
         icon={Lock}
         title="Solo el equipo"
-        hint="Las alineaciones solo las pueden ver los miembros de este equipo."
+        hint="Las alineaciones solo las pueden ver los miembros de este equipo y la dirección de su club."
       />
     );
   }
 
-  const isManage = isTeamCoach(team, firebaseUser?.uid) || isAdmin(profile);
+  const isManage = isTeamCoach(team, uid) || isAdmin(profile) || isDirectorOfTeamClub;
 
   // Por partido asignado a cada lineupId — solo informativo (ver
   // LineupEditor: la asignación en sí es exclusiva del Calendario).

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { NotificationSchema, PublicProfileSchema, UserSchema } from "./user";
+import { NotificationSchema, PublicProfileSchema, UserSchema, UserTeamsSchema } from "./user";
 
 describe("UserSchema", () => {
   it("parsea un perfil completo", () => {
@@ -48,6 +48,24 @@ describe("UserSchema", () => {
       assistedTrainingDays: { "0": "01/01/2026", "2": "03/01/2026" },
     });
     expect(result.assistedTrainingDays).toEqual(["01/01/2026", "03/01/2026"]);
+  });
+});
+
+describe("UserTeamsSchema", () => {
+  it("parsea el mapa {teamname: true} de pertenencias", () => {
+    expect(UserTeamsSchema.parse({ Spartans: true, "Rugby Granollers": true })).toEqual({
+      Spartans: true,
+      "Rugby Granollers": true,
+    });
+  });
+
+  it("null (usuario sin ninguna pertenencia todavía) → mapa vacío", () => {
+    expect(UserTeamsSchema.parse(null)).toEqual({});
+  });
+
+  it("un valor distinto de true no es válido (la .validate de la regla lo impide igualmente)", () => {
+    expect(UserTeamsSchema.safeParse({ Spartans: false }).success).toBe(false);
+    expect(UserTeamsSchema.safeParse({ Spartans: "sí" }).success).toBe(false);
   });
 });
 

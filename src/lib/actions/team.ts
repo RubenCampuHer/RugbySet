@@ -8,6 +8,7 @@ import {
   orderByChild,
   query,
   ref,
+  set,
   update,
 } from "firebase/database";
 import { httpsCallable } from "firebase/functions";
@@ -33,6 +34,22 @@ export async function resolveUidByName(nameSurname: string): Promise<string | nu
 }
 
 /**
+ * Autorreparación de UserTeams/{uid}/{teamname} (varios equipos, fase 1
+ * 2026-09-04): garantiza que el equipo ACTIVO del perfil
+ * (Users/{uid}/teamname) figure también en el mapa de pertenencias. Cubre
+ * las altas hechas desde Android (que solo escribe teamname) y las cuentas
+ * anteriores al backfill. La regla permite al propio usuario esta escritura
+ * únicamente cuando $teamname coincide con su teamname — no sirve para
+ * auto-añadirse a otro equipo. Idempotente: un get y, como mucho, un set.
+ */
+export async function ensureUserTeamMembership(uid: string, teamname: string): Promise<void> {
+  const membershipRef = ref(db, `${PATHS.USER_TEAMS}/${uid}/${teamname}`);
+  const snap = await get(membershipRef);
+  if (snap.val() === true) return;
+  await set(membershipRef, true);
+}
+
+/**
  * Coach acepta a un pendiente — multi-path atómico (espejo de
  * TeamRepository.acceptPendingPlayer): sale de pendingplayers, entra en
  * userplayers y su Users/{uid}/teamname apunta al equipo. La vía legacy
@@ -52,6 +69,8 @@ export async function acceptPendingPlayer(team: Team, playerName: string) {
     [`${PATHS.TEAMS}/${teamname}/pendingplayers`]: pending,
     [`${PATHS.TEAMS}/${teamname}/userplayers`]: players,
     [`${PATHS.USERS}/${playerUid}/teamname`]: teamname,
+    // Varios equipos (fase 1): toda alta mantiene también UserTeams.
+    [`${PATHS.USER_TEAMS}/${playerUid}/${teamname}`]: true,
   });
 }
 
@@ -75,6 +94,7 @@ export async function acceptPendingCoach(team: Team, uid: string) {
     [`${PATHS.TEAMS}/${teamname}/pendingCoaches/${uid}`]: null,
     [`${PATHS.TEAMS}/${teamname}/coaches/${uid}`]: true,
     [`${PATHS.USERS}/${uid}/teamname`]: teamname,
+    [`${PATHS.USER_TEAMS}/${uid}/${teamname}`]: true,
   });
 }
 
@@ -96,6 +116,7 @@ export async function removeCoach(team: Team, uid: string) {
     [`${PATHS.TEAMS}/${teamname}/coaches/${uid}`]: null,
     [`${PATHS.USERS}/${uid}/teamname`]: null,
     [`${PATHS.USERS}/${uid}/assistedTrainingDays`]: null,
+    [`${PATHS.USER_TEAMS}/${uid}/${teamname}`]: null,
   });
 }
 
@@ -154,6 +175,7 @@ export async function removePlayer(team: Team, playerName: string) {
   if (playerUid) {
     updates[`${PATHS.USERS}/${playerUid}/teamname`] = null;
     updates[`${PATHS.USERS}/${playerUid}/assistedTrainingDays`] = null;
+    updates[`${PATHS.USER_TEAMS}/${playerUid}/${teamname}`] = null;
   }
   await update(ref(db), updates);
 }
@@ -360,6 +382,7 @@ export async function deleteTeam(team: Team): Promise<void> {
   for (const uid of uids) {
     updates[`${PATHS.USERS}/${uid}/teamname`] = null;
     updates[`${PATHS.USERS}/${uid}/assistedTrainingDays`] = null;
+    updates[`${PATHS.USER_TEAMS}/${uid}/${teamname}`] = null;
   }
   await update(ref(db), updates);
 }

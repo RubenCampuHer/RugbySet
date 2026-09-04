@@ -2,8 +2,9 @@
 
 import { onAuthStateChanged, signOut, type User as FirebaseUser } from "firebase/auth";
 import { onValue, ref } from "firebase/database";
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { ensureUserProfile } from "@/lib/actions/onboarding";
+import { ensureUserTeamMembership } from "@/lib/actions/team";
 import { PATHS } from "@/lib/constants";
 import { auth, db } from "@/lib/firebase";
 import { parseOr } from "@/lib/schemas/common";
@@ -27,6 +28,9 @@ const AuthContext = createContext<AuthState>({
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null | undefined>(undefined);
   const [profileState, setProfileState] = useState<User | null>(null);
+  // "(uid)/(equipo)" ya reconciliados en esta sesión — onValue vuelve a
+  // disparar con cada cambio del perfil y no hay que repetir el get.
+  const reconciledTeams = useRef(new Set<string>());
 
   useEffect(() => {
     return onAuthStateChanged(auth, (user) => {
@@ -55,7 +59,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         void ensureUserProfile(firebaseUser);
         return;
       }
-      setProfileState(parseOr(UserSchema, snap.val(), `Users/${firebaseUser.uid}`));
+      const parsed = parseOr(UserSchema, snap.val(), `Users/${firebaseUser.uid}`);
+      setProfileState(parsed);
+      // Varios equipos (fase 1, 2026-09-04): el equipo ACTIVO del perfil debe
+      // figurar en UserTeams/{uid}. Se autocura aquí — mismo sitio que
+      // ensureUserProfile — para cubrir altas hechas desde Android (que solo
+      // escribe teamname) y cuentas anteriores al backfill, sin tocar Android.
+      if (parsed?.teamname) {
+        const key = `${firebaseUser.uid}/${parsed.teamname}`;
+        if (!reconciledTeams.current.has(key)) {
+          reconciledTeams.current.add(key);
+          ensureUserTeamMembership(firebaseUser.uid, parsed.teamname).catch((error) =>
+            console.error("ensureUserTeamMembership:", error),
+          );
+        }
+      }
     });
   }, [firebaseUser]);
 

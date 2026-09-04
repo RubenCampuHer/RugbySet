@@ -1,6 +1,6 @@
 // Fuente: _User.kt y _Notification.kt del repo Android — mantener en sincronía.
 import { z } from "zod";
-import { RoleSchema, rtdbList, timestampMs } from "./common";
+import { RoleSchema, rtdbList, rtdbRecord, timestampMs } from "./common";
 
 // Perfil PROPIO (Users/{uid}). Sin fcmToken: la web no lo consume.
 export const UserSchema = z.object({
@@ -24,6 +24,13 @@ export const UserSchema = z.object({
   // Ver src/lib/actions/onboarding.ts.
   onboardingComplete: z.boolean().nullish(),
 });
+
+// UserTeams/{uid} — TODAS las pertenencias a equipo del usuario (varios
+// equipos, fase 1 2026-09-04), mapa {teamname: true} como Team.coaches. Nodo
+// raíz propio, fuera de Users/{uid}: Android reescribe ese nodo entero y
+// borraría el campo. Users.teamname sigue siendo el equipo ACTIVO (uno de
+// estos). En la fase 1 solo lo lee useMyTeams(); ninguna pantalla todavía.
+export const UserTeamsSchema = rtdbRecord(z.literal(true));
 
 // publicProfiles/{uid} — proyección pública mantenida por la Cloud Function
 // mirrorPublicProfile (sin mail, sin fcmToken, sin favoritos, sin

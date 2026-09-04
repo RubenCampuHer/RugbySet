@@ -130,6 +130,11 @@ export async function createStandaloneTeam(opts: {
   await update(ref(db), {
     [`${PATHS.TEAMS}/${opts.teamName}`]: team,
     [`${PATHS.USERS}/${opts.uid}/teamname`]: opts.teamName,
+    // Varios equipos (fase 1, 2026-09-04): la pertenencia va en el mismo
+    // update — la regla de UserTeams evalúa `root` ya combinado, así que
+    // tanto "soy usercoach del equipo" como "coincide con mi teamname" son
+    // ciertos en esta misma escritura.
+    [`${PATHS.USER_TEAMS}/${opts.uid}/${opts.teamName}`]: true,
   });
 }
 
@@ -191,6 +196,7 @@ export async function createClubAndTeam(opts: {
   await update(ref(db), {
     [`${PATHS.TEAMS}/${opts.teamName}`]: team,
     [`${PATHS.USERS}/${opts.uid}/teamname`]: opts.teamName,
+    [`${PATHS.USER_TEAMS}/${opts.uid}/${opts.teamName}`]: true, // ver createStandaloneTeam
   });
   // Puntero de descubrimiento del club que dirijo (rediseño multi-director
   // 2026-09-03) — mismo criterio que createClub en actions/club.ts.

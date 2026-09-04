@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   attendanceDetailForPlayer,
   attendanceSummaryByPlayer,
+  attendedDatesFromTeam,
+  calculateStreak,
   presetRange,
   sessionsInRange,
 } from "./attendance";
@@ -24,6 +26,34 @@ function team(overrides: Partial<Team> = {}): Team {
     ...overrides,
   };
 }
+
+describe("attendedDatesFromTeam", () => {
+  const t = team({
+    trainingdays: [
+      { fecha: "01/01/2026", accepted_players: ["Ana García"], declined_players: ["Marc López"] },
+      { fecha: "08/01/2026", accepted_players: ["Ana García", "Marc López"], declined_players: [] },
+      { fecha: "15/01/2026", accepted_players: [], declined_players: ["Ana García"] },
+      { fecha: null, accepted_players: ["Ana García"], declined_players: [] },
+    ],
+  });
+
+  it("devuelve solo las fechas de ESTE equipo en las que el jugador confirmó", () => {
+    expect(attendedDatesFromTeam(t, "Ana García")).toEqual(["01/01/2026", "08/01/2026"]);
+    expect(attendedDatesFromTeam(t, "Marc López")).toEqual(["08/01/2026"]);
+  });
+
+  it("sin equipo o sin nombre → vacío (nunca lanza)", () => {
+    expect(attendedDatesFromTeam(null, "Ana García")).toEqual([]);
+    expect(attendedDatesFromTeam(t, "")).toEqual([]);
+  });
+
+  it("encaja como sustituto de assistedTrainingDays en calculateStreak", () => {
+    // Ana faltó al último (15/01) → racha 0; Marc no fue al 15/01 tampoco → 0;
+    // con 'now' antes del 15/01, Ana lleva 2 seguidos.
+    expect(calculateStreak(t, attendedDatesFromTeam(t, "Ana García"), new Date(2026, 0, 20))).toBe(0);
+    expect(calculateStreak(t, attendedDatesFromTeam(t, "Ana García"), new Date(2026, 0, 10))).toBe(2);
+  });
+});
 
 describe("sessionsInRange", () => {
   it("sin bounds (rango vacío) incluye todo hasta 'now', ordenado cronológicamente", () => {

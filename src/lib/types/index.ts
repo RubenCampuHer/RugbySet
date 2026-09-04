@@ -7,6 +7,7 @@ import type { LineupDocSchema } from "../schemas/lineup";
 import type { TeamSchema, TrainingDaySchema } from "../schemas/team";
 import type { ExerciseTrainingSchema, SectionSchema, TrainingSchema } from "../schemas/training";
 import type {
+  AttendanceStatsSchema,
   NotificationSchema,
   PublicProfileSchema,
   UserSchema,
@@ -16,6 +17,7 @@ import type {
 export type User = z.infer<typeof UserSchema>;
 export type UserTeams = z.infer<typeof UserTeamsSchema>;
 export type PublicProfile = z.infer<typeof PublicProfileSchema>;
+export type AttendanceStats = z.infer<typeof AttendanceStatsSchema>;
 export type Notification = z.infer<typeof NotificationSchema>;
 export type Exercise = z.infer<typeof ExerciseSchema>;
 export type Training = z.infer<typeof TrainingSchema>;

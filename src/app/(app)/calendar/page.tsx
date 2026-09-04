@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { useLoadingTimeout } from "@/hooks/useLoadingTimeout";
 import { useTeam } from "@/hooks/useTeam";
 import { setAttendance } from "@/lib/actions/team";
+import { attendedDatesFromTeam } from "@/lib/attendance";
 import { paramToKey, todayKey } from "@/lib/calendar";
 import { isTeamCoach } from "@/lib/permissions";
 import type { TrainingDay } from "@/lib/types";
@@ -51,9 +52,12 @@ function CalendarContent() {
     return map;
   }, [team]);
 
+  // "Asistí" por equipo (fase 3): del propio calendario del equipo activo,
+  // no de profile.assistedTrainingDays (lista plana que mezcla equipos).
+  const myNameForAttendance = profile?.nameSurname ?? "";
   const attended = useMemo(
-    () => new Set(profile?.assistedTrainingDays ?? []),
-    [profile],
+    () => new Set(attendedDatesFromTeam(team, myNameForAttendance)),
+    [team, myNameForAttendance],
   );
 
   const stuck = useLoadingTimeout(loading);

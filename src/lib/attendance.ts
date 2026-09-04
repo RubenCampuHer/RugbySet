@@ -17,6 +17,21 @@ function teamTrainingDates(team: Team, now: Date): number[] {
 }
 
 /**
+ * Fechas ("dd/MM/yyyy") de los días de ESTE equipo en los que el jugador
+ * confirmó asistencia — la fuente de verdad por equipo (varios equipos, fase
+ * 3, 2026-09-04). Sustituye a Users/{uid}/assistedTrainingDays en la web:
+ * esa lista es plana, sin equipo, y con varios equipos mezcla fechas de
+ * todos (Android sigue escribiéndola y leyéndola; la web ya no la lee).
+ * Sirve tal cual como segundo argumento de calculateStreak/MaxStreak/Rate.
+ */
+export function attendedDatesFromTeam(team: Team | null | undefined, playerName: string): string[] {
+  if (!team || !playerName) return [];
+  return team.trainingdays
+    .filter((d) => d.fecha && d.accepted_players.includes(playerName))
+    .map((d) => d.fecha!);
+}
+
+/**
  * Racha actual — espejo de _Team.calculateStreak: compara desde el último
  * entreno del equipo hacia atrás cuántos coinciden consecutivamente con los
  * asistidos por el usuario.

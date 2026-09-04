@@ -13,6 +13,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { useMyTeams } from "@/hooks/useMyTeams";
 import { useTeam } from "@/hooks/useTeam";
 import {
+  attendedDatesFromTeam,
   calculateAttendanceRate,
   calculateMaxStreak,
   calculateStreak,
@@ -45,9 +46,12 @@ export default function ProfilePage() {
     return <ProfileSkeleton />;
   }
 
-  const streak = team ? calculateStreak(team, profile.assistedTrainingDays) : 0;
-  const maxStreak = team ? calculateMaxStreak(team, profile.assistedTrainingDays) : 0;
-  const rate = team ? calculateAttendanceRate(team, profile.assistedTrainingDays) : 0;
+  // Asistencia del equipo ACTIVO, derivada de su propio calendario (fase 3):
+  // profile.assistedTrainingDays es una lista plana que mezcla equipos.
+  const attendedDates = attendedDatesFromTeam(team, profile.nameSurname ?? "");
+  const streak = team ? calculateStreak(team, attendedDates) : 0;
+  const maxStreak = team ? calculateMaxStreak(team, attendedDates) : 0;
+  const rate = team ? calculateAttendanceRate(team, attendedDates) : 0;
 
   return (
     <div className="mx-auto max-w-lg space-y-4">
@@ -86,7 +90,11 @@ export default function ProfilePage() {
             profile.teamname && <p>Equipo: {profile.teamname}</p>
           )}
           {profile.mail && <p>Email: {profile.mail}</p>}
-          <p>Entrenos asistidos: {profile.assistedTrainingDays.length}</p>
+          {team && (
+            <p>
+              Entrenos asistidos en {team.teamname}: {attendedDates.length}
+            </p>
+          )}
         </CardContent>
       </Card>
 

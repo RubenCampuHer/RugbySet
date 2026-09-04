@@ -32,11 +32,20 @@ export const UserSchema = z.object({
 // estos). En la fase 1 solo lo lee useMyTeams(); ninguna pantalla todavía.
 export const UserTeamsSchema = rtdbRecord(z.literal(true));
 
+/** Agregados de asistencia calculados server-side (nunca fechas crudas de otro usuario). */
+export const AttendanceStatsSchema = z.object({
+  streak: z.number().int().nullish(),
+  maxStreak: z.number().int().nullish(),
+  attendanceRate: z.number().int().nullish(),
+});
+
 // publicProfiles/{uid} — proyección pública mantenida por la Cloud Function
 // mirrorPublicProfile (sin mail, sin fcmToken, sin favoritos, sin
 // assistedTrainingDays crudo). streak/maxStreak/attendanceRate son agregados
 // ya calculados server-side (mirrorPublicProfile + mirrorTeamAttendanceStats)
-// — solo presentes cuando el usuario tiene equipo.
+// del equipo ACTIVO (los lee Android); teamStats/{teamname} los mismos tres
+// números POR EQUIPO (varios equipos, fase 3 2026-09-04) — la web lee de
+// aquí para mostrar a un jugador dentro de un equipo concreto.
 export const PublicProfileSchema = z.object({
   userId: z.string().nullish(),
   username: z.string().nullish(),
@@ -47,6 +56,7 @@ export const PublicProfileSchema = z.object({
   streak: z.number().int().nullish(),
   maxStreak: z.number().int().nullish(),
   attendanceRate: z.number().int().nullish(),
+  teamStats: rtdbRecord(AttendanceStatsSchema).default({}),
 });
 
 export const NotificationSchema = z.object({

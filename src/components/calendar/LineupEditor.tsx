@@ -14,6 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useProfilesByUid } from "@/hooks/useProfilesByUid";
 import { deleteLineup, updateLineup } from "@/lib/actions/lineup";
 import {
   findDuplicateName,
@@ -159,6 +160,14 @@ export function LineupEditor({
       .sort((a, b) => a - b),
   );
   const [saving, setSaving] = useState(false);
+  // Rosters por uid (2026-09-04): starters/bench siguen siendo texto libre
+  // (admiten a alguien SIN cuenta, ver comentario de LineupRow) — el
+  // desplegable del roster necesita los NOMBRES, resueltos aquí en vivo vía
+  // publicProfiles, no team.userplayers directamente (ya es {uid: true}).
+  const playerProfiles = useProfilesByUid(Object.keys(team.userplayers));
+  const playerNames = Object.values(playerProfiles)
+    .map((p) => p?.nameSurname)
+    .filter((n): n is string => Boolean(n));
   // Ver LineupEditor (versión embebida anterior): cada fila decide
   // "roster o texto libre" una sola vez al montar; forzar remount al
   // copiar una plantilla para que cada una lo vuelva a decidir con el
@@ -299,7 +308,7 @@ export function LineupEditor({
             rowKey={String(pos)}
             label={RUGBY_POSITIONS[pos]}
             value={starters[String(pos)] ?? ""}
-            players={team.userplayers}
+            players={playerNames}
             takenElsewhere={takenNames({ starters, bench }, String(pos))}
             onChange={(v) => setStarter(pos, v)}
           />
@@ -314,7 +323,7 @@ export function LineupEditor({
             rowKey={String(num)}
             label="Suplente"
             value={bench[String(num)] ?? ""}
-            players={team.userplayers}
+            players={playerNames}
             takenElsewhere={takenNames({ starters, bench }, String(num))}
             onChange={(v) => setBenchSlot(num, v)}
             onRemove={() => removeBenchSlot(num)}

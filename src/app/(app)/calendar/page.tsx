@@ -22,7 +22,7 @@ import { isTeamCoach } from "@/lib/permissions";
 import type { TrainingDay } from "@/lib/types";
 
 function CalendarContent() {
-  const { profile, firebaseUser } = useAuth();
+  const { firebaseUser } = useAuth();
   const { team, hasTeam, loading } = useTeam();
   const searchParams = useSearchParams();
 
@@ -54,10 +54,11 @@ function CalendarContent() {
 
   // "Asistí" por equipo (fase 3): del propio calendario del equipo activo,
   // no de profile.assistedTrainingDays (lista plana que mezcla equipos).
-  const myNameForAttendance = profile?.nameSurname ?? "";
+  // Rosters por uid (2026-09-04): accepted_players es {uid: true}.
+  const myUid = firebaseUser?.uid ?? "";
   const attended = useMemo(
-    () => new Set(attendedDatesFromTeam(team, myNameForAttendance)),
-    [team, myNameForAttendance],
+    () => new Set(attendedDatesFromTeam(team, myUid)),
+    [team, myUid],
   );
 
   const stuck = useLoadingTimeout(loading);
@@ -94,7 +95,6 @@ function CalendarContent() {
   }
 
   const isCoach = isTeamCoach(team, firebaseUser?.uid);
-  const myName = profile?.nameSurname ?? "";
   const selectedDay = selected ? (daysByFecha.get(selected) ?? null) : null;
 
   const prevMonth = () => {
@@ -111,12 +111,11 @@ function CalendarContent() {
   };
 
   const submitOwnAttendance = async (day: TrainingDay, status: "accepted" | "declined") => {
-    if (!firebaseUser || !myName || !day.fecha) return;
+    if (!firebaseUser || !day.fecha) return;
     try {
       await setAttendance({
         teamname: team.teamname!,
         fecha: day.fecha,
-        playerName: myName,
         playerUid: firebaseUser.uid,
         status,
       });
@@ -152,7 +151,7 @@ function CalendarContent() {
       <UpcomingEvents
         team={team}
         isCoach={isCoach}
-        myName={myName}
+        myUid={myUid}
         onSelectDay={setSelected}
         onAnswer={(day, status) => void submitOwnAttendance(day, status)}
       />
@@ -164,7 +163,7 @@ function CalendarContent() {
           fecha={selected}
           day={selectedDay}
           isCoach={isCoach}
-          myName={myName}
+          myUid={myUid}
           onAnswer={(status) => selectedDay && void submitOwnAttendance(selectedDay, status)}
         />
       )}

@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useLoadingTimeout } from "@/hooks/useLoadingTimeout";
+import { useProfilesByUid } from "@/hooks/useProfilesByUid";
 import { useTeam } from "@/hooks/useTeam";
 import {
   ATTENDANCE_PRESET_LABELS,
@@ -60,6 +61,12 @@ function TeamAttendance() {
   const { firebaseUser, profile } = useAuth();
   const { team, hasTeam, loading } = useTeam(teamParam ?? undefined);
   const stuck = useLoadingTimeout(profile === null || loading);
+  // Rosters por uid (2026-09-04): attendanceSummaryByPlayer ya no conoce
+  // nombres (es lógica pura, sin Firebase) — se resuelven aquí vía
+  // publicProfiles, mismo hook que ya usa TeamManager para el roster. Antes
+  // de cualquier return condicional (reglas de hooks) — team puede ser null.
+  const playerProfiles = useProfilesByUid(Object.keys(team?.userplayers ?? {}));
+  const nameOf = (uid: string) => playerProfiles[uid]?.nameSurname || "Jugador";
 
   const [preset, setPreset] = useState<AttendancePreset | "custom">("month");
   const [customFrom, setCustomFrom] = useState("");
@@ -110,16 +117,16 @@ function TeamAttendance() {
       : presetRange(preset);
 
   const summary = [...attendanceSummaryByPlayer(team, range)].sort(
-    (a, b) => a.rate - b.rate || a.name.localeCompare(b.name),
+    (a, b) => a.rate - b.rate || nameOf(a.uid).localeCompare(nameOf(b.uid), "es"),
   );
   const hasSessions = (summary[0]?.total ?? 0) > 0;
 
   const exportCsv = () => {
     const rows: string[][] = [["Jugador", "Fecha", "Tipo", "Entreno", "Estado"]];
-    for (const name of team.userplayers) {
-      for (const d of attendanceDetailForPlayer(team, name, range)) {
+    for (const uid of Object.keys(team.userplayers)) {
+      for (const d of attendanceDetailForPlayer(team, uid, range)) {
         rows.push([
-          name,
+          nameOf(uid),
           d.fecha,
           d.eventType === "MATCH" ? "Partido" : "Entrenamiento",
           d.nameTrainingDay ?? "",
@@ -207,16 +214,17 @@ function TeamAttendance() {
         <Card>
           <CardContent className="divide-y divide-border p-0">
             {summary.map((s) => {
-              const detail = expanded === s.name ? attendanceDetailForPlayer(team, s.name, range) : [];
+              const name = nameOf(s.uid);
+              const detail = expanded === s.uid ? attendanceDetailForPlayer(team, s.uid, range) : [];
               return (
-                <div key={s.name}>
+                <div key={s.uid}>
                   <button
                     type="button"
-                    onClick={() => setExpanded(expanded === s.name ? null : s.name)}
+                    onClick={() => setExpanded(expanded === s.uid ? null : s.uid)}
                     className="flex w-full items-center gap-3 p-3 text-left hover:bg-muted/50"
                   >
-                    <AvatarInitials name={s.name} size="sm" />
-                    <span className="flex-1 truncate text-sm font-medium">{s.name}</span>
+                    <AvatarInitials name={name} size="sm" />
+                    <span className="flex-1 truncate text-sm font-medium">{name}</span>
                     <span className="shrink-0 text-xs text-muted-foreground">
                       {s.attended}/{s.total}
                     </span>
@@ -232,13 +240,13 @@ function TeamAttendance() {
                     <Badge variant={s.rate < 70 ? "destructive" : "secondary"} className="shrink-0">
                       {s.rate}%
                     </Badge>
-                    {expanded === s.name ? (
+                    {expanded === s.uid ? (
                       <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
                     ) : (
                       <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
                     )}
                   </button>
-                  {expanded === s.name && (
+                  {expanded === s.uid && (
                     <div className="space-y-1 bg-muted/30 px-3 pb-3">
                       {detail.map((d) => (
                         <div

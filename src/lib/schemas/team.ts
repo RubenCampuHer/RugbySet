@@ -1,7 +1,11 @@
 // Fuente: _Team.kt y _TrainingDay.kt del repo Android.
-// Notas: la clave de Teams/{teamname} es el nombre del equipo; userplayers y
-// pendingplayers son listas de nameSurname (texto, no uids); trainingdays es
-// un ARRAY embebido y cada TrainingDay lleva el _Training COMPLETO copiado.
+// Notas: la clave de Teams/{teamname} es el nombre del equipo; trainingdays
+// es un ARRAY embebido y cada TrainingDay lleva el _Training COMPLETO copiado.
+// Rosters por uid (2026-09-04): userplayers/pendingplayers/accepted_players/
+// declined_players eran listas de nameSurname (texto) — dos personas con el
+// mismo nombre se confundían en aceptar/expulsar/asistencia. Ahora son mapas
+// {uid: true}, como Team.coaches — el nombre para mostrar se resuelve en vivo
+// vía publicProfiles (useProfilesByUid), nunca se guarda una copia congelada.
 import { z } from "zod";
 import { rtdbList, rtdbRecord } from "./common";
 import { LineupDocSchema } from "./lineup";
@@ -13,8 +17,8 @@ export const TrainingDaySchema = z.object({
   horaFin: z.string().nullish(),
   nameTrainingDay: z.string().nullish(),
   training: TrainingSchema.nullish(),
-  accepted_players: rtdbList(z.string()).default([]), // nameSurname
-  declined_players: rtdbList(z.string()).default([]),
+  accepted_players: rtdbRecord(z.literal(true)).default({}), // {uid: true}
+  declined_players: rtdbRecord(z.literal(true)).default({}),
   // Campos aditivos (2026-07-13): null/"TRAINING" = entrenamiento, "MATCH" = partido.
   eventType: z.enum(["TRAINING", "MATCH"]).nullish(),
   location: z.string().nullish(),
@@ -31,8 +35,8 @@ export const TeamSchema = z.object({
   usercoach: z.string().nullish(), // uid del coach fundador — sigue siendo "el dueño" (borrar equipo, no puede salir sin borrarlo)
   teamcode: z.string().nullish(),
   teamicon: z.string().nullish(),
-  userplayers: rtdbList(z.string()).default([]),
-  pendingplayers: rtdbList(z.string()).default([]),
+  userplayers: rtdbRecord(z.literal(true)).default({}), // {uid: true}
+  pendingplayers: rtdbRecord(z.literal(true)).default({}),
   trainingdays: rtdbList(TrainingDaySchema).default([]),
   clubId: z.string().nullish(),
   category: z.string().nullish(),

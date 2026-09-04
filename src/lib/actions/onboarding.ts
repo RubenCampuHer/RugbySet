@@ -99,8 +99,9 @@ function buildTeam(opts: {
     usercoach: opts.uid,
     teamcode: opts.teamCode,
     teamicon: opts.iconUrl ?? "",
-    userplayers: opts.alsoPlayer ? [opts.coachName] : [],
-    pendingplayers: [],
+    // Rosters por uid (2026-09-04): {uid: true}, no el nombre del coach.
+    userplayers: opts.alsoPlayer ? { [opts.uid]: true } : {},
+    pendingplayers: {},
     trainingdays: [],
     clubId: opts.clubId ?? null,
     category: opts.category ?? null,

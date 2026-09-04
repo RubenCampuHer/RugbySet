@@ -546,7 +546,7 @@ export function ClubManager({ club, viewingAsAdmin = false }: { club: Club; view
                         <p className="truncate text-sm font-medium">{name}</p>
                         {team && (
                           <p className="truncate text-xs text-muted-foreground">
-                            {team.userplayers.length} jugador{team.userplayers.length === 1 ? "" : "es"}
+                            {Object.keys(team.userplayers).length} jugador{Object.keys(team.userplayers).length === 1 ? "" : "es"}
                             {team.category && ` · ${team.category}`}
                           </p>
                         )}

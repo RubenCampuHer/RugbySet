@@ -145,9 +145,9 @@ function TeamRow({ name, team }: { name: string; team: Team | undefined }) {
           <p className="truncate text-sm font-medium">{name}</p>
           {team && (
             <p className="truncate text-xs text-muted-foreground">
-              {team.userplayers.length} jugador{team.userplayers.length === 1 ? "" : "es"}
-              {team.pendingplayers.length > 0 &&
-                ` · ${team.pendingplayers.length} pendiente${team.pendingplayers.length === 1 ? "" : "s"}`}
+              {Object.keys(team.userplayers).length} jugador{Object.keys(team.userplayers).length === 1 ? "" : "es"}
+              {Object.keys(team.pendingplayers).length > 0 &&
+                ` · ${Object.keys(team.pendingplayers).length} pendiente${Object.keys(team.pendingplayers).length === 1 ? "" : "s"}`}
             </p>
           )}
         </div>

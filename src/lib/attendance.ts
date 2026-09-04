@@ -23,11 +23,13 @@ function teamTrainingDates(team: Team, now: Date): number[] {
  * esa lista es plana, sin equipo, y con varios equipos mezcla fechas de
  * todos (Android sigue escribiéndola y leyéndola; la web ya no la lee).
  * Sirve tal cual como segundo argumento de calculateStreak/MaxStreak/Rate.
+ * Rosters por uid (2026-09-04): accepted_players es {uid: true}, no una
+ * lista de nombres — recibe uid, no nameSurname.
  */
-export function attendedDatesFromTeam(team: Team | null | undefined, playerName: string): string[] {
-  if (!team || !playerName) return [];
+export function attendedDatesFromTeam(team: Team | null | undefined, uid: string): string[] {
+  if (!team || !uid) return [];
   return team.trainingdays
-    .filter((d) => d.fecha && d.accepted_players.includes(playerName))
+    .filter((d) => d.fecha && d.accepted_players[uid] === true)
     .map((d) => d.fecha!);
 }
 
@@ -122,7 +124,8 @@ export function sessionsInRange(team: Team, range: DateRange, now = new Date()):
 }
 
 export type PlayerAttendanceSummary = {
-  name: string;
+  /** Rosters por uid (2026-09-04) — el nombre a mostrar se resuelve aparte, vía useProfilesByUid (el llamador no está en Firebase). */
+  uid: string;
   attended: number;
   total: number;
   /** 0-100, siempre 0 (nunca NaN) cuando total es 0. */
@@ -139,15 +142,15 @@ export function attendanceSummaryByPlayer(
 ): PlayerAttendanceSummary[] {
   const sessions = sessionsInRange(team, range, now);
   const total = sessions.length;
-  return team.userplayers.map((name) => {
-    const attended = sessions.filter((s) => s.accepted_players.includes(name)).length;
+  return Object.keys(team.userplayers).map((uid) => {
+    const attended = sessions.filter((s) => s.accepted_players[uid] === true).length;
     let streak = 0;
     for (let i = sessions.length - 1; i >= 0; i--) {
-      if (sessions[i].accepted_players.includes(name)) streak++;
+      if (sessions[i].accepted_players[uid] === true) streak++;
       else break;
     }
     return {
-      name,
+      uid,
       attended,
       total,
       rate: total === 0 ? 0 : Math.round((attended / total) * 100),
@@ -166,7 +169,7 @@ export type PlayerAttendanceDetail = {
 /** Desglose día a día de un jugador dentro de un rango (para el detalle desplegable del informe). */
 export function attendanceDetailForPlayer(
   team: Team,
-  name: string,
+  uid: string,
   range: DateRange,
   now = new Date(),
 ): PlayerAttendanceDetail[] {
@@ -174,9 +177,9 @@ export function attendanceDetailForPlayer(
     fecha: s.fecha!,
     nameTrainingDay: s.nameTrainingDay,
     eventType: s.eventType,
-    status: s.accepted_players.includes(name)
+    status: s.accepted_players[uid] === true
       ? "accepted"
-      : s.declined_players.includes(name)
+      : s.declined_players[uid] === true
         ? "declined"
         : "none",
   }));

@@ -14,14 +14,14 @@ import type { Team, TrainingDay } from "@/lib/types";
 export function UpcomingEvents({
   team,
   isCoach,
-  myName,
+  myUid,
   onSelectDay,
   onAnswer,
   limit = 5,
 }: {
   team: Team;
   isCoach: boolean;
-  myName: string;
+  myUid: string;
   onSelectDay: (fecha: string) => void;
   onAnswer: (day: TrainingDay, status: "accepted" | "declined") => void;
   limit?: number;
@@ -49,11 +49,12 @@ export function UpcomingEvents({
       <div className="space-y-2">
         {upcoming.map(({ day, date }) => {
           const isMatch = day.eventType === "MATCH";
-          const accepted = day.accepted_players.includes(myName);
-          const declined = day.declined_players.includes(myName);
-          const noAnswer = team.userplayers.filter(
-            (n) => !day.accepted_players.includes(n) && !day.declined_players.includes(n),
-          ).length;
+          const accepted = day.accepted_players[myUid] === true;
+          const declined = day.declined_players[myUid] === true;
+          const noAnswer =
+            Object.keys(team.userplayers).length -
+            Object.keys(day.accepted_players).length -
+            Object.keys(day.declined_players).length;
 
           const activate = () => onSelectDay(day.fecha!);
 
@@ -110,10 +111,10 @@ export function UpcomingEvents({
               {isCoach ? (
                 <span className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
                   <span className="flex items-center gap-0.5">
-                    <Check className="size-3" /> {day.accepted_players.length}
+                    <Check className="size-3" /> {Object.keys(day.accepted_players).length}
                   </span>
                   <span className="flex items-center gap-0.5">
-                    <X className="size-3" /> {day.declined_players.length}
+                    <X className="size-3" /> {Object.keys(day.declined_players).length}
                   </span>
                   <span>{noAnswer}—</span>
                 </span>

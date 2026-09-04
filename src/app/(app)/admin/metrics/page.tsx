@@ -81,8 +81,8 @@ export default function AdminMetricsPage() {
     let pendingBacklog = 0;
     let recentActivity = 0;
     for (const { team } of teams) {
-      if (team.userplayers.length === 0) withoutPlayers++;
-      if (team.pendingplayers.length > 0) pendingBacklog += team.pendingplayers.length;
+      if (Object.keys(team.userplayers).length === 0) withoutPlayers++;
+      pendingBacklog += Object.keys(team.pendingplayers).length;
       const hasRecent = team.trainingdays.some((d) => {
         const ms = parseFecha(d.fecha);
         return ms != null && ms >= cutoff && ms <= now;

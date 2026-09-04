@@ -2,15 +2,7 @@
 // ⚠️ Patrones de escritura CORRECTOS bajo database.rules.json — NO replicar
 // la vía legacy Android (setValue del nodo Teams/Users completo), que está
 // denegada en varios casos. Referencia: TeamRepository.kt (multi-path).
-import {
-  equalTo,
-  get,
-  orderByChild,
-  query,
-  ref,
-  set,
-  update,
-} from "firebase/database";
+import { get, ref, set, update } from "firebase/database";
 import { httpsCallable } from "firebase/functions";
 import { PATHS } from "@/lib/constants";
 import { db, functions } from "@/lib/firebase";
@@ -18,23 +10,6 @@ import { parseOr } from "@/lib/schemas/common";
 import { UserTeamsSchema } from "@/lib/schemas/user";
 import { nextActiveTeam } from "@/lib/teams";
 import type { Team, Training, TrainingDay } from "@/lib/types";
-
-/** nameSurname → uid, vía publicProfiles (indexOn nameSurname). */
-export async function resolveUidByName(nameSurname: string): Promise<string | null> {
-  const snap = await get(
-    query(
-      ref(db, PATHS.PUBLIC_PROFILES),
-      orderByChild("nameSurname"),
-      equalTo(nameSurname),
-    ),
-  );
-  let uid: string | null = null;
-  snap.forEach((child) => {
-    uid = child.key;
-    return true; // primer resultado
-  });
-  return uid;
-}
 
 /**
  * Autorreparación entre el equipo ACTIVO (Users/{uid}/teamname) y las
@@ -105,35 +80,26 @@ async function hasActiveTeam(uid: string): Promise<boolean> {
 /**
  * Coach acepta a un pendiente — multi-path atómico (espejo de
  * TeamRepository.acceptPendingPlayer): sale de pendingplayers, entra en
- * userplayers y su Users/{uid}/teamname apunta al equipo. La vía legacy
- * Android nunca fijaba el teamname (guard de modifyUser).
+ * userplayers (ambos mapas {uid: true}, rosters por uid 2026-09-04 — ver
+ * schemas/team.ts) y su Users/{uid}/teamname apunta al equipo si no tenía
+ * ninguno activo (fase 2). El uid ya lo tiene la UI (roster resuelto vía
+ * useProfilesByUid) — no hace falta resolver ningún nombre.
  */
-export async function acceptPendingPlayer(team: Team, playerName: string) {
+export async function acceptPendingPlayer(team: Team, uid: string) {
   const teamname = team.teamname!;
-  const playerUid = await resolveUidByName(playerName);
-  if (!playerUid) throw new Error(`No se encontró el perfil de ${playerName}`);
-
-  const pending = team.pendingplayers.filter((n) => n !== playerName);
-  const players = team.userplayers.includes(playerName)
-    ? team.userplayers
-    : [...team.userplayers, playerName];
-
-  // Varios equipos (fase 2): el activo del jugador NO cambia si ya tenía
-  // uno — aceptarle en un segundo equipo no le cambia la pantalla.
   const updates: Record<string, unknown> = {
-    [`${PATHS.TEAMS}/${teamname}/pendingplayers`]: pending,
-    [`${PATHS.TEAMS}/${teamname}/userplayers`]: players,
-    [`${PATHS.USER_TEAMS}/${playerUid}/${teamname}`]: true,
+    [`${PATHS.TEAMS}/${teamname}/pendingplayers/${uid}`]: null,
+    [`${PATHS.TEAMS}/${teamname}/userplayers/${uid}`]: true,
+    [`${PATHS.USER_TEAMS}/${uid}/${teamname}`]: true,
   };
-  if (!(await hasActiveTeam(playerUid))) updates[`${PATHS.USERS}/${playerUid}/teamname`] = teamname;
+  if (!(await hasActiveTeam(uid))) updates[`${PATHS.USERS}/${uid}/teamname`] = teamname;
   await update(ref(db), updates);
 }
 
 /** Coach rechaza a un pendiente — escribe solo pendingplayers. */
-export async function rejectPendingPlayer(team: Team, playerName: string) {
+export async function rejectPendingPlayer(team: Team, uid: string) {
   await update(ref(db), {
-    [`${PATHS.TEAMS}/${team.teamname}/pendingplayers`]:
-      team.pendingplayers.filter((n) => n !== playerName),
+    [`${PATHS.TEAMS}/${team.teamname}/pendingplayers/${uid}`]: null,
   });
 }
 
@@ -211,12 +177,10 @@ export async function transferTeamOwnership(team: Team, newFounderUid: string): 
  * por pendingCoaches (el coach que lo asciende ya lo conoce, no hace falta
  * que "se solicite" a sí mismo). Sale de userplayers, entra en coaches.
  */
-export async function promoteToCoach(team: Team, playerName: string) {
+export async function promoteToCoach(team: Team, uid: string) {
   const teamname = team.teamname!;
-  const uid = await resolveUidByName(playerName);
-  if (!uid) throw new Error(`No se encontró el perfil de ${playerName}`);
   await update(ref(db), {
-    [`${PATHS.TEAMS}/${teamname}/userplayers`]: team.userplayers.filter((n) => n !== playerName),
+    [`${PATHS.TEAMS}/${teamname}/userplayers/${uid}`]: null,
     [`${PATHS.TEAMS}/${teamname}/coaches/${uid}`]: true,
   });
 }
@@ -226,21 +190,16 @@ export async function promoteToCoach(team: Team, playerName: string) {
  * TeamRepository.removePlayer): fuera de userplayers y se limpian su
  * teamname y asistencia (escrituras por hijo, permitidas al coach).
  */
-export async function removePlayer(team: Team, playerName: string) {
+export async function removePlayer(team: Team, uid: string) {
   const teamname = team.teamname!;
-  const playerUid = await resolveUidByName(playerName);
   const updates: Record<string, unknown> = {
-    [`${PATHS.TEAMS}/${teamname}/userplayers`]: team.userplayers.filter(
-      (n) => n !== playerName,
-    ),
+    [`${PATHS.TEAMS}/${teamname}/userplayers/${uid}`]: null,
+    [`${PATHS.USER_TEAMS}/${uid}/${teamname}`]: null,
   };
-  if (playerUid) {
-    updates[`${PATHS.USER_TEAMS}/${playerUid}/${teamname}`] = null;
-    // Fase 2: su activo solo se limpia si era ESTE equipo (ver removeCoach).
-    if (await isActiveTeamOf(playerUid, teamname)) {
-      updates[`${PATHS.USERS}/${playerUid}/teamname`] = null;
-      updates[`${PATHS.USERS}/${playerUid}/assistedTrainingDays`] = null;
-    }
+  // Fase 2: su activo solo se limpia si era ESTE equipo (ver removeCoach).
+  if (await isActiveTeamOf(uid, teamname)) {
+    updates[`${PATHS.USERS}/${uid}/teamname`] = null;
+    updates[`${PATHS.USERS}/${uid}/assistedTrainingDays`] = null;
   }
   await update(ref(db), updates);
 }
@@ -248,54 +207,49 @@ export async function removePlayer(team: Team, playerName: string) {
 /** Formato de fecha compartido con Android: "dd/MM/yyyy". */
 export type AttendanceStatus = "accepted" | "declined";
 
+function toDateList(v: unknown): string[] {
+  if (v == null) return [];
+  return Array.isArray(v) ? v.filter(Boolean) : (Object.values(v as object).filter(Boolean) as string[]);
+}
+
 /**
- * Confirmar/rechazar asistencia de un jugador en un día concreto.
- * Escribe SOLO las listas accepted/declined del día (regla nueva: cualquier
- * miembro del equipo) + el assistedTrainingDays del jugador (dueño, o coach
- * del equipo). Válido para el propio jugador y para el coach pasando lista.
+ * Confirmar/rechazar asistencia de un jugador en un día concreto. Escribe
+ * SOLO la entrada propia de accepted/declined_players (rosters por uid,
+ * 2026-09-04 — la regla ahora exige que sea TU entrada, o que quien escribe
+ * sea el coach del equipo/ADMIN) + el assistedTrainingDays del jugador
+ * (dueño, o coach del equipo). Válido para el propio jugador y para el
+ * coach pasando lista.
  */
 export async function setAttendance(opts: {
   teamname: string;
   fecha: string;
-  playerName: string;
   playerUid: string;
   status: AttendanceStatus;
 }) {
-  const { teamname, fecha, playerName, playerUid, status } = opts;
+  const { teamname, fecha, playerUid, status } = opts;
 
   // Índice REAL del día en el array (puede ser disperso) — leer crudo.
   const daysSnap = await get(ref(db, `${PATHS.TEAMS}/${teamname}/trainingdays`));
   let idx: string | null = null;
-  let rawDay: { accepted_players?: unknown; declined_players?: unknown } | null = null;
   daysSnap.forEach((child) => {
     if (child.child("fecha").val() === fecha) {
       idx = child.key;
-      rawDay = child.val();
       return true;
     }
     return false;
   });
-  if (idx === null || rawDay === null) throw new Error("Día de entreno no encontrado");
+  if (idx === null) throw new Error("Día de entreno no encontrado");
 
-  const toList = (v: unknown): string[] =>
-    v == null ? [] : Array.isArray(v) ? v.filter(Boolean) : Object.values(v as object).filter(Boolean) as string[];
-
-  const current: { accepted_players?: unknown; declined_players?: unknown } = rawDay;
-  const accepted = toList(current.accepted_players).filter((n) => n !== playerName);
-  const declined = toList(current.declined_players).filter((n) => n !== playerName);
-  if (status === "accepted") accepted.push(playerName);
-  else declined.push(playerName);
-
-  await update(ref(db, `${PATHS.TEAMS}/${teamname}/trainingdays`), {
-    [`${idx}/accepted_players`]: accepted,
-    [`${idx}/declined_players`]: declined,
+  await update(ref(db, `${PATHS.TEAMS}/${teamname}/trainingdays/${idx}`), {
+    [`accepted_players/${playerUid}`]: status === "accepted" ? true : null,
+    [`declined_players/${playerUid}`]: status === "declined" ? true : null,
   });
 
-  // Asistencia personal (dd/MM/yyyy) — alimenta las estadísticas del perfil.
+  // Asistencia personal (dd/MM/yyyy) — Android sigue leyéndola, ver fase 3.
   const favSnap = await get(
     ref(db, `${PATHS.USERS}/${playerUid}/assistedTrainingDays`),
   );
-  const days = toList(favSnap.val()).filter((d) => d !== fecha);
+  const days = toDateList(favSnap.val()).filter((d) => d !== fecha);
   if (status === "accepted") days.push(fecha);
   await update(ref(db, `${PATHS.USERS}/${playerUid}`), {
     assistedTrainingDays: days,
@@ -348,8 +302,8 @@ export async function upsertTrainingDay(
     training: day.training ?? null,
     eventType: day.eventType ?? "TRAINING",
     location: day.location?.trim() ? day.location.trim() : null,
-    accepted_players: existingDay?.accepted_players ?? [],
-    declined_players: existingDay?.declined_players ?? [],
+    accepted_players: existingDay?.accepted_players ?? {},
+    declined_players: existingDay?.declined_players ?? {},
     lineupId: existingDay?.lineupId ?? null,
   };
   const rest = existing.filter((d) => d.fecha !== day.fecha);
@@ -373,14 +327,10 @@ export async function deleteTrainingDay(
   await update(ref(db, `${PATHS.TEAMS}/${teamname}`), {
     trainingdays: existing.filter((d) => d.fecha !== fecha),
   });
-  for (const name of day?.accepted_players ?? []) {
-    const uid = await resolveUidByName(name);
-    if (!uid) continue;
+  // Rosters por uid: accepted_players ya son claves de uid directamente.
+  for (const uid of Object.keys(day?.accepted_players ?? {})) {
     const snap = await get(ref(db, `${PATHS.USERS}/${uid}/assistedTrainingDays`));
-    const v = snap.val();
-    const days = (v == null ? [] : Array.isArray(v) ? v : Object.values(v)).filter(
-      (d) => d !== fecha,
-    );
+    const days = toDateList(snap.val()).filter((d) => d !== fecha);
     await update(ref(db, `${PATHS.USERS}/${uid}`), { assistedTrainingDays: days });
   }
 }
@@ -438,12 +388,10 @@ export async function leaveTeam(teamname: string): Promise<{ activeTeam: string 
  */
 export async function deleteTeam(team: Team): Promise<void> {
   const teamname = team.teamname!;
-  const resolvedUids = await Promise.all(
-    team.userplayers.map((name) => resolveUidByName(name)),
-  );
+  // Rosters por uid: userplayers ya son claves de uid, sin resolver nombres.
   const uids = Array.from(
     new Set(
-      [...resolvedUids, team.usercoach, ...Object.keys(team.coaches)].filter(
+      [...Object.keys(team.userplayers), team.usercoach, ...Object.keys(team.coaches)].filter(
         (uid): uid is string => Boolean(uid),
       ),
     ),

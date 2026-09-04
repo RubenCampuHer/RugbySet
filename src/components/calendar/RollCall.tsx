@@ -6,35 +6,43 @@ import { AttendanceToggle } from "@/components/AttendanceToggle";
 import { AvatarInitials } from "@/components/AvatarInitials";
 import { SearchInput } from "@/components/SearchInput";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { resolveUidByName, setAttendance } from "@/lib/actions/team";
+import { useProfilesByUid } from "@/hooks/useProfilesByUid";
+import { setAttendance } from "@/lib/actions/team";
 import type { Team, TrainingDay } from "@/lib/types";
 
-/** Pasar lista del coach: búsqueda + filas de 44px con AttendanceToggle. */
+/**
+ * Pasar lista del coach: búsqueda + filas de 44px con AttendanceToggle.
+ * Rosters por uid (2026-09-04): team.userplayers es {uid: true} — el nombre
+ * a mostrar se resuelve en vivo vía publicProfiles (useProfilesByUid), la
+ * misma fuente que usa TeamManager para el resto del equipo.
+ */
 export function RollCall({ team, day }: { team: Team; day: TrainingDay }) {
   const [search, setSearch] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
+  const uids = useMemo(() => Object.keys(team.userplayers), [team.userplayers]);
+  const profiles = useProfilesByUid(uids);
 
-  const status = (name: string): "accepted" | "declined" | "none" =>
-    day.accepted_players.includes(name)
+  const status = (uid: string): "accepted" | "declined" | "none" =>
+    day.accepted_players[uid] === true
       ? "accepted"
-      : day.declined_players.includes(name)
+      : day.declined_players[uid] === true
         ? "declined"
         : "none";
 
   const players = useMemo(
-    () => team.userplayers.filter((n) => n.toLowerCase().includes(search.toLowerCase())),
-    [team.userplayers, search],
+    () =>
+      uids
+        .map((uid) => ({ uid, name: profiles[uid]?.nameSurname || "" }))
+        .filter(({ name }) => name.toLowerCase().includes(search.toLowerCase())),
+    [uids, profiles, search],
   );
 
-  const mark = async (name: string, s: "accepted" | "declined") => {
-    setBusy(name);
+  const mark = async (uid: string, s: "accepted" | "declined") => {
+    setBusy(uid);
     try {
-      const uid = await resolveUidByName(name);
-      if (!uid) throw new Error(`Sin perfil para ${name}`);
       await setAttendance({
         teamname: team.teamname!,
         fecha: day.fecha!,
-        playerName: name,
         playerUid: uid,
         status: s,
       });
@@ -47,22 +55,22 @@ export function RollCall({ team, day }: { team: Team; day: TrainingDay }) {
 
   return (
     <div className="space-y-2">
-      {team.userplayers.length > 8 && (
+      {uids.length > 8 && (
         <SearchInput value={search} onChange={setSearch} placeholder="Buscar jugador…" />
       )}
       <ScrollArea className="h-72 pr-2">
         <div className="space-y-1">
-          {players.map((name) => (
+          {players.map(({ uid, name }) => (
             <div
-              key={name}
+              key={uid}
               className="flex items-center gap-2 rounded-lg py-1 pr-1 pl-2 hover:bg-muted/50"
             >
-              <AvatarInitials name={name} size="sm" />
-              <span className="flex-1 truncate text-sm">{name}</span>
+              <AvatarInitials name={name || "Jugador"} size="sm" />
+              <span className="flex-1 truncate text-sm">{name || "Jugador"}</span>
               <AttendanceToggle
-                value={status(name)}
-                onChange={(s) => void mark(name, s)}
-                disabled={busy === name}
+                value={status(uid)}
+                onChange={(s) => void mark(uid, s)}
+                disabled={busy === uid}
                 size="lg"
               />
             </div>

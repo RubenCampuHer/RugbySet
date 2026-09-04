@@ -2,20 +2,20 @@ import { describe, expect, it } from "vitest";
 import { TeamSchema, TrainingDaySchema } from "./team";
 
 describe("TeamSchema", () => {
-  it("parsea un equipo mínimo con defaults de listas vacías", () => {
+  it("parsea un equipo mínimo con defaults de mapas/listas vacíos", () => {
     const result = TeamSchema.parse({ teamname: "Spartans", usercoach: "uid1" });
-    expect(result.userplayers).toEqual([]);
-    expect(result.pendingplayers).toEqual([]);
+    expect(result.userplayers).toEqual({});
+    expect(result.pendingplayers).toEqual({});
     expect(result.trainingdays).toEqual([]);
   });
 
-  it("userplayers/pendingplayers como array disperso (RTDB) se normalizan", () => {
+  it("userplayers/pendingplayers son mapas {uid: true} (rosters por uid, 2026-09-04)", () => {
     const result = TeamSchema.parse({
-      userplayers: { "0": "Jugador Uno", "3": "Jugador Dos" },
+      userplayers: { uid1: true, uid2: true },
       pendingplayers: null,
     });
-    expect(result.userplayers).toEqual(["Jugador Uno", "Jugador Dos"]);
-    expect(result.pendingplayers).toEqual([]);
+    expect(result.userplayers).toEqual({ uid1: true, uid2: true });
+    expect(result.pendingplayers).toEqual({});
   });
 
   it("clubId/category son opcionales (equipo independiente)", () => {
@@ -42,10 +42,19 @@ describe("TeamSchema", () => {
 });
 
 describe("TrainingDaySchema", () => {
-  it("accepted_players/declined_players por defecto vacíos", () => {
+  it("accepted_players/declined_players son mapas {uid: true}, por defecto vacíos", () => {
     const result = TrainingDaySchema.parse({ fecha: "01/01/2026" });
-    expect(result.accepted_players).toEqual([]);
-    expect(result.declined_players).toEqual([]);
+    expect(result.accepted_players).toEqual({});
+    expect(result.declined_players).toEqual({});
+  });
+
+  it("accepted_players/declined_players se parsean como mapa uid->true", () => {
+    const result = TrainingDaySchema.parse({
+      accepted_players: { uid1: true },
+      declined_players: { uid2: true },
+    });
+    expect(result.accepted_players).toEqual({ uid1: true });
+    expect(result.declined_players).toEqual({ uid2: true });
   });
 
   it("eventType nullish acepta TRAINING, MATCH o ausente — no un valor arbitrario", () => {

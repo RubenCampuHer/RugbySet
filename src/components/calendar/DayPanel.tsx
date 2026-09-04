@@ -24,7 +24,6 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { assignLineupToMatch, createLineup } from "@/lib/actions/lineup";
-import { resolveUidByName } from "@/lib/actions/team";
 import { sendAttendanceNotification } from "@/lib/actions/notify";
 import type { Team, TrainingDay } from "@/lib/types";
 
@@ -152,14 +151,14 @@ export function DayPanel({
   fecha,
   day,
   isCoach,
-  myName,
+  myUid,
   onAnswer,
 }: {
   team: Team;
   fecha: string;
   day: TrainingDay | null;
   isCoach: boolean;
-  myName: string;
+  myUid: string;
   onAnswer: (status: "accepted" | "declined") => void;
 }) {
   const { profile, firebaseUser } = useAuth();
@@ -193,29 +192,27 @@ export function DayPanel({
   }
 
   const isMatch = day.eventType === "MATCH";
-  const accepted = day.accepted_players.includes(myName);
-  const declined = day.declined_players.includes(myName);
-  const noAnswerCount =
-    team.userplayers.length - day.accepted_players.length - day.declined_players.length;
-  const noAnswerNames = team.userplayers.filter(
-    (n) => !day.accepted_players.includes(n) && !day.declined_players.includes(n),
+  const accepted = day.accepted_players[myUid] === true;
+  const declined = day.declined_players[myUid] === true;
+  // Rosters por uid (2026-09-04): sin resolver nombres — team.userplayers,
+  // accepted_players y declined_players ya son mapas {uid: true}.
+  const noAnswerUids = Object.keys(team.userplayers).filter(
+    (uid) => day.accepted_players[uid] !== true && day.declined_players[uid] !== true,
   );
+  const noAnswerCount = noAnswerUids.length;
 
   const sendConvocatoria = async () => {
     setSending(true);
     try {
-      const uids = (
-        await Promise.all(noAnswerNames.map((n) => resolveUidByName(n)))
-      ).filter((u): u is string => u !== null);
       const { sent } = await sendAttendanceNotification({
         teamName: team.teamname!,
         trainingDate: day.fecha!,
         trainingTime: `${day.horaInicio} - ${day.horaFin}`,
-        recipientUserIds: uids,
+        recipientUserIds: noAnswerUids,
         senderUserId: firebaseUser?.uid ?? "",
         senderUsername: profile?.username ?? "",
       });
-      toast.success(`Convocatoria enviada a ${uids.length} jugadores (${sent} push)`);
+      toast.success(`Convocatoria enviada a ${noAnswerUids.length} jugadores (${sent} push)`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "No se pudo enviar");
     } finally {
@@ -284,10 +281,10 @@ export function DayPanel({
             <TabsContent value="summary" className="space-y-3 pt-3">
               <div className="flex flex-wrap gap-1">
                 <Badge variant="outline" className="gap-1">
-                  <Check className="size-3" /> {day.accepted_players.length}
+                  <Check className="size-3" /> {Object.keys(day.accepted_players).length}
                 </Badge>
                 <Badge variant="outline" className="gap-1">
-                  <X className="size-3" /> {day.declined_players.length}
+                  <X className="size-3" /> {Object.keys(day.declined_players).length}
                 </Badge>
                 <Badge variant="outline">{noAnswerCount} sin responder</Badge>
               </div>

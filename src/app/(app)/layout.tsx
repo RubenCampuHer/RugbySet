@@ -150,13 +150,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 </DropdownMenuItem>
               )}
               {isAdmin(profile) && (
-                <DropdownMenuItem render={<Link href="/admin/teams" />}>
-                  <Shield /> Todos los equipos
-                </DropdownMenuItem>
-              )}
-              {isAdmin(profile) && (
-                <DropdownMenuItem render={<Link href="/admin/clubs" />}>
-                  <Building2 /> Todos los clubes
+                <DropdownMenuItem render={<Link href="/admin/organization" />}>
+                  <Shield /> Organización
                 </DropdownMenuItem>
               )}
               {isAdmin(profile) && (

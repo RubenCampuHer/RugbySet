@@ -1,6 +1,6 @@
 "use client";
 
-import { Lock, Plus, Shield } from "lucide-react";
+import { Lock, Plus, Shield, Users } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -10,6 +10,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/PageHeader";
 import { SearchInput } from "@/components/SearchInput";
 import { ListRowsSkeleton } from "@/components/skeletons";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -30,20 +31,20 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useAllClubs } from "@/hooks/useAllClubs";
-import { useAllTeams } from "@/hooks/useAllTeams";
+import { useAllTeams, type NamedTeam } from "@/hooks/useAllTeams";
 import { createClub, getClubByCode } from "@/lib/actions/club";
 import { isAdmin } from "@/lib/permissions";
+import type { Team } from "@/lib/types";
 
 /**
  * "+ Nuevo club" para el ADMIN: elige un equipo YA existente (sin club
  * todavía) para que sea el fundador — createClub ya acepta uid/coachName
  * como parámetros libres, no atados a la sesión actual, así que no hace
- * falta ninguna acción nueva, solo esta UI.
+ * falta ninguna acción nueva, solo esta UI. Idéntico al que vivía en el
+ * antiguo /admin/clubs, solo movido aquí.
  */
-function NewClubDialog() {
+function NewClubDialog({ availableTeams }: { availableTeams: NamedTeam[] }) {
   const [open, setOpen] = useState(false);
-  const { teams } = useAllTeams();
-  const availableTeams = teams.filter(({ team }) => !team.clubId);
   const [teamname, setTeamname] = useState("");
   const [clubName, setClubName] = useState("");
   const [clubCode, setClubCode] = useState("");
@@ -134,17 +135,46 @@ function NewClubDialog() {
   );
 }
 
+/** Fila de equipo — igual en la lista independiente y anidada bajo un club. */
+function TeamRow({ name, team }: { name: string; team: Team | undefined }) {
+  return (
+    <Link href={`/admin/teams/detail?name=${encodeURIComponent(name)}`}>
+      <div className="flex items-center gap-3 py-2 pr-1 pl-1 hover:bg-muted/50 rounded-lg">
+        <AvatarInitials name={name} src={team?.teamicon} size="sm" />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium">{name}</p>
+          {team && (
+            <p className="truncate text-xs text-muted-foreground">
+              {team.userplayers.length} jugador{team.userplayers.length === 1 ? "" : "es"}
+              {team.pendingplayers.length > 0 &&
+                ` · ${team.pendingplayers.length} pendiente${team.pendingplayers.length === 1 ? "" : "s"}`}
+            </p>
+          )}
+        </div>
+        {team?.category && <Badge variant="outline">{team.category}</Badge>}
+      </div>
+    </Link>
+  );
+}
+
 /**
- * Listado global de clubes — solo ADMIN. Cada fila enlaza a
- * /admin/clubs/detail?id=..., que reutiliza ClubManager (mismo cuerpo que
- * /club, con viewingAsAdmin) en vez de una pantalla nueva.
+ * "Organización" — vista unificada del ADMIN, sustituye a los antiguos
+ * /admin/teams + /admin/clubs (pedido explícito 2026-09-04: "unificar la
+ * vista del admin de equipos y clubs"). Jerárquica en vez de dos listas
+ * planas separadas: cada club con sus equipos anidados debajo (reflejando
+ * la relación real, antes había que entrar equipo a equipo para saber a
+ * qué club pertenecía cada uno) + una sección aparte para los equipos sin
+ * club. Clicar un club o un equipo lleva a los mismos ClubManager/
+ * TeamManager de siempre (viewingAsAdmin) — esto solo cambia cómo se
+ * llega ahí, no la gestión en sí.
  */
-export default function AdminClubsPage() {
+export default function AdminOrganizationPage() {
   const { profile } = useAuth();
-  const { clubs, loading } = useAllClubs();
+  const { teams, loading: loadingTeams } = useAllTeams();
+  const { clubs, loading: loadingClubs } = useAllClubs();
   const [search, setSearch] = useState("");
 
-  if (profile === null || loading) {
+  if (profile === null || loadingTeams || loadingClubs) {
     return <ListRowsSkeleton />;
   }
   if (!isAdmin(profile)) {
@@ -152,29 +182,40 @@ export default function AdminClubsPage() {
       <EmptyState
         icon={Lock}
         title="Solo administradores"
-        hint="No tienes permisos para ver todos los clubes."
+        hint="No tienes permisos para ver equipos y clubes ajenos."
       />
     );
   }
 
-  const filtered = clubs.filter(
-    ({ club }) => search === "" || (club.clubname ?? "").toLowerCase().includes(search.toLowerCase()),
+  const teamsByName = new Map(teams.map(({ name, team }) => [name, team]));
+  const independentTeams = teams.filter(({ team }) => !team.clubId);
+  const availableForNewClub = independentTeams;
+
+  const q = search.trim().toLowerCase();
+  const filteredClubs = clubs.filter(({ club }) => {
+    if (q === "") return true;
+    if ((club.clubname ?? "").toLowerCase().includes(q)) return true;
+    return club.teams.some((n) => n.toLowerCase().includes(q));
+  });
+  const filteredIndependent = independentTeams.filter(
+    ({ name }) => q === "" || name.toLowerCase().includes(q),
   );
+  const noResults = filteredClubs.length === 0 && filteredIndependent.length === 0;
 
   return (
     <div className="mx-auto max-w-2xl space-y-4">
-      <PageHeader title="Todos los clubes" count={clubs.length} />
-      <NewClubDialog />
-      <SearchInput placeholder="Buscar club…" value={search} onChange={setSearch} />
+      <PageHeader title="Organización" />
+      <NewClubDialog availableTeams={availableForNewClub} />
+      <SearchInput placeholder="Buscar equipo o club…" value={search} onChange={setSearch} />
 
-      {filtered.length === 0 ? (
+      {noResults ? (
         <EmptyState icon={Shield} title="Sin resultados" />
       ) : (
-        <div className="space-y-2">
-          {filtered.map(({ id, club }) => (
-            <Link key={id} href={`/admin/clubs/detail?id=${encodeURIComponent(id)}`}>
-              <Card className="transition-colors hover:bg-muted/50">
-                <CardContent className="flex items-center gap-3 py-3">
+        <>
+          {filteredClubs.map(({ id, club }) => (
+            <Card key={id}>
+              <Link href={`/admin/clubs/detail?id=${encodeURIComponent(id)}`}>
+                <CardContent className="flex items-center gap-3 border-b border-border py-3 hover:bg-muted/50">
                   <AvatarInitials name={club.clubname ?? id} src={club.clubicon} />
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-medium">{club.clubname || id}</p>
@@ -185,10 +226,34 @@ export default function AdminClubsPage() {
                     </p>
                   </div>
                 </CardContent>
-              </Card>
-            </Link>
+              </Link>
+              <CardContent className="divide-y divide-border py-1 pl-6">
+                {club.teams.length === 0 ? (
+                  <p className="py-2 text-xs text-muted-foreground">Sin equipos todavía.</p>
+                ) : (
+                  club.teams.map((name) => (
+                    <TeamRow key={name} name={name} team={teamsByName.get(name)} />
+                  ))
+                )}
+              </CardContent>
+            </Card>
           ))}
-        </div>
+
+          {filteredIndependent.length > 0 && (
+            <div className="space-y-2">
+              <p className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+                <Users className="size-4" /> Equipos independientes
+              </p>
+              <Card>
+                <CardContent className="divide-y divide-border p-0 px-3">
+                  {filteredIndependent.map(({ name, team }) => (
+                    <TeamRow key={name} name={name} team={team} />
+                  ))}
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

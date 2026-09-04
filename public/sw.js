@@ -1,13 +1,25 @@
 // Service worker mínimo (F5 del plan): cachea el shell estático para que la
 // PWA arranque offline. Los datos vienen de RTDB por WebSocket, que no pasa
 // por el SW — sin conexión se ve el shell con estados de carga.
-const CACHE = "rugbyset-shell-v1";
+//
+// CACHE debe subir de número en cualquier deploy que toque este archivo (o
+// que quieras forzar a purgar cachés viejas) — activate() borra cualquier
+// caché que no coincida con el nombre actual. Bug real 2026-09-04: se
+// quedó fijo en "v1" desde el principio, así que esa limpieza nunca hizo
+// nada en la práctica.
+const CACHE = "rugbyset-shell-v2";
 const SHELL = ["/", "/login", "/exercises", "/manifest.webmanifest"];
 
+// Con skipWaiting() automático, una pestaña abierta durante el deploy pasaba
+// a ejecutar el SW nuevo (y sus caches) a media navegación sin avisar. Ahora
+// solo se activa al momento cuando lo pide la propia pestaña (ver
+// RegisterSW.tsx: aviso "hay versión nueva" → botón "Recargar").
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "SKIP_WAITING") self.skipWaiting();
+});
+
 self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(CACHE).then((cache) => cache.addAll(SHELL)).then(() => self.skipWaiting()),
-  );
+  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL)));
 });
 
 self.addEventListener("activate", (event) => {

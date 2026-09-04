@@ -467,6 +467,13 @@ function CoachesSection({
               )}
             </div>
             <Badge variant="outline">Fundador</Badge>
+            {canManage && (
+              <RenamePersonDialog
+                uid={founderUid}
+                currentName={profiles[founderUid]?.nameSurname ?? ""}
+                ariaLabel={`Editar nombre de ${profiles[founderUid]?.nameSurname ?? "el entrenador"}`}
+              />
+            )}
             {canOfferDirector(founderUid) && (
               <Button
                 size="icon-sm"
@@ -489,8 +496,11 @@ function CoachesSection({
             name={profiles[uid]?.nameSurname || "Entrenador"}
             src={profiles[uid]?.usericon}
             action={
-              canRemoveCoach || canOfferDirector(uid) ? (
+              canManage || canRemoveCoach || canOfferDirector(uid) ? (
                 <span className="flex gap-1">
+                  {canManage && (
+                    <RenamePersonDialog uid={uid} currentName={profiles[uid]?.nameSurname ?? ""} triggerSize="icon-xl" ariaLabel={`Editar nombre de ${name}`} />
+                  )}
                   {canRemoveCoach && (
                     <ConfirmDialog
                       trigger={

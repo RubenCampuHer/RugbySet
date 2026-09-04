@@ -1,6 +1,7 @@
 "use client";
 
 import { Check, ChevronDown, ChevronLeft, ChevronRight, Download, Flame, Lock, TriangleAlert, Users, X } from "lucide-react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -9,7 +10,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/PageHeader";
 import { ListRowsSkeleton } from "@/components/skeletons";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
@@ -79,7 +80,17 @@ function TeamAttendance() {
     return <ListRowsSkeleton />;
   }
   if (!hasTeam || team === null) {
-    return <EmptyState icon={Users} title="Equipo no encontrado" />;
+    return (
+      <EmptyState
+        icon={Users}
+        title="Equipo no encontrado"
+        action={
+          <Link href="/team" className={buttonVariants({ variant: "outline" })}>
+            Ir a mi equipo
+          </Link>
+        }
+      />
+    );
   }
 
   const canView = isTeamCoach(team, firebaseUser?.uid) || isAdmin(profile);

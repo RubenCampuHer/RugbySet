@@ -11,6 +11,7 @@ import { UpcomingEvents } from "@/components/calendar/UpcomingEvents";
 import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/PageHeader";
 import { CalendarSkeleton } from "@/components/skeletons";
+import { JoinTeamForm } from "@/components/team/JoinTeamForm";
 import { Button } from "@/components/ui/button";
 import { useLoadingTimeout } from "@/hooks/useLoadingTimeout";
 import { useTeam } from "@/hooks/useTeam";
@@ -70,14 +71,20 @@ function CalendarContent() {
     return <CalendarSkeleton />;
   }
   if (!hasTeam || team === null) {
+    // Bug real reportado 2026-09-04: este mensaje mandaba a "la app
+    // Android" sin ningún botón — para alguien que aterriza aquí sin
+    // equipo (p.ej. desde un enlace guardado) se sentía como la app
+    // entera bloqueada. El código SÍ funciona desde la web (ver /team) —
+    // se ofrece aquí mismo, sin mandar a ningún sitio.
     return (
-      <div className="space-y-2">
+      <div className="space-y-4">
         <PageHeader title="Calendario" />
         <EmptyState
           icon={CalendarDays}
           title="Sin calendario de equipo"
-          hint="Únete a un equipo desde la app Android para ver sus entrenos."
+          hint="Únete a un equipo con el código que te haya dado tu entrenador."
         />
+        <JoinTeamForm />
       </div>
     );
   }

@@ -1,13 +1,14 @@
 "use client";
 
 import { Shield, TriangleAlert } from "lucide-react";
+import Link from "next/link";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { ClubManager } from "@/components/club/ClubManager";
 import { ClubMembershipCard } from "@/components/club/ClubMembershipCard";
 import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/PageHeader";
 import { TeamSkeleton } from "@/components/skeletons";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { useClub } from "@/hooks/useClub";
 import { useLoadingTimeout } from "@/hooks/useLoadingTimeout";
 import { useTeam } from "@/hooks/useTeam";
@@ -57,6 +58,11 @@ export default function ClubPage() {
           icon={Shield}
           title="Nada que ver aquí todavía"
           hint="La gestión de club es cosa del entrenador de un equipo: crea uno o une tu equipo a un club existente desde el equipo."
+          action={
+            <Link href="/team" className={buttonVariants({ variant: "outline" })}>
+              Ir a mi equipo
+            </Link>
+          }
         />
       )}
     </div>

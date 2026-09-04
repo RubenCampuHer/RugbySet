@@ -1,6 +1,7 @@
 "use client";
 
 import { ChevronDown, ChevronLeft, ChevronRight, Lock, Plus, TriangleAlert, Trophy } from "lucide-react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { toast } from "sonner";
@@ -10,7 +11,7 @@ import { LineupEditorSheet } from "@/components/calendar/LineupEditorSheet";
 import { LineupSummary } from "@/components/calendar/LineupSummary";
 import { PageHeader } from "@/components/PageHeader";
 import { ListRowsSkeleton } from "@/components/skeletons";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
@@ -119,7 +120,17 @@ function TeamLineups() {
     return <ListRowsSkeleton />;
   }
   if (!hasTeam || team === null) {
-    return <EmptyState icon={Trophy} title="Equipo no encontrado" />;
+    return (
+      <EmptyState
+        icon={Trophy}
+        title="Equipo no encontrado"
+        action={
+          <Link href="/team" className={buttonVariants({ variant: "outline" })}>
+            Ir a mi equipo
+          </Link>
+        }
+      />
+    );
   }
 
   const isMember = profile.teamname === team.teamname;

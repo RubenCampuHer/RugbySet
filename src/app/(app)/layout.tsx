@@ -138,7 +138,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <DropdownMenuItem render={<Link href="/profile" />}>
                 <User /> Perfil
               </DropdownMenuItem>
-              {isCoach(profile) && (
+              {/* 2026-09-04: también quien dirige un club sin ser COACH global
+                  (p.ej. un ADMIN que fundó/dirige un club) — antes solo isCoach. */}
+              {(isCoach(profile) || isAdmin(profile) || Boolean(profile?.directorOfClubId)) && (
                 <DropdownMenuItem render={<Link href="/club" />}>
                   <Building2 /> Mi club
                 </DropdownMenuItem>

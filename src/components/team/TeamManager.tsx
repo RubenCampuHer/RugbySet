@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDownCircle, ArrowUpCircle, Camera, Check, ClipboardList, Copy, Crown, Flame, LogOut, Megaphone, Pencil, ShieldCheck, Trash2, TriangleAlert, Trophy, UserPlus, Users, X } from "lucide-react";
+import { ArrowDownCircle, ArrowUpCircle, Building2, Camera, Check, ClipboardList, Copy, Crown, Flame, LogOut, Megaphone, Pencil, ShieldCheck, Trash2, TriangleAlert, Trophy, UserPlus, Users, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useRef, useState } from "react";
@@ -873,6 +873,24 @@ export function TeamManager({ teamname }: { teamname: string | null }) {
               </button>
             )}
             {canManage && <ChangeTeamCodeDialog teamname={team.teamname!} currentCode={team.teamcode ?? ""} />}
+            {/* Club del equipo (2026-09-04): el club es contexto del equipo,
+                no al revés — se llega a él desde aquí, sin secuestrar la
+                pestaña "Equipo". Enlaza solo para quien tiene algo que hacer
+                en /club (coach, director, ADMIN); para un jugador es informativo. */}
+            {club &&
+              (canManage ? (
+                <Link
+                  href="/club"
+                  className="inline-flex min-h-8 items-center gap-1 rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-secondary-foreground hover:bg-secondary/80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                  aria-label={`Ir al club ${club.clubname}`}
+                >
+                  <Building2 className="size-3" /> {club.clubname}
+                </Link>
+              ) : (
+                <Badge variant="secondary" className="gap-1">
+                  <Building2 className="size-3" /> {club.clubname}
+                </Badge>
+              ))}
             {isFounder && (
               <Badge className="border-transparent bg-primary/15 text-brand">
                 Eres el entrenador

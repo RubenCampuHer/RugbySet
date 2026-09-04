@@ -272,16 +272,12 @@ function CoachesSection({
   canManage,
   canRemoveCoach,
   canAppointDirector,
-  myUid,
-  isFounder,
 }: {
   team: Team;
   club: Club | null;
   canManage: boolean;
   canRemoveCoach: boolean;
   canAppointDirector: boolean;
-  myUid: string | null | undefined;
-  isFounder: boolean;
 }) {
   const [busy, setBusy] = useState<string | null>(null);
   const founderUid = team.usercoach;
@@ -338,22 +334,17 @@ function CoachesSection({
 
   // Reasignar el entrenador principal a un co-entrenador ya existente
   // (pedido 2026-09-04: poder abandonar el equipo "dejando a alguien al
-  // mando"). Si quien lo hace ES el fundador actual, se sale a continuación
-  // en el mismo clic (leaveTeam ya funciona para cualquier co-entrenador,
-  // y tras la transferencia el fundador saliente pasa a serlo); si lo hace
-  // un ADMIN sobre un equipo ajeno, solo transfiere — el ex-fundador decide
-  // salir él mismo cuando quiera con "Salir del equipo" (ya disponible en
-  // cuanto deja de ser el fundador literal).
+  // mando"). SOLO transfiere — el fundador saliente queda como
+  // co-entrenador normal (nunca se auto-elimina en el mismo clic: un
+  // incidente real 2026-09-04 mostró que combinar "transferir y salir" en
+  // un solo botón saca a alguien del equipo por sorpresa sin vuelta atrás
+  // fácil). Salir es un paso aparte y consciente con "Salir del equipo"
+  // (ya disponible en cuanto se deja de ser el fundador literal).
   const transfer = async (uid: string, name: string) => {
     setBusy(uid);
     try {
       await transferTeamOwnership(team, uid);
-      if (isFounder && myUid) {
-        await leaveTeam();
-        toast.success(`${name} es ahora el entrenador principal. Has salido del equipo.`);
-      } else {
-        toast.success(`${name} es ahora el entrenador principal`);
-      }
+      toast.success(`${name} es ahora el entrenador principal`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "No se pudo transferir");
     } finally {
@@ -413,14 +404,9 @@ function CoachesSection({
                           <Crown className="size-4" />
                         </Button>
                       }
-                      title={isFounder ? `¿Transferir el equipo a ${name} y salir?` : `¿Hacer a ${name} entrenador principal?`}
-                      description={
-                        isFounder
-                          ? "Pasarás a ser co-entrenador y saldrás del equipo en el mismo paso."
-                          : "El entrenador actual pasará a ser co-entrenador."
-                      }
-                      confirmLabel={isFounder ? "Transferir y salir" : "Transferir"}
-                      destructive={isFounder}
+                      title={`¿Hacer a ${name} entrenador principal?`}
+                      description="El entrenador actual pasará a ser co-entrenador — para salir del equipo, hazlo aparte con «Salir del equipo»."
+                      confirmLabel="Transferir"
                       onConfirm={() => transfer(uid, name)}
                     />
                   )}
@@ -763,8 +749,6 @@ export function TeamManager({
         canManage={canManage}
         canRemoveCoach={canDeleteTeam}
         canAppointDirector={canAppointDirector}
-        myUid={firebaseUser?.uid}
-        isFounder={isFounder}
       />
 
       <Card>

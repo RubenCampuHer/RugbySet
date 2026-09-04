@@ -138,21 +138,20 @@ function useClubPendingContent(clubId: string) {
  * (autoexclusión, sin pedir permiso a nadie).
  *
  * "Hacer fundador" (2026-09-04, "poder abandonar el club dejando a alguien
- * al mando"): reasigna adminUserId a un codirector ya existente. Si quien
- * lo hace ES el fundador actual, se autoexcluye a continuación en el mismo
- * clic (removeDirector ya funciona para cualquier codirector, y tras la
- * transferencia el fundador saliente pasa a serlo); si lo hace un ADMIN,
- * solo transfiere — el ex-fundador decide salir él mismo cuando quiera.
+ * al mando"): reasigna adminUserId a un codirector ya existente. SOLO
+ * transfiere — el fundador saliente queda como codirector normal (nunca
+ * se autoexcluye en el mismo clic: un incidente real 2026-09-04 mostró
+ * que combinar "transferir y salir" en un solo botón saca a alguien del
+ * club por sorpresa sin vuelta atrás fácil). Dejar la dirección es un
+ * paso aparte y consciente con la autoexclusión de abajo.
  */
 function DirectorsSection({
   club,
   myUid,
-  isFounder,
   canRemoveDirector,
 }: {
   club: Club;
   myUid: string | null | undefined;
-  isFounder: boolean;
   canRemoveDirector: boolean;
 }) {
   const [busy, setBusy] = useState<string | null>(null);
@@ -175,12 +174,7 @@ function DirectorsSection({
     setBusy(uid);
     try {
       await transferClubOwnership(club, uid);
-      if (isFounder && myUid) {
-        await removeDirector(club, myUid);
-        toast.success(`${name} es ahora el fundador del club. Has dejado la dirección.`);
-      } else {
-        toast.success(`${name} es ahora el fundador del club`);
-      }
+      toast.success(`${name} es ahora el fundador del club`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "No se pudo transferir");
     } finally {
@@ -220,14 +214,9 @@ function DirectorsSection({
                       <Crown className="size-4" />
                     </Button>
                   }
-                  title={isFounder ? `¿Transferir el club a ${name} y dejar la dirección?` : `¿Hacer a ${name} fundador del club?`}
-                  description={
-                    isFounder
-                      ? "Pasarás a ser codirector y dejarás la dirección en el mismo paso."
-                      : "El fundador actual pasará a ser codirector."
-                  }
-                  confirmLabel={isFounder ? "Transferir y salir" : "Transferir"}
-                  destructive={isFounder}
+                  title={`¿Hacer a ${name} fundador del club?`}
+                  description="El fundador actual pasará a ser codirector — para dejar la dirección, hazlo aparte con la autoexclusión de tu propia fila."
+                  confirmLabel="Transferir"
                   onConfirm={() => transfer(uid, name)}
                 />
               )}
@@ -438,7 +427,7 @@ export function ClubManager({ club, viewingAsAdmin = false }: { club: Club; view
         </div>
       </div>
 
-      <DirectorsSection club={club} myUid={myUid} isFounder={isFounder} canRemoveDirector={canDeleteClub} />
+      <DirectorsSection club={club} myUid={myUid} canRemoveDirector={canDeleteClub} />
 
       {pendingContent.length > 0 && (
         <Card>

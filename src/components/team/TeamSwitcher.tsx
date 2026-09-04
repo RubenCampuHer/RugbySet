@@ -7,6 +7,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuTrigger,
@@ -58,13 +59,17 @@ export function TeamSwitcher({ className }: { className?: string }) {
         <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="center">
-        <DropdownMenuLabel>Mis equipos</DropdownMenuLabel>
-        {teams.map((t) => (
-          <DropdownMenuItem key={t} onClick={() => void choose(t)}>
-            <span className="truncate">{t}</span>
-            {t === active && <Check className="ml-auto size-4 text-brand" />}
-          </DropdownMenuItem>
-        ))}
+        {/* Base UI exige que GroupLabel viva dentro de un Group (error #31 en
+            producción si no) — bug real 2026-09-04 al abrir el selector. */}
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>Mis equipos</DropdownMenuLabel>
+          {teams.map((t) => (
+            <DropdownMenuItem key={t} onClick={() => void choose(t)}>
+              <span className="truncate">{t}</span>
+              {t === active && <Check className="ml-auto size-4 text-brand" />}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuGroup>
       </DropdownMenuContent>
     </DropdownMenu>
   );

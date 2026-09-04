@@ -9,6 +9,7 @@ import { AvatarInitials } from "@/components/AvatarInitials";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/PageHeader";
+import { RenamePersonDialog } from "@/components/RenamePersonDialog";
 import { SearchInput } from "@/components/SearchInput";
 import { ListRowsSkeleton } from "@/components/skeletons";
 import { Button } from "@/components/ui/button";
@@ -140,6 +141,11 @@ export default function AdminUsersPage() {
                       ))}
                     </SelectContent>
                   </Select>
+                  <RenamePersonDialog
+                    uid={uid}
+                    currentName={p.nameSurname ?? ""}
+                    ariaLabel={`Editar nombre de ${p.nameSurname ?? p.username}`}
+                  />
                   <ConfirmDialog
                     trigger={
                       <Button

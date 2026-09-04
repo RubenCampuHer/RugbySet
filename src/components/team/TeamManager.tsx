@@ -9,6 +9,7 @@ import { AvatarInitials } from "@/components/AvatarInitials";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/PageHeader";
+import { RenamePersonDialog } from "@/components/RenamePersonDialog";
 import { TeamSkeleton } from "@/components/skeletons";
 import { CreateTeamDialog } from "@/components/team/CreateTeamDialog";
 import { JoinTeamForm } from "@/components/team/JoinTeamForm";
@@ -792,6 +793,7 @@ export function TeamManager({
                     action={
                       canManage ? (
                         <span className="flex gap-1">
+                          <RenamePersonDialog uid={uid} currentName={name} triggerSize="icon-xl" />
                           <Button
                             size="icon-xl"
                             variant="ghost"

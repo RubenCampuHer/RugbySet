@@ -1,10 +1,13 @@
 "use client";
 
-import { ClipboardCheck, Flame, LogOut, Smartphone, Trophy } from "lucide-react";
+import { Camera, ClipboardCheck, Flame, LogOut, Trophy } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useRef, useState } from "react";
+import { toast } from "sonner";
 import { AvatarInitials } from "@/components/AvatarInitials";
 import { PageHeader } from "@/components/PageHeader";
+import { RenamePersonDialog } from "@/components/RenamePersonDialog";
 import { ProfileSkeleton } from "@/components/skeletons";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -18,6 +21,7 @@ import {
   calculateMaxStreak,
   calculateStreak,
 } from "@/lib/attendance";
+import { updateOwnPhoto } from "@/lib/actions/profile";
 import { getRoleDisplayName, isAdmin } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 
@@ -37,14 +41,29 @@ function AttendanceBar({ percent }: { percent: number }) {
 }
 
 export default function ProfilePage() {
-  const { profile, logout } = useAuth();
+  const { firebaseUser, profile, logout } = useAuth();
   const { team } = useTeam();
   const { teams: myTeams } = useMyTeams();
   const router = useRouter();
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
   if (profile === null) {
     return <ProfileSkeleton />;
   }
+
+  const uploadPhoto = async (file: File) => {
+    if (!firebaseUser) return;
+    setUploadingPhoto(true);
+    try {
+      await updateOwnPhoto(firebaseUser.uid, file);
+      toast.success("Foto actualizada");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo subir la foto");
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
 
   // Asistencia del equipo ACTIVO, derivada de su propio calendario (fase 3):
   // profile.assistedTrainingDays es una lista plana que mezcla equipos.
@@ -58,15 +77,44 @@ export default function ProfilePage() {
       <PageHeader title="Perfil" />
       <Card>
         <CardHeader className="flex flex-row items-center gap-4">
-          <AvatarInitials
-            name={profile.nameSurname}
-            src={profile.usericon}
-            className="size-16"
-            fallbackClassName="text-lg"
-          />
-          <div>
-            <CardTitle>{profile.nameSurname ?? "Sin nombre"}</CardTitle>
-            <p className="text-sm text-muted-foreground">@{profile.username}</p>
+          <div className="relative">
+            <AvatarInitials
+              name={profile.nameSurname}
+              src={profile.usericon}
+              className="size-16"
+              fallbackClassName="text-lg"
+            />
+            <input
+              ref={photoInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                e.target.value = "";
+                if (file) void uploadPhoto(file);
+              }}
+            />
+            <Button
+              type="button"
+              size="icon-sm"
+              variant="secondary"
+              className="absolute -right-1 -bottom-1 rounded-full"
+              aria-label="Cambiar foto de perfil"
+              disabled={uploadingPhoto}
+              onClick={() => photoInputRef.current?.click()}
+            >
+              <Camera className="size-3.5" />
+            </Button>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div>
+              <CardTitle>{profile.nameSurname ?? "Sin nombre"}</CardTitle>
+              <p className="text-sm text-muted-foreground">@{profile.username}</p>
+            </div>
+            {firebaseUser && (
+              <RenamePersonDialog uid={firebaseUser.uid} currentName={profile.nameSurname ?? ""} />
+            )}
           </div>
         </CardHeader>
         <CardContent className="space-y-2 text-sm">
@@ -124,11 +172,6 @@ export default function ProfilePage() {
           </CardContent>
         </Card>
       )}
-
-      <p className="flex items-center gap-2 text-xs text-muted-foreground">
-        <Smartphone className="size-3.5 shrink-0" />
-        Tu nombre, foto y equipo se editan desde la app Android.
-      </p>
 
       {/* Como en Android (ReadUser): la cola de aprobación solo para ADMIN */}
       {isAdmin(profile) && (

@@ -1038,6 +1038,17 @@ export function TeamManager({
         />
       )}
 
+      {/* El fundador no tiene "Salir" (el equipo necesita un entrenador
+          principal): decirlo, en vez de que el botón simplemente no esté
+          (pregunta real 2026-09-04: "¿cuál es el botón de salir?"). */}
+      {isFounder && !viewingAsSomeAdmin && (
+        <p className="text-center text-xs text-muted-foreground">
+          Para salir del equipo, primero haz entrenador principal a un co-entrenador (corona en
+          «Entrenadores»); después te aparecerá aquí «Salir de {team.teamname}».
+          {Object.keys(team.coaches).length === 0 && " Ahora mismo no hay ningún co-entrenador."}
+        </p>
+      )}
+
       {canDeleteTeam && (
         <ConfirmDialog
           trigger={

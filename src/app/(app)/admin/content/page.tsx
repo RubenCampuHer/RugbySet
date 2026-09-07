@@ -1,7 +1,7 @@
 "use client";
 
-import { ChevronDown, Lock, SearchX } from "lucide-react";
-import { useState } from "react";
+import { ChevronDown, Lock, SearchX, X } from "lucide-react";
+import { useMemo, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/PageHeader";
@@ -9,6 +9,7 @@ import { PrivacyBadge, ApprovalBadge } from "@/components/PrivacyBadge";
 import { SearchInput } from "@/components/SearchInput";
 import { ListRowsSkeleton } from "@/components/skeletons";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Select,
@@ -23,6 +24,19 @@ import { cn } from "@/lib/utils";
 import type { Exercise, Training } from "@/lib/types";
 
 type Kind = "all" | "exercise" | "training";
+
+// Base UI: <SelectValue /> sin hijos pinta el VALOR crudo ("exercise"), no la
+// etiqueta del item — por eso el trigger salía en inglés. Mismo patrón que el
+// resto del repo: siempre pasar la etiqueta como hijo.
+const KIND_LABELS: Record<Kind, string> = {
+  all: "Todo",
+  exercise: "Ejercicios",
+  training: "Entrenos",
+};
+
+/** Valores reservados del filtro de autor (nunca colisionan con un username real: no llevan espacios ni "*"). */
+const ALL_AUTHORS = "* todos *";
+const NO_AUTHOR = "* sin autor *";
 
 type Row =
   | { kind: "exercise"; name: string; item: Exercise }
@@ -107,7 +121,25 @@ export default function AdminContentPage() {
   const { exercises, trainings, loading } = useAllContent();
   const [search, setSearch] = useState("");
   const [kind, setKind] = useState<Kind>("all");
+  const [author, setAuthor] = useState<string>(ALL_AUTHORS);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
+  // Autores con su nº de contenidos (ejercicios + entrenos), de más a menos —
+  // calculado sobre TODO el contenido (no sobre lo ya filtrado) para que la
+  // lista del desplegable sea estable mientras se combina con tipo/búsqueda.
+  const authors = useMemo(() => {
+    const counts = new Map<string, number>();
+    let withoutAuthor = 0;
+    for (const item of [...exercises, ...trainings]) {
+      if (!item.name) continue;
+      if (item.author) counts.set(item.author, (counts.get(item.author) ?? 0) + 1);
+      else withoutAuthor += 1;
+    }
+    const list = [...counts.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "es"))
+      .map(([name, count]) => ({ name, count }));
+    return { list, withoutAuthor };
+  }, [exercises, trainings]);
 
   if (profile === null || loading) {
     return <ListRowsSkeleton />;
@@ -133,12 +165,24 @@ export default function AdminContentPage() {
 
   const filtered = rows.filter((r) => {
     const matchesKind = kind === "all" || r.kind === kind;
+    const matchesAuthor =
+      author === ALL_AUTHORS ||
+      (author === NO_AUTHOR ? !r.item.author : r.item.author === author);
     const matchesSearch =
       search === "" ||
       r.name.toLowerCase().includes(search.toLowerCase()) ||
       (r.item.author ?? "").toLowerCase().includes(search.toLowerCase());
-    return matchesKind && matchesSearch;
+    return matchesKind && matchesAuthor && matchesSearch;
   });
+
+  const hasFilters = search !== "" || kind !== "all" || author !== ALL_AUTHORS;
+  const clearFilters = () => {
+    setSearch("");
+    setKind("all");
+    setAuthor(ALL_AUTHORS);
+  };
+  const authorLabel =
+    author === ALL_AUTHORS ? "Todos los autores" : author === NO_AUTHOR ? "Sin autor" : author;
 
   const toggle = (key: string) => {
     setExpanded((prev) => {
@@ -157,27 +201,84 @@ export default function AdminContentPage() {
         de administración, no cambia lo que ves en /ejercicios ni /entrenos.
         Toca una fila para ver el detalle completo.
       </p>
-      <div className="flex gap-2">
+      <div className="space-y-2">
         <SearchInput
-          className="flex-1"
           placeholder="Buscar por nombre o autor…"
           value={search}
           onChange={setSearch}
         />
-        <Select value={kind} onValueChange={(v) => setKind(v as Kind)}>
-          <SelectTrigger className="w-36" aria-label="Filtrar por tipo">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todo</SelectItem>
-            <SelectItem value="exercise">Ejercicios</SelectItem>
-            <SelectItem value="training">Entrenos</SelectItem>
-          </SelectContent>
-        </Select>
+        <div className="flex flex-wrap gap-2">
+          <Select value={kind} onValueChange={(v) => setKind((v as Kind | null) ?? "all")}>
+            <SelectTrigger className="w-32" aria-label="Filtrar por tipo">
+              <SelectValue>{KIND_LABELS[kind]}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {(Object.keys(KIND_LABELS) as Kind[]).map((k) => (
+                <SelectItem key={k} value={k}>
+                  {KIND_LABELS[k]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {/* Filtro por autor (2026-09-07): desplegable con conteo, ordenado por
+              volumen. Atajo: tocar "de X" en cualquier fila fija este mismo filtro. */}
+          <Select value={author} onValueChange={(v) => setAuthor(v ?? ALL_AUTHORS)}>
+            <SelectTrigger className="min-w-0 max-w-full flex-1 sm:flex-none sm:w-56" aria-label="Filtrar por autor">
+              <SelectValue className="min-w-0 truncate">{authorLabel}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL_AUTHORS}>Todos los autores</SelectItem>
+              {authors.list.map((a) => (
+                <SelectItem key={a.name} value={a.name}>
+                  <span className="flex w-full items-center justify-between gap-3">
+                    <span className="truncate">{a.name}</span>
+                    <span className="text-xs tabular-nums text-muted-foreground">{a.count}</span>
+                  </span>
+                </SelectItem>
+              ))}
+              {authors.withoutAuthor > 0 && (
+                <SelectItem value={NO_AUTHOR}>
+                  <span className="flex w-full items-center justify-between gap-3">
+                    <span>Sin autor</span>
+                    <span className="text-xs tabular-nums text-muted-foreground">{authors.withoutAuthor}</span>
+                  </span>
+                </SelectItem>
+              )}
+            </SelectContent>
+          </Select>
+        </div>
+        {hasFilters && (
+          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <span>
+              {filtered.length} de {rows.length}
+            </span>
+            {author !== ALL_AUTHORS && (
+              <Badge variant="secondary" className="gap-1 pr-1">
+                Autor: {authorLabel}
+                <button
+                  type="button"
+                  aria-label="Quitar filtro de autor"
+                  className="rounded-full p-0.5 hover:bg-background/60"
+                  onClick={() => setAuthor(ALL_AUTHORS)}
+                >
+                  <X className="size-3" />
+                </button>
+              </Badge>
+            )}
+            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={clearFilters}>
+              Quitar filtros
+            </Button>
+          </div>
+        )}
       </div>
 
       {filtered.length === 0 ? (
-        <EmptyState icon={SearchX} title="Sin resultados" />
+        <EmptyState
+          icon={SearchX}
+          title="Sin resultados"
+          hint={hasFilters ? "Prueba a quitar algún filtro." : undefined}
+          action={hasFilters ? <Button variant="outline" onClick={clearFilters}>Quitar filtros</Button> : undefined}
+        />
       ) : (
         <div className="space-y-2">
           {filtered.map((r) => {
@@ -196,7 +297,32 @@ export default function AdminContentPage() {
                       <p className="font-medium">{r.name}</p>
                       <p className="text-sm text-muted-foreground">
                         {r.kind === "exercise" ? "Ejercicio" : "Entreno"}
-                        {r.item.author && ` · de ${r.item.author}`}
+                        {r.item.author && (
+                          <>
+                            {" · de "}
+                            {/* Atajo: filtrar por este autor sin abrir el desplegable.
+                                stopPropagation para no plegar/desplegar la fila. */}
+                            <span
+                              role="button"
+                              tabIndex={0}
+                              className="cursor-pointer underline-offset-2 hover:text-foreground hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                              aria-label={`Filtrar por autor ${r.item.author}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setAuthor(r.item.author!);
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" || e.key === " ") {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setAuthor(r.item.author!);
+                                }
+                              }}
+                            >
+                              {r.item.author}
+                            </span>
+                          </>
+                        )}
                         {r.item.teamname && ` · ${r.item.teamname}`}
                       </p>
                     </div>

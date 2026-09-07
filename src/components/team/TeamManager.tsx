@@ -873,24 +873,6 @@ export function TeamManager({ teamname }: { teamname: string | null }) {
               </button>
             )}
             {canManage && <ChangeTeamCodeDialog teamname={team.teamname!} currentCode={team.teamcode ?? ""} />}
-            {/* Club del equipo (2026-09-04): el club es contexto del equipo,
-                no al revés — se llega a él desde aquí, sin secuestrar la
-                pestaña "Equipo". Enlaza solo para quien tiene algo que hacer
-                en /club (coach, director, ADMIN); para un jugador es informativo. */}
-            {club &&
-              (canManage ? (
-                <Link
-                  href="/club"
-                  className="inline-flex min-h-8 items-center gap-1 rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-secondary-foreground hover:bg-secondary/80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-                  aria-label={`Ir al club ${club.clubname}`}
-                >
-                  <Building2 className="size-3" /> {club.clubname}
-                </Link>
-              ) : (
-                <Badge variant="secondary" className="gap-1">
-                  <Building2 className="size-3" /> {club.clubname}
-                </Badge>
-              ))}
             {isFounder && (
               <Badge className="border-transparent bg-primary/15 text-brand">
                 Eres el entrenador
@@ -902,6 +884,22 @@ export function TeamManager({ teamname }: { teamname: string | null }) {
               </Badge>
             )}
           </div>
+          {/* Club del equipo (2026-09-04, aviso explícito 2026-09-07): el club
+              es contexto del equipo, no al revés — se llega a él desde aquí,
+              sin secuestrar la pestaña "Equipo". Antes era un chip discreto
+              solo enlazado para quien gestiona; ahora es una frase visible y
+              enlaza para todos (el jugador ve en /club la tarjeta informativa). */}
+          {club && (
+            <Link
+              href="/club"
+              className="mt-1.5 inline-flex min-h-8 items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            >
+              <Building2 className="size-4 shrink-0" />
+              <span>
+                Este equipo forma parte del club <span className="font-medium text-brand">{club.clubname}</span>
+              </span>
+            </Link>
+          )}
         </div>
       </div>
 

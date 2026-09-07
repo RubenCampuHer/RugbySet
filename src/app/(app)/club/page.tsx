@@ -15,7 +15,7 @@ import { useTeam } from "@/hooks/useTeam";
 import { isTeamCoach } from "@/lib/permissions";
 
 /**
- * "Mi club": si administras un club (Clubs.adminUserId === tu uid) ves su
+ * "Club": si administras un club (Clubs.adminUserId === tu uid) ves su
  * gestión completa (ClubManager); si eres coach de un equipo, ves el estado
  * de afiliación de tu propio equipo (ClubMembershipCard) — ambas secciones
  * son independientes, un admin de club también puede tener su propio equipo
@@ -42,6 +42,10 @@ export default function ClubPage() {
   }
 
   const isCoachOfOwnTeam = Boolean(team && isTeamCoach(team, firebaseUser?.uid));
+  // 2026-09-07: un jugador cuyo equipo está en un club también ve aquí la
+  // tarjeta informativa "tu equipo forma parte del club X" (antes: estado
+  // vacío engañoso). Sin club, solo el coach tiene algo que hacer (unirse/crear).
+  const showMembership = Boolean(hasTeam && team && (isCoachOfOwnTeam || team.clubId));
 
   return (
     <div className="mx-auto max-w-2xl space-y-4">
@@ -49,15 +53,15 @@ export default function ClubPage() {
 
       {club && <ClubManager club={club} />}
 
-      {isCoachOfOwnTeam && hasTeam && team && (
-        <ClubMembershipCard team={team} uid={profile.userId!} />
+      {showMembership && team && (
+        <ClubMembershipCard team={team} uid={profile.userId!} isCoach={isCoachOfOwnTeam} />
       )}
 
-      {!club && !isCoachOfOwnTeam && (
+      {!club && !showMembership && (
         <EmptyState
           icon={Shield}
           title="Nada que ver aquí todavía"
-          hint="La gestión de club es cosa del entrenador de un equipo: crea uno o une tu equipo a un club existente desde el equipo."
+          hint="Tu equipo no forma parte de ningún club. Unirse a uno o crearlo es cosa del entrenador del equipo."
           action={
             <Link href="/team" className={buttonVariants({ variant: "outline" })}>
               Ir a mi equipo

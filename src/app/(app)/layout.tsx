@@ -32,6 +32,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useNotifications } from "@/hooks/useNotifications";
+import { useTeam } from "@/hooks/useTeam";
 import { isOnboardingDone } from "@/lib/onboarding-flag";
 import { isAdmin, isCoach } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
@@ -58,6 +59,10 @@ function UnreadDot({ count }: { count: number }) {
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { firebaseUser, profile, logout } = useAuth();
   const { unreadCount } = useNotifications();
+  // Equipo activo: solo para saber si pertenece a un club (entrada "Club" del
+  // menú también para jugadores, 2026-09-07). Misma suscripción que ya abre
+  // /team, así que no añade lecturas nuevas en la práctica.
+  const { team: activeTeam } = useTeam();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -139,10 +144,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 <User /> Perfil
               </DropdownMenuItem>
               {/* 2026-09-04: también quien dirige un club sin ser COACH global
-                  (p.ej. un ADMIN que fundó/dirige un club) — antes solo isCoach. */}
-              {(isCoach(profile) || isAdmin(profile) || Boolean(profile?.directorOfClubId)) && (
+                  (p.ej. un ADMIN que fundó/dirige un club) — antes solo isCoach.
+                  2026-09-07: y cualquier miembro cuyo equipo activo está en un
+                  club (jugador incluido) — ve la tarjeta informativa. "Club",
+                  no "Mi club": para el jugador es el club de su equipo. */}
+              {(isCoach(profile) ||
+                isAdmin(profile) ||
+                Boolean(profile?.directorOfClubId) ||
+                Boolean(activeTeam?.clubId)) && (
                 <DropdownMenuItem render={<Link href="/club" />}>
-                  <Building2 /> Mi club
+                  <Building2 /> Club
                 </DropdownMenuItem>
               )}
               {isAdmin(profile) && (

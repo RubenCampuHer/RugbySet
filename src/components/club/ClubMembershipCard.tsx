@@ -22,8 +22,12 @@ import { parseOr } from "@/lib/schemas/common";
 import { ClubSchema } from "@/lib/schemas/club";
 import type { Club, Team } from "@/lib/types";
 
-/** Coach cuyo equipo ya pertenece a un club — solo lectura + salir. */
-function AlreadyInClub({ team }: { team: Team }) {
+/**
+ * Equipo que ya pertenece a un club — tarjeta informativa para cualquier
+ * miembro (2026-09-07: antes solo la veía el coach); "Salir del club" solo
+ * con `canLeave` (coach del equipo).
+ */
+function AlreadyInClub({ team, canLeave }: { team: Team; canLeave: boolean }) {
   const [club, setClub] = useState<Club | null | undefined>(undefined);
   const [leaving, setLeaving] = useState(false);
   const clubId = team.clubId;
@@ -57,25 +61,33 @@ function AlreadyInClub({ team }: { team: Team }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg">Tu equipo pertenece a un club</CardTitle>
+        <CardTitle className="text-lg">Tu equipo forma parte de un club</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="flex items-center gap-3">
           <AvatarInitials name={club?.clubname ?? "Club"} src={club?.clubicon} />
-          <p className="font-medium">{club?.clubname ?? "Cargando…"}</p>
+          <div className="min-w-0">
+            <p className="font-medium">{club?.clubname ?? "Cargando…"}</p>
+            <p className="text-sm text-muted-foreground">
+              {team.teamname} pertenece a este club
+              {club?.clubcode ? ` · Código: ${club.clubcode}` : ""}
+            </p>
+          </div>
         </div>
-        <ConfirmDialog
-          trigger={
-            <Button variant="ghost" className="w-full text-destructive hover:text-destructive" disabled={leaving}>
-              Salir del club
-            </Button>
-          }
-          title="¿Salir del club?"
-          description="Tu equipo deja de pertenecer al club; su admin ya no podrá gestionarlo. Puedes volver a solicitar el ingreso más adelante."
-          confirmLabel="Salir del club"
-          destructive
-          onConfirm={leave}
-        />
+        {canLeave && (
+          <ConfirmDialog
+            trigger={
+              <Button variant="ghost" className="w-full text-destructive hover:text-destructive" disabled={leaving}>
+                Salir del club
+              </Button>
+            }
+            title="¿Salir del club?"
+            description="Tu equipo deja de pertenecer al club; su admin ya no podrá gestionarlo. Puedes volver a solicitar el ingreso más adelante."
+            confirmLabel="Salir del club"
+            destructive
+            onConfirm={leave}
+          />
+        )}
       </CardContent>
     </Card>
   );
@@ -210,7 +222,12 @@ function NotInClub({ team, uid }: { team: Team; uid: string }) {
   );
 }
 
-/** Estado de membresía de club del equipo propio — decide cuál de los dos mostrar. */
-export function ClubMembershipCard({ team, uid }: { team: Team; uid: string }) {
-  return team.clubId ? <AlreadyInClub team={team} /> : <NotInClub team={team} uid={uid} />;
+/**
+ * Estado de membresía de club del equipo propio — decide cuál de los dos mostrar.
+ * - Con club: tarjeta informativa para cualquier miembro; "Salir" solo si `isCoach`.
+ * - Sin club: unirse/crear solo tiene sentido para el coach; para un jugador no renderiza nada.
+ */
+export function ClubMembershipCard({ team, uid, isCoach }: { team: Team; uid: string; isCoach: boolean }) {
+  if (team.clubId) return <AlreadyInClub team={team} canLeave={isCoach} />;
+  return isCoach ? <NotInClub team={team} uid={uid} /> : null;
 }

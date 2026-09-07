@@ -182,7 +182,7 @@ function ExerciseForm({
         </div>
         {!loadingMyClub && myClubId == null && (
           <p className="text-xs text-muted-foreground">
-            Tu equipo no pertenece a ningún club — únete o crea uno desde &quot;Mi club&quot;.
+            Tu equipo no pertenece a ningún club — únete o crea uno desde &quot;Club&quot;.
           </p>
         )}
         {privacy === "Club" && (

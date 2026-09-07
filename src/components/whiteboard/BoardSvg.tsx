@@ -18,6 +18,7 @@ export function BoardSvg({
   onBackgroundPointerDown,
   onObjectPointerDown,
   onEndpointPointerDown,
+  onCtrlPointerDown,
   onRootPointerMove,
   onRootPointerUp,
   onRootPointerCancel,
@@ -30,6 +31,7 @@ export function BoardSvg({
   onBackgroundPointerDown?: (e: ReactPointerEvent<SVGSVGElement>) => void;
   onObjectPointerDown?: (id: string) => (e: ReactPointerEvent<SVGElement>) => void;
   onEndpointPointerDown?: (id: string, endpoint: Endpoint) => (e: ReactPointerEvent<SVGElement>) => void;
+  onCtrlPointerDown?: (id: string) => (e: ReactPointerEvent<SVGElement>) => void;
   onRootPointerMove?: (e: ReactPointerEvent<SVGSVGElement>) => void;
   onRootPointerUp?: (e: ReactPointerEvent<SVGSVGElement>) => void;
   onRootPointerCancel?: (e: ReactPointerEvent<SVGSVGElement>) => void;
@@ -63,6 +65,7 @@ export function BoardSvg({
               ? (endpoint) => onEndpointPointerDown(object.id, endpoint)
               : undefined
           }
+          onCtrlPointerDown={onCtrlPointerDown?.(object.id)}
         />
       ))}
       {draft && (

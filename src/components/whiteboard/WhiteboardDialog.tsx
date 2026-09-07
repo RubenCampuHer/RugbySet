@@ -7,24 +7,44 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { BoardSvg, screenToBoardPoint, type DraftShape } from "./BoardSvg";
 import { boardToJpegFile } from "./export";
+import { ctrlFromMidpoint, ctrlFromOffset, ctrlOffset, snapStraight } from "./geometry";
 import { Toolbar } from "./Toolbar";
 import {
+  MIN_DRAG_DISTANCE,
   newObjectId,
   parseBoardData,
   serializeBoardData,
   type BoardObject,
+  type SegmentObject,
   type Tool,
   type Vec,
 } from "./types";
 
-/** Distancia mínima (en coords de board) para que un arrastre cree flecha/línea. */
-const MIN_DRAG_DISTANCE = 12;
-
 type Drag =
   | { kind: "draw"; tool: "arrow-run" | "arrow-pass" | "line"; from: Vec }
   | { kind: "move-point"; id: string; startPointer: Vec; startPos: Vec }
-  | { kind: "move-segment"; id: string; startPointer: Vec; startFrom: Vec; startTo: Vec }
-  | { kind: "endpoint"; id: string; endpoint: "from" | "to" };
+  | {
+      kind: "move-segment";
+      id: string;
+      startPointer: Vec;
+      startFrom: Vec;
+      startTo: Vec;
+      startCtrl?: Vec;
+    }
+  /** `ctrlOffset`: desplazamiento del ctrl respecto al centro de la cuerda, para conservar la curvatura al estirar. */
+  | { kind: "endpoint"; id: string; endpoint: "from" | "to"; ctrlOffset?: Vec }
+  /** Arrastre del tirador central: curva (o endereza) la flecha/línea. */
+  | { kind: "ctrl"; id: string };
+
+const isSegment = (o: BoardObject): o is SegmentObject => o.kind === "arrow" || o.kind === "line";
+
+/** Devuelve el segmento con `ctrl` fijado, o sin la clave si es undefined (no dejar `ctrl: undefined` en el estado). */
+function withCtrl<T extends SegmentObject>(o: T, ctrl: Vec | undefined): T {
+  if (ctrl) return { ...o, ctrl };
+  const { ctrl: _omit, ...rest } = o;
+  void _omit;
+  return rest as T;
+}
 
 export function WhiteboardDialog({
   open,
@@ -99,10 +119,16 @@ export function WhiteboardDialog({
     setSelectedId(id);
     beginChange();
     const pos = screenToBoardPoint(e.currentTarget, e.clientX, e.clientY);
-    dragRef.current =
-      obj.kind === "arrow" || obj.kind === "line"
-        ? { kind: "move-segment", id, startPointer: pos, startFrom: obj.from, startTo: obj.to }
-        : { kind: "move-point", id, startPointer: pos, startPos: obj.pos };
+    dragRef.current = isSegment(obj)
+      ? {
+          kind: "move-segment",
+          id,
+          startPointer: pos,
+          startFrom: obj.from,
+          startTo: obj.to,
+          startCtrl: obj.ctrl,
+        }
+      : { kind: "move-point", id, startPointer: pos, startPos: obj.pos };
   };
 
   const handleEndpointPointerDown =
@@ -111,10 +137,27 @@ export function WhiteboardDialog({
       e.stopPropagation();
       const svg = e.currentTarget.ownerSVGElement;
       if (!svg) return;
+      const obj = objects.find((o) => o.id === id);
+      if (!obj || !isSegment(obj)) return;
       svg.setPointerCapture(e.pointerId);
       beginChange();
-      dragRef.current = { kind: "endpoint", id, endpoint };
+      dragRef.current = {
+        kind: "endpoint",
+        id,
+        endpoint,
+        ctrlOffset: obj.ctrl ? ctrlOffset(obj.from, obj.to, obj.ctrl) : undefined,
+      };
     };
+
+  const handleCtrlPointerDown = (id: string) => (e: ReactPointerEvent<SVGElement>) => {
+    if (tool !== "select") return;
+    e.stopPropagation();
+    const svg = e.currentTarget.ownerSVGElement;
+    if (!svg) return;
+    svg.setPointerCapture(e.pointerId);
+    beginChange();
+    dragRef.current = { kind: "ctrl", id };
+  };
 
   const handleRootPointerMove = (e: ReactPointerEvent<SVGSVGElement>) => {
     const drag = dragRef.current;
@@ -142,12 +185,17 @@ export function WhiteboardDialog({
       const dy = pos.y - drag.startPointer.y;
       setObjects((objs) =>
         objs.map((o) =>
-          o.id === drag.id && (o.kind === "arrow" || o.kind === "line")
-            ? {
-                ...o,
-                from: { x: drag.startFrom.x + dx, y: drag.startFrom.y + dy },
-                to: { x: drag.startTo.x + dx, y: drag.startTo.y + dy },
-              }
+          o.id === drag.id && isSegment(o)
+            ? withCtrl(
+                {
+                  ...o,
+                  from: { x: drag.startFrom.x + dx, y: drag.startFrom.y + dy },
+                  to: { x: drag.startTo.x + dx, y: drag.startTo.y + dy },
+                },
+                drag.startCtrl
+                  ? { x: drag.startCtrl.x + dx, y: drag.startCtrl.y + dy }
+                  : undefined,
+              )
             : o,
         ),
       );
@@ -155,11 +203,26 @@ export function WhiteboardDialog({
     }
     if (drag.kind === "endpoint") {
       setObjects((objs) =>
-        objs.map((o) =>
-          o.id === drag.id && (o.kind === "arrow" || o.kind === "line")
-            ? { ...o, [drag.endpoint]: pos }
-            : o,
-        ),
+        objs.map((o) => {
+          if (o.id !== drag.id || !isSegment(o)) return o;
+          const moved = { ...o, [drag.endpoint]: pos };
+          // Conservar la curvatura relativa a la nueva cuerda en vez de deformarla.
+          return withCtrl(
+            moved,
+            drag.ctrlOffset ? ctrlFromOffset(moved.from, moved.to, drag.ctrlOffset) : undefined,
+          );
+        }),
+      );
+      return;
+    }
+    if (drag.kind === "ctrl") {
+      setObjects((objs) =>
+        objs.map((o) => {
+          if (o.id !== drag.id || !isSegment(o)) return o;
+          // El tirador queda bajo el dedo; cerca de la recta, vuelve a recta.
+          const ctrl = snapStraight(o.from, o.to, ctrlFromMidpoint(o.from, o.to, pos), MIN_DRAG_DISTANCE);
+          return withCtrl(o, ctrl);
+        }),
       );
     }
   };
@@ -225,6 +288,9 @@ export function WhiteboardDialog({
     setSelectedId(null);
   };
 
+  const selectedObject = selectedId === null ? undefined : objects.find((o) => o.id === selectedId);
+  const selectedSegment = selectedObject && isSegment(selectedObject) ? selectedObject : null;
+
   const handleSave = async () => {
     setSaving(true);
     try {
@@ -270,6 +336,13 @@ export function WhiteboardDialog({
           onClear={handleClear}
         />
 
+        {selectedSegment && (
+          <p className="border-b px-3 py-1.5 text-xs text-muted-foreground">
+            Arrastra el punto central para curvar la {selectedSegment.kind === "arrow" ? "flecha" : "línea"}; los
+            extremos, para estirarla.
+          </p>
+        )}
+
         <div className="flex flex-1 items-center justify-center overflow-auto bg-black/20 p-2">
           <BoardSvg
             objects={objects}
@@ -283,6 +356,7 @@ export function WhiteboardDialog({
             onRootPointerCancel={handleRootPointerCancel}
             onObjectPointerDown={handleObjectPointerDown}
             onEndpointPointerDown={handleEndpointPointerDown}
+            onCtrlPointerDown={handleCtrlPointerDown}
           />
         </div>
       </DialogContent>

@@ -30,6 +30,8 @@ export type ArrowObject = {
   style: ArrowStyle;
   from: Vec;
   to: Vec;
+  /** Punto de control (Bézier cuadrática). Ausente = recta. */
+  ctrl?: Vec;
 };
 
 export type LineObject = {
@@ -37,7 +39,12 @@ export type LineObject = {
   kind: "line";
   from: Vec;
   to: Vec;
+  /** Punto de control (Bézier cuadrática). Ausente = recta. */
+  ctrl?: Vec;
 };
+
+/** Flecha o línea: los dos objetos con extremos `from`/`to`. */
+export type SegmentObject = ArrowObject | LineObject;
 
 export type BoardObject = PlayerObject | PointObject | ArrowObject | LineObject;
 
@@ -77,6 +84,7 @@ const ArrowSchema = z.object({
   style: z.enum(["run", "pass"]),
   from: VecSchema,
   to: VecSchema,
+  ctrl: VecSchema.optional(),
 });
 
 const LineSchema = z.object({
@@ -84,6 +92,7 @@ const LineSchema = z.object({
   kind: z.literal("line"),
   from: VecSchema,
   to: VecSchema,
+  ctrl: VecSchema.optional(),
 });
 
 export const BoardObjectSchema = z.discriminatedUnion("kind", [
@@ -103,6 +112,12 @@ export const BOARD_WIDTH = 1600;
 export const BOARD_HEIGHT = 900;
 
 export const EMPTY_BOARD: BoardState = { version: 1, objects: [] };
+
+/**
+ * Distancia mínima (en coords de board) para que un arrastre cree flecha/línea,
+ * y umbral bajo el cual una curva vuelve a ser recta.
+ */
+export const MIN_DRAG_DISTANCE = 12;
 
 /** Nunca lanza — un boardData corrupto o de una versión futura abre la pizarra vacía. */
 export function parseBoardData(raw: string | null | undefined): BoardState {

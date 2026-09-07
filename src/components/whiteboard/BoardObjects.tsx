@@ -1,4 +1,5 @@
 import type { PointerEvent as ReactPointerEvent } from "react";
+import { curveMidpoint, segmentPathD } from "./geometry";
 import type { BoardObject } from "./types";
 
 const ATTACK_COLOR = "#ef4444";
@@ -10,12 +11,16 @@ const SELECTED_RING = "#facc15";
 
 export const PLAYER_RADIUS = 28;
 export const HANDLE_RADIUS = 14;
+/** Ancho del trazo invisible que hace agarrable una flecha/línea de 5px con el dedo. */
+const HIT_STROKE_WIDTH = 28;
 
 type Endpoint = "from" | "to";
 
 type Handlers = {
   onBodyPointerDown?: (e: ReactPointerEvent<SVGElement>) => void;
   onEndpointPointerDown?: (endpoint: Endpoint) => (e: ReactPointerEvent<SVGElement>) => void;
+  /** Tirador central de flechas/líneas: arrastrarlo curva el segmento. */
+  onCtrlPointerDown?: (e: ReactPointerEvent<SVGElement>) => void;
 };
 
 /** Renderiza un único objeto de la pizarra. interactive=false para el export (sin selección/handles). */
@@ -25,6 +30,7 @@ export function BoardObjectShape({
   interactive,
   onBodyPointerDown,
   onEndpointPointerDown,
+  onCtrlPointerDown,
 }: { object: BoardObject; selected: boolean; interactive: boolean } & Handlers) {
   const ring = interactive && selected ? (
     <RingFor object={object} />
@@ -107,13 +113,18 @@ export function BoardObjectShape({
     case "line": {
       const isArrow = object.kind === "arrow";
       const dashed = isArrow ? object.style === "pass" : false;
+      // Recta (L) o Bézier cuadrática (Q) según haya ctrl. El marker con
+      // orient="auto-start-reverse" sigue la tangente final, también en la curva.
+      const d = segmentPathD(object.from, object.to, object.ctrl);
+      const mid = curveMidpoint(object.from, object.to, object.ctrl);
       return (
         <g onPointerDown={onBodyPointerDown} style={{ cursor: interactive ? "grab" : undefined }}>
-          <line
-            x1={object.from.x}
-            y1={object.from.y}
-            x2={object.to.x}
-            y2={object.to.y}
+          {interactive && (
+            <path d={d} fill="none" stroke="transparent" strokeWidth={HIT_STROKE_WIDTH} />
+          )}
+          <path
+            d={d}
+            fill="none"
             stroke={selected && interactive ? SELECTED_RING : "white"}
             strokeWidth={5}
             strokeDasharray={dashed ? "14 10" : undefined}
@@ -140,6 +151,17 @@ export function BoardObjectShape({
                 strokeWidth={3}
                 style={{ cursor: "grab" }}
                 onPointerDown={onEndpointPointerDown?.("to")}
+              />
+              {/* Tirador central (colores invertidos para distinguirlo de los extremos): curva al arrastrar. */}
+              <circle
+                cx={mid.x}
+                cy={mid.y}
+                r={HANDLE_RADIUS - 3}
+                fill={SELECTED_RING}
+                stroke="white"
+                strokeWidth={3}
+                style={{ cursor: "grab" }}
+                onPointerDown={onCtrlPointerDown}
               />
             </>
           )}

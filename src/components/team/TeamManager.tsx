@@ -218,12 +218,25 @@ function statsForTeam(profile: PublicProfile | null | undefined, teamname: strin
 }
 
 /** Fila de jugador en la lista del equipo — objetivo táctil 44px en las acciones. */
+/** Ficha de persona (2026-09-09): fotos+nombre navegan si se conoce el uid — nunca envuelve `action` (botones propios). */
+function PersonLink({ uid, children }: { uid?: string; children: React.ReactNode }) {
+  if (!uid) return <>{children}</>;
+  return (
+    <Link href={`/profile/detail?uid=${encodeURIComponent(uid)}`} className="flex min-w-0 flex-1 items-center gap-3 rounded-lg hover:opacity-80">
+      {children}
+    </Link>
+  );
+}
+
 function PlayerRow({
+  uid,
   name,
   src,
   stats,
   action,
 }: {
+  /** Ficha de persona: si se pasa, foto+nombre son clicables (ver PersonLink). */
+  uid?: string;
   name: string;
   /** usericon de publicProfiles — sin él no se veía la foto de nadie (bug real 2026-09-04). */
   src?: string | null;
@@ -232,8 +245,10 @@ function PlayerRow({
 }) {
   return (
     <div className="flex items-center gap-3 rounded-lg py-2 pr-1 pl-2 hover:bg-muted/50">
-      <AvatarInitials name={name} src={src} size="sm" />
-      <span className="flex-1 truncate text-sm">{name}</span>
+      <PersonLink uid={uid}>
+        <AvatarInitials name={name} src={src} size="sm" />
+        <span className="flex-1 truncate text-sm">{name}</span>
+      </PersonLink>
       {stats && (typeof stats.streak === "number" || typeof stats.attendanceRate === "number") && (
         <span className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
           {typeof stats.streak === "number" && stats.streak > 0 && (
@@ -292,6 +307,7 @@ function PendingSection({ team, canManage }: { team: Team; canManage: boolean })
           return (
             <PlayerRow
               key={uid}
+              uid={uid}
               name={name}
               src={profiles[uid]?.usericon}
               action={
@@ -455,17 +471,19 @@ function CoachesSection({
       <CardContent className="divide-y divide-border">
         {founderUid && (
           <div className="flex items-center gap-3 rounded-lg py-2 pr-1 pl-2">
-            <AvatarInitials
-              name={profiles[founderUid]?.nameSurname || "Entrenador"}
-              src={profiles[founderUid]?.usericon}
-              size="sm"
-            />
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm">{profiles[founderUid]?.nameSurname || "Entrenador"}</p>
-              {profiles[founderUid]?.username && (
-                <p className="truncate text-xs text-muted-foreground">@{profiles[founderUid]?.username}</p>
-              )}
-            </div>
+            <PersonLink uid={founderUid}>
+              <AvatarInitials
+                name={profiles[founderUid]?.nameSurname || "Entrenador"}
+                src={profiles[founderUid]?.usericon}
+                size="sm"
+              />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm">{profiles[founderUid]?.nameSurname || "Entrenador"}</p>
+                {profiles[founderUid]?.username && (
+                  <p className="truncate text-xs text-muted-foreground">@{profiles[founderUid]?.username}</p>
+                )}
+              </div>
+            </PersonLink>
             <Badge variant="outline">Fundador</Badge>
             {canManage && (
               <RenamePersonDialog
@@ -493,6 +511,7 @@ function CoachesSection({
           return (
           <PlayerRow
             key={uid}
+            uid={uid}
             name={profiles[uid]?.nameSurname || "Entrenador"}
             src={profiles[uid]?.usericon}
             action={
@@ -572,6 +591,7 @@ function CoachesSection({
         {pendingUids.map((uid) => (
           <PlayerRow
             key={uid}
+            uid={uid}
             name={profiles[uid]?.nameSurname || "Solicitud pendiente"}
             src={profiles[uid]?.usericon}
             action={
@@ -960,6 +980,7 @@ export function TeamManager({ teamname }: { teamname: string | null }) {
                 return (
                   <PlayerRow
                     key={uid}
+                    uid={uid}
                     name={name}
                     src={playerProfiles[uid]?.usericon}
                     stats={statsForTeam(playerProfiles[uid], team.teamname!)}

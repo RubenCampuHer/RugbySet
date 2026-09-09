@@ -265,26 +265,37 @@ function DirectorsSection({
       </CardHeader>
       <CardContent className="divide-y divide-border">
         <div className="flex items-center gap-3 py-2">
-          <AvatarInitials
-            name={profiles[club.adminUserId ?? ""]?.nameSurname || "Fundador"}
-            src={profiles[club.adminUserId ?? ""]?.usericon}
-            size="sm"
-          />
-          <span className="flex-1 truncate text-sm">
-            {profiles[club.adminUserId ?? ""]?.nameSurname || "Fundador"}
-          </span>
+          {/* Ficha de persona (2026-09-09): foto+nombre navegan a /profile/detail */}
+          <Link
+            href={`/profile/detail?uid=${encodeURIComponent(club.adminUserId ?? "")}`}
+            className="flex min-w-0 flex-1 items-center gap-3 hover:opacity-80"
+          >
+            <AvatarInitials
+              name={profiles[club.adminUserId ?? ""]?.nameSurname || "Fundador"}
+              src={profiles[club.adminUserId ?? ""]?.usericon}
+              size="sm"
+            />
+            <span className="flex-1 truncate text-sm">
+              {profiles[club.adminUserId ?? ""]?.nameSurname || "Fundador"}
+            </span>
+          </Link>
           <Badge variant="outline">Fundador</Badge>
         </div>
         {directorUids.map((uid) => {
           const name = profiles[uid]?.nameSurname || "este codirector";
           return (
             <div key={uid} className="flex items-center gap-3 py-2">
-              <AvatarInitials
-                name={profiles[uid]?.nameSurname || "Codirector"}
-                src={profiles[uid]?.usericon}
-                size="sm"
-              />
-              <span className="flex-1 truncate text-sm">{profiles[uid]?.nameSurname || "Codirector"}</span>
+              <Link
+                href={`/profile/detail?uid=${encodeURIComponent(uid)}`}
+                className="flex min-w-0 flex-1 items-center gap-3 hover:opacity-80"
+              >
+                <AvatarInitials
+                  name={profiles[uid]?.nameSurname || "Codirector"}
+                  src={profiles[uid]?.usericon}
+                  size="sm"
+                />
+                <span className="flex-1 truncate text-sm">{profiles[uid]?.nameSurname || "Codirector"}</span>
+              </Link>
               {canRemoveDirector && (
                 <ConfirmDialog
                   trigger={

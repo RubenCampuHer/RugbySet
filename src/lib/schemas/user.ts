@@ -45,7 +45,10 @@ export const AttendanceStatsSchema = z.object({
 // ya calculados server-side (mirrorPublicProfile + mirrorTeamAttendanceStats)
 // del equipo ACTIVO (los lee Android); teamStats/{teamname} los mismos tres
 // números POR EQUIPO (varios equipos, fase 3 2026-09-04) — la web lee de
-// aquí para mostrar a un jugador dentro de un equipo concreto.
+// aquí para mostrar a un jugador dentro de un equipo concreto. teams/
+// directorOfClubId (2026-09-09, ficha de persona): TODOS los equipos con su
+// rol y el club que dirige, calculados igual que teamStats (Admin SDK, no
+// requiere abrir ninguna regla nueva) — espejo de PublicProfile.kt.
 export const PublicProfileSchema = z.object({
   userId: z.string().nullish(),
   username: z.string().nullish(),
@@ -57,6 +60,8 @@ export const PublicProfileSchema = z.object({
   maxStreak: z.number().int().nullish(),
   attendanceRate: z.number().int().nullish(),
   teamStats: rtdbRecord(AttendanceStatsSchema).default({}),
+  teams: rtdbRecord(z.enum(["player", "coach"])).default({}),
+  directorOfClubId: z.string().nullish(),
 });
 
 export const NotificationSchema = z.object({

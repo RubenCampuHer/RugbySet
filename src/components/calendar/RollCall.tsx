@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { toast } from "sonner";
 import { AttendanceToggle } from "@/components/AttendanceToggle";
 import { AvatarInitials } from "@/components/AvatarInitials";
@@ -69,8 +70,14 @@ export function RollCall({ team, day }: { team: Team; day: TrainingDay }) {
               key={uid}
               className="flex items-center gap-2 rounded-lg py-1 pr-1 pl-2 hover:bg-muted/50"
             >
-              <AvatarInitials name={name || "Jugador"} src={icon} size="sm" />
-              <span className="flex-1 truncate text-sm">{name || "Jugador"}</span>
+              {/* Ficha de persona (2026-09-09) — solo foto+nombre, el toggle queda fuera */}
+              <Link
+                href={`/profile/detail?uid=${encodeURIComponent(uid)}`}
+                className="flex min-w-0 flex-1 items-center gap-2 hover:opacity-80"
+              >
+                <AvatarInitials name={name || "Jugador"} src={icon} size="sm" />
+                <span className="flex-1 truncate text-sm">{name || "Jugador"}</span>
+              </Link>
               <AttendanceToggle
                 value={status(uid)}
                 onChange={(s) => void mark(uid, s)}

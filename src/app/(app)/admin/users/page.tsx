@@ -5,6 +5,7 @@ import { Lock, Trash2, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useAuth } from "@/components/auth/AuthProvider";
+import Link from "next/link";
 import { AvatarInitials } from "@/components/AvatarInitials";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
@@ -115,16 +116,22 @@ export default function AdminUsersPage() {
             return (
               <Card key={uid}>
                 <CardContent className="flex items-center gap-3 py-3">
-                  <AvatarInitials name={p.nameSurname} src={p.usericon} />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium">
-                      {p.nameSurname ?? p.username ?? "(sin nombre)"}
-                    </p>
-                    <p className="truncate text-sm text-muted-foreground">
-                      {p.username && `@${p.username}`}
-                      {p.teamname && ` · ${p.teamname}`}
-                    </p>
-                  </div>
+                  {/* Ficha de persona (2026-09-09) */}
+                  <Link
+                    href={`/profile/detail?uid=${encodeURIComponent(uid)}`}
+                    className="flex min-w-0 flex-1 items-center gap-3 hover:opacity-80"
+                  >
+                    <AvatarInitials name={p.nameSurname} src={p.usericon} />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium">
+                        {p.nameSurname ?? p.username ?? "(sin nombre)"}
+                      </p>
+                      <p className="truncate text-sm text-muted-foreground">
+                        {p.username && `@${p.username}`}
+                        {p.teamname && ` · ${p.teamname}`}
+                      </p>
+                    </div>
+                  </Link>
                   <Select
                     value={p.role}
                     disabled={isSelf || busy === uid}

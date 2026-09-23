@@ -67,7 +67,7 @@ export default function ProfilePage() {
 
   // Asistencia del equipo ACTIVO, derivada de su propio calendario (fase 3):
   // profile.assistedTrainingDays es una lista plana que mezcla equipos.
-  const attendedDates = attendedDatesFromTeam(team, profile.nameSurname ?? "");
+  const attendedDates = attendedDatesFromTeam(team, firebaseUser?.uid ?? "");
   const streak = team ? calculateStreak(team, attendedDates) : 0;
   const maxStreak = team ? calculateMaxStreak(team, attendedDates) : 0;
   const rate = team ? calculateAttendanceRate(team, attendedDates) : 0;

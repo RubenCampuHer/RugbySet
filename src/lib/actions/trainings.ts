@@ -5,6 +5,7 @@ import { get, ref, remove, set, update } from "firebase/database";
 import { PATHS } from "@/lib/constants";
 import { auth, db } from "@/lib/firebase";
 import { canCreateContent, canDeleteTraining, canEditTraining } from "@/lib/permissions";
+import { mergeNode } from "@/lib/rtdb";
 import { findAvailableName } from "@/lib/utils";
 import type { Section, Training, User } from "@/lib/types";
 
@@ -16,6 +17,8 @@ export type TrainingInput = {
   etiquetas: string[];
   /** Ver comentario equivalente en lib/actions/exercises.ts (ExerciseInput.clubId). */
   clubId?: string | null;
+  /** Solo al copiar de otro autor: de dónde viene. Al editar se omite y se conserva el existente. */
+  copiedFrom?: { name: string; author: string };
 };
 
 /**
@@ -54,6 +57,7 @@ function buildTraining(input: TrainingInput, author: string): Training {
     approvalStatus: input.privacy === "Publico" || input.privacy === "Club" ? "PENDING" : null,
     teamname: null, // sin uso real — ver comentario en schemas/training.ts
     clubId: input.privacy === "Club" ? (input.clubId ?? null) : null,
+    ...(input.copiedFrom ? { copiedFrom: input.copiedFrom } : {}),
   };
 }
 
@@ -77,10 +81,19 @@ export async function updateTraining(
     throw new Error("Sin permiso para editar este entrenamiento");
   }
 
-  const updated = buildTraining(input, original.author!);
-  await set(ref(db, `${PATHS.TRAININGS}/${input.name}`), updated);
-  if (input.name !== originalName) {
-    await remove(ref(db, `${PATHS.TRAININGS}/${originalName}`));
+  // Fusión sobre el nodo CRUDO (espejo de TrainingRepository.modifyTraining):
+  // conserva created_at y claves desconocidas.
+  const merged = mergeNode(original, {
+    ...buildTraining(input, original.author!),
+    created_at: original.created_at ?? Date.now(),
+  });
+  if (input.name === originalName) {
+    await set(ref(db, `${PATHS.TRAININGS}/${input.name}`), merged);
+  } else {
+    await update(ref(db), {
+      [`${PATHS.TRAININGS}/${input.name}`]: merged,
+      [`${PATHS.TRAININGS}/${originalName}`]: null,
+    });
   }
 }
 

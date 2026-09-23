@@ -260,7 +260,7 @@ export function LineupEditor({
 
   const remove = async () => {
     try {
-      await deleteLineup(team.teamname!, lineup.lineupId!, team.trainingdays);
+      await deleteLineup(team.teamname!, lineup.lineupId!);
       toast.success("Alineación eliminada");
       onDeleted?.();
     } catch (e) {

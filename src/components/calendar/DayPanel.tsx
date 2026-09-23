@@ -49,7 +49,7 @@ function MatchLineupSection({ team, fecha, day }: { team: Team; fecha: string; d
   const assign = async (lineupId: string | null) => {
     setAssigning(true);
     try {
-      await assignLineupToMatch(team.teamname!, fecha, lineupId, team.trainingdays);
+      await assignLineupToMatch(team.teamname!, fecha, lineupId);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "No se pudo asignar la alineación");
     } finally {
@@ -65,7 +65,7 @@ function MatchLineupSection({ team, fecha, day }: { team: Team; fecha: string; d
     setAssigning(true);
     try {
       const doc = await createLineup(team.teamname!, { name: newName });
-      await assignLineupToMatch(team.teamname!, fecha, doc.lineupId!, team.trainingdays);
+      await assignLineupToMatch(team.teamname!, fecha, doc.lineupId!);
       setCreating(false);
       setNewName("");
     } catch (e) {

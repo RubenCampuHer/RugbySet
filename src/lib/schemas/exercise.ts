@@ -3,6 +3,13 @@
 import { z } from "zod";
 import { ApprovalStatusSchema, PrivacySchema, rtdbList, timestampMs } from "./common";
 
+// Origen de una copia hecha con "Copiar a mis ejercicios/entrenos" (solo web;
+// Android lo conserva al editar porque fusiona con el nodo existente).
+export const CopiedFromSchema = z.object({
+  name: z.string(),
+  author: z.string().nullish(),
+});
+
 export const ExerciseSchema = z.object({
   name: z.string().nullish(),
   descCorta: z.string().nullish(),
@@ -25,4 +32,5 @@ export const ExerciseSchema = z.object({
   // JSON serializado del estado de la pizarra (solo web, Android lo ignora
   // pero debe preservarlo al editar — ver _Exercise.kt).
   boardData: z.string().nullish(),
+  copiedFrom: CopiedFromSchema.nullish().catch(null),
 });

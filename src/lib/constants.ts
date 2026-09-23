@@ -14,4 +14,5 @@ export const PATHS = {
   EXERCISES: "Exercises",
   TRAININGS: "Trainings",
   NOTIFICATIONS: "notifications", // hijo de Users/{uid}
+  TRAINING_DAYS: "trainingdays", // hijo de Teams/{t} (FirebasePaths.TRAINING_DAYS)
 } as const;

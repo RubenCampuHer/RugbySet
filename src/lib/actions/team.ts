@@ -9,7 +9,15 @@ import { db, functions } from "@/lib/firebase";
 import { parseOr } from "@/lib/schemas/common";
 import { UserTeamsSchema } from "@/lib/schemas/user";
 import { nextActiveTeam } from "@/lib/teams";
-import type { Team, Training, TrainingDay } from "@/lib/types";
+import {
+  findRawDay,
+  patchRawDay,
+  rawDays,
+  removeRawDay,
+  upsertRawDay,
+  type RawDay,
+} from "@/lib/trainingdays";
+import type { Team, Training } from "@/lib/types";
 
 /**
  * Autorreparación entre el equipo ACTIVO (Users/{uid}/teamname) y las
@@ -300,32 +308,49 @@ export async function upsertTrainingDay(
     eventType?: "TRAINING" | "MATCH";
     location?: string | null;
   },
-  existing: TrainingDay[],
 ) {
-  const existingDay = existing.find((d) => d.fecha === day.fecha);
-  const newDay: TrainingDay = {
-    fecha: day.fecha,
-    horaInicio: day.horaInicio,
-    horaFin: day.horaFin,
-    nameTrainingDay: day.nameTrainingDay ?? "",
-    // Firebase (update/set) RECHAZA cualquier `undefined` en el objeto que
-    // se escribe (arroja "contains undefined in property...") — a
-    // diferencia de `null`, que sí se persiste como "ausente". training/
-    // lineupId son opcionales (Partido sin entreno; sin alineación
-    // publicada todavía, el caso normal) así que hay que convertir
-    // undefined -> null explícitamente antes de escribir, mismo criterio
-    // que ya usa location aquí abajo.
-    training: day.training ?? null,
-    eventType: day.eventType ?? "TRAINING",
-    location: day.location?.trim() ? day.location.trim() : null,
-    accepted_players: existingDay?.accepted_players ?? {},
-    declined_players: existingDay?.declined_players ?? {},
-    lineupId: existingDay?.lineupId ?? null,
-  };
-  const rest = existing.filter((d) => d.fecha !== day.fecha);
+  // Solo los campos del editor (espejo de TeamWrites.dayEditorFields): el
+  // resto del día (asistencia, lineupId, cancelled y cualquier clave que
+  // esta versión no conozca) se conserva al fusionar sobre el dato CRUDO.
+  // null borra la clave (Firebase rechaza undefined; mergeNode lo descarta).
+  await mutateTrainingDays(teamname, (days) =>
+    upsertRawDay(days, day.fecha, {
+      horaInicio: day.horaInicio,
+      horaFin: day.horaFin,
+      nameTrainingDay: day.nameTrainingDay ?? "",
+      training: day.training ?? null,
+      eventType: day.eventType ?? "TRAINING",
+      location: day.location?.trim() ? day.location.trim() : null,
+    }),
+  );
+}
+
+/**
+ * Lee Teams/{t}/trainingdays CRUDO, aplica `fn` y reescribe el array. Nunca
+ * se escribe a partir de `team.trainingdays` parseado: Zod quita las claves
+ * que no conoce y se perderían en TODOS los días. Devuelve la lista anterior.
+ */
+export async function mutateTrainingDays(
+  teamname: string,
+  fn: (days: RawDay[]) => RawDay[],
+): Promise<RawDay[]> {
+  const snap = await get(ref(db, `${PATHS.TEAMS}/${teamname}/${PATHS.TRAINING_DAYS}`));
+  const before = rawDays(snap.val());
   await update(ref(db, `${PATHS.TEAMS}/${teamname}`), {
-    trainingdays: [...rest, newDay],
+    [PATHS.TRAINING_DAYS]: fn(before),
   });
+  return before;
+}
+
+/**
+ * Cancela (o reactiva) un evento sin borrarlo: sigue en el calendario,
+ * marcado, con sus respuestas. Campo solo web — Android lo conserva al
+ * editar (fusiona) pero todavía no lo pinta.
+ */
+export async function setEventCancelled(teamname: string, fecha: string, cancelled: boolean) {
+  await mutateTrainingDays(teamname, (days) =>
+    patchRawDay(days, fecha, { cancelled: cancelled ? true : null }),
+  );
 }
 
 /**
@@ -334,17 +359,12 @@ export async function upsertTrainingDay(
  * hijo — la vía legacy Android con setValue del User completo estaba
  * denegada y dejaba asistencias huérfanas).
  */
-export async function deleteTrainingDay(
-  teamname: string,
-  fecha: string,
-  existing: TrainingDay[],
-) {
-  const day = existing.find((d) => d.fecha === fecha);
-  await update(ref(db, `${PATHS.TEAMS}/${teamname}`), {
-    trainingdays: existing.filter((d) => d.fecha !== fecha),
-  });
+export async function deleteTrainingDay(teamname: string, fecha: string) {
+  const before = await mutateTrainingDays(teamname, (days) => removeRawDay(days, fecha));
+  const removed = findRawDay(before, fecha);
+  const accepted = removed?.accepted_players;
   // Rosters por uid: accepted_players ya son claves de uid directamente.
-  for (const uid of Object.keys(day?.accepted_players ?? {})) {
+  for (const uid of Object.keys(accepted && typeof accepted === "object" ? accepted : {})) {
     const snap = await get(ref(db, `${PATHS.USERS}/${uid}/assistedTrainingDays`));
     const days = toDateList(snap.val()).filter((d) => d !== fecha);
     await update(ref(db, `${PATHS.USERS}/${uid}`), { assistedTrainingDays: days });

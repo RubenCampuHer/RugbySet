@@ -12,10 +12,13 @@
 // una acción exclusiva del Calendario — la alineación no sabe ni le
 // importa a qué partido está asignada, esa referencia vive solo en
 // TrainingDay.lineupId.
-import { push, ref, update } from "firebase/database";
+import { push, ref, remove, update } from "firebase/database";
+import { mutateTrainingDays } from "@/lib/actions/team";
 import { PATHS } from "@/lib/constants";
 import { db } from "@/lib/firebase";
-import type { LineupDoc, TrainingDay } from "@/lib/types";
+import { mergeNode } from "@/lib/rtdb";
+import { patchRawDay } from "@/lib/trainingdays";
+import type { LineupDoc } from "@/lib/types";
 
 /** Crea una alineación nueva — solo nombre, sin ningún partido asociado todavía. */
 export async function createLineup(teamname: string, data: { name: string }): Promise<LineupDoc> {
@@ -50,69 +53,26 @@ export async function updateLineup(
 }
 
 /**
- * Reconstruye un TrainingDay campo a campo (nunca `{...day}`) antes de
- * reescribir trainingdays entero — un día leído de RTDB puede traer algún
- * campo nullish ausente (undefined tras el parseo de Zod) si es antiguo, y
- * Firebase rechaza cualquier undefined en el objeto que se escribe. Mismo
- * criterio que upsertTrainingDay (ver team.ts).
- */
-function rebuildDay(day: TrainingDay, overrides: Partial<TrainingDay>): TrainingDay {
-  return {
-    fecha: day.fecha ?? null,
-    horaInicio: day.horaInicio ?? null,
-    horaFin: day.horaFin ?? null,
-    nameTrainingDay: day.nameTrainingDay ?? "",
-    training: day.training ?? null,
-    eventType: day.eventType ?? "TRAINING",
-    location: day.location ?? null,
-    accepted_players: day.accepted_players,
-    declined_players: day.declined_players,
-    lineupId: day.lineupId ?? null,
-    ...overrides,
-  };
-}
-
-/**
  * Asigna (o quita, con lineupId=null) qué alineación es la de un partido
- * YA EXISTENTE en el calendario — acción exclusiva de DayPanel, que
- * siempre opera sobre un TrainingDay confirmado (nunca hace falta crear
- * el día aquí: si no existe, es un error de uso, no un caso a resolver).
+ * YA EXISTENTE en el calendario — acción exclusiva de DayPanel. Fusiona
+ * sobre el dato crudo (ver mutateTrainingDays): no toca ningún otro campo.
  */
 export async function assignLineupToMatch(
   teamname: string,
   fecha: string,
   lineupId: string | null,
-  existing: TrainingDay[],
 ): Promise<void> {
-  const existingDay = existing.find((d) => d.fecha === fecha);
-  if (!existingDay) throw new Error(`No existe ningún partido el ${fecha}`);
-  const newDay = rebuildDay(existingDay, { lineupId });
-  const rest = existing.filter((d) => d.fecha !== fecha);
-  await update(ref(db, `${PATHS.TEAMS}/${teamname}`), {
-    trainingdays: [...rest, newDay],
-  });
+  await mutateTrainingDays(teamname, (days) => patchRawDay(days, fecha, { lineupId }));
 }
 
 /**
  * Borra una alineación. Si algún partido (o varios — la misma alineación
  * puede reutilizarse en más de un partido) la tenía asignada, limpia esa
- * referencia en la misma escritura para no dejarla colgando.
+ * referencia. Dos escrituras: la de trainingdays fusiona sobre el crudo.
  */
-export async function deleteLineup(
-  teamname: string,
-  lineupId: string,
-  existing: TrainingDay[],
-): Promise<void> {
-  const updates: Record<string, unknown> = {
-    [`lineups/${lineupId}`]: null,
-  };
-  const referencingFechas = new Set(
-    existing.filter((d) => d.lineupId === lineupId).map((d) => d.fecha),
+export async function deleteLineup(teamname: string, lineupId: string): Promise<void> {
+  await mutateTrainingDays(teamname, (days) =>
+    days.map((d) => (d.lineupId === lineupId ? mergeNode(d, { lineupId: null }) : d)),
   );
-  if (referencingFechas.size > 0) {
-    updates.trainingdays = existing.map((d) =>
-      referencingFechas.has(d.fecha) ? rebuildDay(d, { lineupId: null }) : d,
-    );
-  }
-  await update(ref(db, `${PATHS.TEAMS}/${teamname}`), updates);
+  await remove(ref(db, `${PATHS.TEAMS}/${teamname}/lineups/${lineupId}`));
 }

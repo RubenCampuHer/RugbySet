@@ -81,7 +81,6 @@ export function EventEditorSheet({
       await upsertTrainingDay(
         team.teamname!,
         { fecha, horaInicio, horaFin, training, nameTrainingDay: eventName, eventType, location },
-        team.trainingdays,
       );
       toast.success(
         day
@@ -101,7 +100,7 @@ export function EventEditorSheet({
   };
 
   const remove = async () => {
-    await deleteTrainingDay(team.teamname!, fecha, team.trainingdays);
+    await deleteTrainingDay(team.teamname!, fecha);
     toast.success(isMatch ? "Partido borrado" : "Entreno borrado");
     onOpenChange(false);
   };

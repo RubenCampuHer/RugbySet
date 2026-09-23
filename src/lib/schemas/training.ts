@@ -3,7 +3,7 @@
 // referencia) — no hay que resolver contra Exercises/.
 import { z } from "zod";
 import { ApprovalStatusSchema, PrivacySchema, rtdbList, timestampMs } from "./common";
-import { ExerciseSchema } from "./exercise";
+import { CopiedFromSchema, ExerciseSchema } from "./exercise";
 
 export const ExerciseTrainingSchema = z.object({
   exercise: ExerciseSchema.nullish(),
@@ -31,4 +31,5 @@ export const TrainingSchema = z.object({
   // Ver comentario equivalente en schemas/exercise.ts.
   teamname: z.string().nullish(),
   clubId: z.string().nullish(),
+  copiedFrom: CopiedFromSchema.nullish().catch(null),
 });

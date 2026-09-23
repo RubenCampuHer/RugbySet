@@ -28,6 +28,10 @@ export const TrainingDaySchema = z.object({
   // referencia — permite varias alineaciones alternativas por partido
   // (Plan A/B) sin publicar más de una a la vez, y plantillas sin partido.
   lineupId: z.string().nullish(),
+  // Evento cancelado (2026-09-23, solo web): sigue en el calendario con sus
+  // respuestas pero no cuenta para asistencia. Android lo conserva al editar
+  // (fusiona el día) aunque todavía no lo pinta.
+  cancelled: z.boolean().nullish().catch(null),
 });
 
 export const TeamSchema = z.object({

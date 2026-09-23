@@ -7,6 +7,7 @@ import { get, ref, remove, set, update } from "firebase/database";
 import { PATHS } from "@/lib/constants";
 import { auth, db } from "@/lib/firebase";
 import { canCreateContent, canDeleteExercise, canEditExercise } from "@/lib/permissions";
+import { mergeNode } from "@/lib/rtdb";
 import { resizeAndUpload } from "@/lib/storage";
 import { findAvailableName } from "@/lib/utils";
 import type { Exercise, User } from "@/lib/types";
@@ -27,6 +28,8 @@ export type ExerciseInput = {
    * mismo criterio que ya se documentaba para teamname).
    */
   clubId?: string | null;
+  /** Solo al copiar de otro autor: de dónde viene. Al editar se omite y se conserva el existente. */
+  copiedFrom?: { name: string; author: string };
 };
 
 /** Sube la imagen de un ejercicio a exercises_images/{uid}/... (ver storage.rules). */
@@ -55,6 +58,7 @@ function buildExercise(input: ExerciseInput, author: string): Exercise {
     teamname: null, // sin uso real — ver comentario en schemas/exercise.ts
     clubId: input.privacy === "Club" ? (input.clubId ?? null) : null,
     boardData: input.boardData,
+    ...(input.copiedFrom ? { copiedFrom: input.copiedFrom } : {}),
   };
 }
 
@@ -78,10 +82,21 @@ export async function updateExercise(
     throw new Error("Sin permiso para editar este ejercicio");
   }
 
-  const updated = buildExercise(input, original.author!);
-  await set(ref(db, `${PATHS.EXERCISES}/${input.name}`), updated);
-  if (input.name !== originalName) {
-    await remove(ref(db, `${PATHS.EXERCISES}/${originalName}`));
+  // Fusión sobre el nodo CRUDO (espejo de ExerciseRepository.modifyExercise):
+  // se conservan created_at y cualquier clave que este código no conozca
+  // (p. ej. `stability`); antes un set() del objeto construido las borraba.
+  const merged = mergeNode(original, {
+    ...buildExercise(input, original.author!),
+    created_at: original.created_at ?? Date.now(),
+  });
+  if (input.name === originalName) {
+    await set(ref(db, `${PATHS.EXERCISES}/${input.name}`), merged);
+  } else {
+    // Renombrar = una sola escritura multi-path (alta nueva + baja vieja).
+    await update(ref(db), {
+      [`${PATHS.EXERCISES}/${input.name}`]: merged,
+      [`${PATHS.EXERCISES}/${originalName}`]: null,
+    });
   }
 }
 

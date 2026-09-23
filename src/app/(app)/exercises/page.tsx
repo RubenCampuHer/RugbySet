@@ -12,14 +12,17 @@ import { ListSkeleton } from "@/components/skeletons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useMyClubId } from "@/hooks/useMyClubId";
+import { matchesLibraryTab, type LibraryTab } from "@/lib/library";
 import { useExercises } from "@/hooks/useExercises";
 import { canCreateContent } from "@/lib/permissions";
 
-type Tab = "all" | "favs" | "own";
+type Tab = LibraryTab;
 
 export default function ExercisesPage() {
   const { exercises, loading } = useExercises();
   const { profile } = useAuth();
+  const { clubId: myClubId } = useMyClubId();
   const [search, setSearch] = useState("");
   const [activeTags, setActiveTags] = useState<string[]>([]);
   const [tab, setTab] = useState<Tab>("all");
@@ -41,12 +44,11 @@ export default function ExercisesPage() {
       search === "" ||
       (e.name ?? "").toLowerCase().includes(search.toLowerCase());
     const matchesTags = activeTags.every((tag) => e.etiquetas.includes(tag));
-    const matchesTab =
-      tab === "all"
-        ? true
-        : tab === "favs"
-          ? favNames.has(e.name ?? "")
-          : e.author === profile?.username;
+    const matchesTab = matchesLibraryTab(e, tab, {
+      username: profile?.username,
+      favNames,
+      myClubId,
+    });
     return matchesSearch && matchesTags && matchesTab;
   });
 
@@ -86,6 +88,7 @@ export default function ExercisesPage() {
       <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
         <TabsList>
           <TabsTrigger value="all">Todos</TabsTrigger>
+          {myClubId && <TabsTrigger value="club">Del club</TabsTrigger>}
           <TabsTrigger value="favs">Favoritos ({favNames.size})</TabsTrigger>
           <TabsTrigger value="own">Propios ({ownCount})</TabsTrigger>
         </TabsList>
@@ -127,12 +130,16 @@ export default function ExercisesPage() {
               ? "No tienes ejercicios favoritos"
               : tab === "own"
                 ? "No has creado ningún ejercicio todavía"
+                : tab === "club"
+                  ? "Tu club aún no ha compartido ejercicios"
                 : "No hay ejercicios que coincidan"
           }
           hint={
             tab === "favs"
               ? "Toca la estrella en un ejercicio para guardarlo aquí."
-              : undefined
+              : tab === "club"
+                ? "Los ejercicios con privacidad Club aparecen aquí cuando la dirección del club los aprueba."
+                : undefined
           }
         />
       ) : (

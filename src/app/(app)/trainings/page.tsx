@@ -10,16 +10,19 @@ import { ListSkeleton } from "@/components/skeletons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useMyClubId } from "@/hooks/useMyClubId";
+import { matchesLibraryTab, type LibraryTab } from "@/lib/library";
 import { useTrainings } from "@/hooks/useTrainings";
 import { canCreateContent } from "@/lib/permissions";
 import { EmptyState } from "@/components/EmptyState";
 import { TrainingCard } from "@/components/trainings/TrainingCard";
 
-type Tab = "all" | "favs" | "own";
+type Tab = LibraryTab;
 
 export default function TrainingsPage() {
   const { trainings, loading } = useTrainings();
   const { profile } = useAuth();
+  const { clubId: myClubId } = useMyClubId();
   const [search, setSearch] = useState("");
   const [activeTags, setActiveTags] = useState<string[]>([]);
   const [tab, setTab] = useState<Tab>("all");
@@ -41,12 +44,11 @@ export default function TrainingsPage() {
       search === "" ||
       (t.name ?? "").toLowerCase().includes(search.toLowerCase());
     const matchesTags = activeTags.every((tag) => t.etiquetas.includes(tag));
-    const matchesTab =
-      tab === "all"
-        ? true
-        : tab === "favs"
-          ? favNames.has(t.name ?? "")
-          : t.author === profile?.username;
+    const matchesTab = matchesLibraryTab(t, tab, {
+      username: profile?.username,
+      favNames,
+      myClubId,
+    });
     return matchesSearch && matchesTags && matchesTab;
   });
 
@@ -86,6 +88,7 @@ export default function TrainingsPage() {
       <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
         <TabsList>
           <TabsTrigger value="all">Todos</TabsTrigger>
+          {myClubId && <TabsTrigger value="club">Del club</TabsTrigger>}
           <TabsTrigger value="favs">Favoritos ({favNames.size})</TabsTrigger>
           <TabsTrigger value="own">Propios ({ownCount})</TabsTrigger>
         </TabsList>
@@ -127,12 +130,16 @@ export default function TrainingsPage() {
               ? "No tienes entrenos favoritos"
               : tab === "own"
                 ? "No has creado ningún entreno todavía"
+                : tab === "club"
+                  ? "Tu club aún no ha compartido entrenos"
                 : "No hay entrenos que coincidan"
           }
           hint={
             tab === "favs"
               ? "Toca la estrella en un entreno para guardarlo aquí."
-              : undefined
+              : tab === "club"
+                ? "Los entrenos con privacidad Club aparecen aquí cuando la dirección del club los aprueba."
+                : undefined
           }
         />
       ) : (

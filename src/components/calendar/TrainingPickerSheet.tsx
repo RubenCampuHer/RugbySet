@@ -15,10 +15,12 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useMyClubId } from "@/hooks/useMyClubId";
+import { matchesLibraryTab, type LibraryTab } from "@/lib/library";
 import { useTrainings } from "@/hooks/useTrainings";
 import { cn } from "@/lib/utils";
 
-type Tab = "all" | "favs" | "own";
+type Tab = LibraryTab;
 
 /**
  * Selector de entreno para un día del calendario — mismo patrón que
@@ -39,6 +41,7 @@ export function TrainingPickerSheet({
 }) {
   const { trainings, loading } = useTrainings();
   const { profile } = useAuth();
+  const { clubId: myClubId } = useMyClubId();
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState<Tab>("all");
   const [activeTags, setActiveTags] = useState<string[]>([]);
@@ -54,12 +57,11 @@ export function TrainingPickerSheet({
       search === "" ||
       (t.name ?? "").toLowerCase().includes(search.toLowerCase());
     const matchesTags = activeTags.every((tag) => t.etiquetas.includes(tag));
-    const matchesTab =
-      tab === "all"
-        ? true
-        : tab === "favs"
-          ? favNames.has(t.name ?? "")
-          : t.author === profile?.username;
+    const matchesTab = matchesLibraryTab(t, tab, {
+      username: profile?.username,
+      favNames,
+      myClubId,
+    });
     return matchesSearch && matchesTags && matchesTab;
   });
 
@@ -99,6 +101,7 @@ export function TrainingPickerSheet({
           <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
             <TabsList>
               <TabsTrigger value="all">Todos</TabsTrigger>
+              {myClubId && <TabsTrigger value="club">Del club</TabsTrigger>}
               <TabsTrigger value="favs">Favoritos</TabsTrigger>
               <TabsTrigger value="own">Propios</TabsTrigger>
             </TabsList>

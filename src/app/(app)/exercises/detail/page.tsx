@@ -14,12 +14,18 @@ import { PrivacyBadge, ApprovalBadge } from "@/components/PrivacyBadge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DetailSkeleton } from "@/components/skeletons";
+import { CopyToMineDialog } from "@/components/library/CopyToMineDialog";
 import { useClub } from "@/hooks/useClub";
 import { useMyClubId } from "@/hooks/useMyClubId";
-import { deleteExercise, duplicateExercise } from "@/lib/actions/exercises";
+import { copyExerciseToMine, deleteExercise, duplicateExercise } from "@/lib/actions/exercises";
 import { PATHS } from "@/lib/constants";
 import { db } from "@/lib/firebase";
-import { canDeleteExercise, canEditExercise, canViewExercise } from "@/lib/permissions";
+import {
+  canCreateContent,
+  canDeleteExercise,
+  canEditExercise,
+  canViewExercise,
+} from "@/lib/permissions";
 import { parseOr } from "@/lib/schemas/common";
 import { ExerciseSchema } from "@/lib/schemas/exercise";
 import type { Exercise } from "@/lib/types";
@@ -146,8 +152,35 @@ function ExerciseDetail() {
           {exercise.descLarga}
         </p>
       )}
+      {exercise.copiedFrom?.name && (
+        <p className="text-sm text-muted-foreground">
+          Basado en{" "}
+          <Link
+            href={`/exercises/detail?name=${encodeURIComponent(exercise.copiedFrom.name)}`}
+            className="underline underline-offset-4"
+          >
+            {exercise.copiedFrom.name}
+          </Link>
+          {exercise.copiedFrom.author ? `, de ${exercise.copiedFrom.author}` : ""}
+        </p>
+      )}
       {exercise.author && (
         <p className="text-sm text-muted-foreground">Autor: {exercise.author}</p>
+      )}
+      {exercise.name && canCreateContent(profile) && exercise.author !== profile.username && (
+        <div className="print:hidden">
+          <CopyToMineDialog
+            kind="exercise"
+            sourceName={exercise.name}
+            onCopy={async (newName) => {
+              const created = await copyExerciseToMine(exercise, newName, profile);
+              toast.success(`Copiado como "${created}"`, {
+                description: "Es privado: solo lo ves tú hasta que cambies la privacidad.",
+              });
+              router.push(`/exercises/detail?name=${encodeURIComponent(created)}`);
+            }}
+          />
+        </div>
       )}
     </article>
   );

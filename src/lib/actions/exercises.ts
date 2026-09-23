@@ -163,3 +163,36 @@ export async function duplicateExercise(
   await set(ref(db, `${PATHS.EXERCISES}/${name}`), duplicate);
   return name;
 }
+
+/**
+ * "Copiar a mis ejercicios" (2026-09-23): copia PRIVADA de un ejercicio que
+ * puedo ver, con origen en `copiedFrom`. Nunca sobrescribe un nombre existente.
+ */
+export async function copyExerciseToMine(
+  exercise: Exercise,
+  newName: string,
+  currentUser: User,
+): Promise<string> {
+  if (!canCreateContent(currentUser)) {
+    throw new Error("Sin permiso para crear ejercicios");
+  }
+  const name = newName.trim();
+  const snap = await get(ref(db, `${PATHS.EXERCISES}/${name}`));
+  if (snap.exists()) throw new Error(`Ya existe un ejercicio llamado "${name}"`);
+  const copy = buildExercise(
+    {
+      name,
+      descCorta: exercise.descCorta ?? "",
+      descLarga: exercise.descLarga ?? "",
+      image: exercise.image ?? null,
+      privacy: "Privado",
+      etiquetas: exercise.etiquetas,
+      boardData: exercise.boardData ?? null,
+      clubId: null,
+      copiedFrom: { name: exercise.name ?? "", author: exercise.author ?? "" },
+    },
+    currentUser.username!,
+  );
+  await set(ref(db, `${PATHS.EXERCISES}/${name}`), copy);
+  return name;
+}

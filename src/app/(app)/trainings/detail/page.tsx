@@ -16,12 +16,22 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { DetailSkeleton } from "@/components/skeletons";
+import { AssignToDaySheet } from "@/components/library/AssignToDaySheet";
+import { CopyToMineDialog } from "@/components/library/CopyToMineDialog";
 import { useClub } from "@/hooks/useClub";
 import { useMyClubId } from "@/hooks/useMyClubId";
-import { deleteTraining, duplicateTraining } from "@/lib/actions/trainings";
+import { useTeam } from "@/hooks/useTeam";
+import { copyTrainingToMine, deleteTraining, duplicateTraining } from "@/lib/actions/trainings";
 import { PATHS } from "@/lib/constants";
 import { db } from "@/lib/firebase";
-import { canDeleteTraining, canEditTraining, canViewTraining } from "@/lib/permissions";
+import {
+  canCreateContent,
+  canDeleteTraining,
+  canEditTraining,
+  canViewTraining,
+  isAdmin,
+  isTeamCoach,
+} from "@/lib/permissions";
 import { parseOr } from "@/lib/schemas/common";
 import { TrainingSchema } from "@/lib/schemas/training";
 import type { Training } from "@/lib/types";
@@ -30,7 +40,8 @@ function TrainingDetail() {
   const params = useSearchParams();
   const name = params.get("name");
   const router = useRouter();
-  const { profile } = useAuth();
+  const { profile, firebaseUser } = useAuth();
+  const { team } = useTeam();
   const { clubId: myClubId, loading: loadingMyClub } = useMyClubId();
   const { club: adminClub, loading: loadingAdminClub } = useClub();
   const [result, setResult] = useState<
@@ -124,6 +135,41 @@ function TrainingDetail() {
         ))}
       </div>
       {training.descCorta && <p>{training.descCorta}</p>}
+      {training.copiedFrom?.name && (
+        <p className="text-sm text-muted-foreground">
+          Basado en{" "}
+          <Link
+            href={`/trainings/detail?name=${encodeURIComponent(training.copiedFrom.name)}`}
+            className="underline underline-offset-4"
+          >
+            {training.copiedFrom.name}
+          </Link>
+          {training.copiedFrom.author ? `, de ${training.copiedFrom.author}` : ""}
+        </p>
+      )}
+
+      {training.name &&
+        ((team && (isTeamCoach(team, firebaseUser?.uid) || isAdmin(profile))) ||
+          (canCreateContent(profile) && training.author !== profile.username)) && (
+          <div className="flex flex-wrap gap-2 print:hidden">
+            {team && (isTeamCoach(team, firebaseUser?.uid) || isAdmin(profile)) && (
+              <AssignToDaySheet team={team} training={training} />
+            )}
+            {canCreateContent(profile) && training.author !== profile.username && (
+              <CopyToMineDialog
+                kind="training"
+                sourceName={training.name}
+                onCopy={async (newName) => {
+                  const created = await copyTrainingToMine(training, newName, profile);
+                  toast.success(`Copiado como "${created}"`, {
+                    description: "Es privado: solo lo ves tú hasta que cambies la privacidad.",
+                  });
+                  router.push(`/trainings/detail?name=${encodeURIComponent(created)}`);
+                }}
+              />
+            )}
+          </div>
+        )}
 
       {training.sections.map((section, i) => (
         <Card key={section.uid ?? i} className="break-inside-avoid">

@@ -155,3 +155,36 @@ export async function duplicateTraining(
   await set(ref(db, `${PATHS.TRAININGS}/${name}`), duplicate);
   return name;
 }
+
+/**
+ * "Copiar a mis entrenos" (2026-09-23): cualquier entrenador puede quedarse
+ * una copia PRIVADA de un entreno que puede ver (p. ej. del club) para
+ * adaptarla, sin tocar el original. Guarda de dónde viene (`copiedFrom`).
+ * Falla si el nombre ya existe (la clave ES el nombre): nunca sobrescribe.
+ */
+export async function copyTrainingToMine(
+  training: Training,
+  newName: string,
+  currentUser: User,
+): Promise<string> {
+  if (!canCreateContent(currentUser)) {
+    throw new Error("Sin permiso para crear entrenamientos");
+  }
+  const name = newName.trim();
+  const snap = await get(ref(db, `${PATHS.TRAININGS}/${name}`));
+  if (snap.exists()) throw new Error(`Ya existe un entreno llamado "${name}"`);
+  const copy = buildTraining(
+    {
+      name,
+      descCorta: training.descCorta ?? "",
+      sections: training.sections,
+      privacy: "Privado",
+      etiquetas: training.etiquetas,
+      clubId: null,
+      copiedFrom: { name: training.name ?? "", author: training.author ?? "" },
+    },
+    currentUser.username!,
+  );
+  await set(ref(db, `${PATHS.TRAININGS}/${name}`), copy);
+  return name;
+}

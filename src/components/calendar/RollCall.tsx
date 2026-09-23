@@ -1,21 +1,25 @@
 "use client";
 
+import { CheckCheck } from "lucide-react";
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { AttendanceToggle } from "@/components/AttendanceToggle";
 import { AvatarInitials } from "@/components/AvatarInitials";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { SearchInput } from "@/components/SearchInput";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useProfilesByUid } from "@/hooks/useProfilesByUid";
-import { setAttendance } from "@/lib/actions/team";
+import { setAttendance, setAttendanceBulk } from "@/lib/actions/team";
 import type { Team, TrainingDay } from "@/lib/types";
 
 /**
- * Pasar lista del coach: búsqueda + filas de 44px con AttendanceToggle.
+ * Pasar lista del coach: contadores en vivo, búsqueda, filas de 44px con
+ * AttendanceToggle y "marcar a los que faltan" en bloque (2026-09-23).
  * Rosters por uid (2026-09-04): team.userplayers es {uid: true} — el nombre
- * a mostrar se resuelve en vivo vía publicProfiles (useProfilesByUid), la
- * misma fuente que usa TeamManager para el resto del equipo.
+ * a mostrar se resuelve en vivo vía publicProfiles (useProfilesByUid).
  */
 export function RollCall({ team, day }: { team: Team; day: TrainingDay }) {
   const [search, setSearch] = useState("");
@@ -30,6 +34,10 @@ export function RollCall({ team, day }: { team: Team; day: TrainingDay }) {
         ? "declined"
         : "none";
 
+  const came = uids.filter((u) => status(u) === "accepted").length;
+  const missed = uids.filter((u) => status(u) === "declined").length;
+  const unmarked = uids.filter((u) => status(u) === "none");
+
   const players = useMemo(
     () =>
       uids
@@ -38,7 +46,8 @@ export function RollCall({ team, day }: { team: Team; day: TrainingDay }) {
           name: profiles[uid]?.nameSurname || "",
           icon: profiles[uid]?.usericon ?? null,
         }))
-        .filter(({ name }) => name.toLowerCase().includes(search.toLowerCase())),
+        .filter(({ name }) => name.toLowerCase().includes(search.toLowerCase()))
+        .sort((a, b) => a.name.localeCompare(b.name, "es")),
     [uids, profiles, search],
   );
 
@@ -58,11 +67,50 @@ export function RollCall({ team, day }: { team: Team; day: TrainingDay }) {
     }
   };
 
+  const markRest = async () => {
+    try {
+      const { marked, personalFailed } = await setAttendanceBulk({
+        teamname: team.teamname!,
+        fecha: day.fecha!,
+        playerUids: unmarked,
+        status: "accepted",
+      });
+      toast.success(`${marked} ${marked === 1 ? "jugador marcado" : "jugadores marcados"} como presentes`, {
+        description:
+          personalFailed > 0
+            ? `En ${personalFailed} no se pudo actualizar su historial personal (tienen otro equipo activo).`
+            : undefined,
+      });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo guardar");
+    }
+  };
+
   return (
-    <div className="space-y-2">
-      {uids.length > 8 && (
-        <SearchInput value={search} onChange={setSearch} placeholder="Buscar jugador…" />
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-1.5" aria-live="polite">
+        <Badge variant="outline">{came} vinieron</Badge>
+        <Badge variant="outline">{missed} no</Badge>
+        <Badge variant={unmarked.length > 0 ? "secondary" : "outline"}>
+          {unmarked.length} sin marcar
+        </Badge>
+      </div>
+
+      {unmarked.length > 0 && (
+        <ConfirmDialog
+          trigger={
+            <Button size="sm" variant="outline" className="w-full">
+              <CheckCheck className="size-4" /> Marcar a los {unmarked.length} sin marcar como presentes
+            </Button>
+          }
+          title={`¿Marcar a ${unmarked.length} como presentes?`}
+          description="Solo afecta a quien no tiene respuesta ni marca. Después puedes corregir a cualquiera tocando su fila."
+          confirmLabel="Marcar presentes"
+          onConfirm={markRest}
+        />
       )}
+
+      <SearchInput value={search} onChange={setSearch} placeholder="Buscar jugador…" />
       <ScrollArea className="h-72 pr-2">
         <div className="space-y-1">
           {players.map(({ uid, name, icon }) => (
@@ -87,7 +135,9 @@ export function RollCall({ team, day }: { team: Team; day: TrainingDay }) {
             </div>
           ))}
           {players.length === 0 && (
-            <p className="py-4 text-center text-sm text-muted-foreground">Sin resultados.</p>
+            <p className="py-4 text-center text-sm text-muted-foreground">
+              {uids.length === 0 ? "El equipo aún no tiene jugadores." : "Nadie con ese nombre."}
+            </p>
           )}
         </div>
       </ScrollArea>

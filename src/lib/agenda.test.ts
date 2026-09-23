@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { agendaGroups, noAnswerUids, playerPending, relativeDayLabel, staffHome } from "./agenda";
+import { agendaGroups, limitGroups, noAnswerUids, playerPending, relativeDayLabel, staffHome } from "./agenda";
 import type { Team, TrainingDay } from "./types";
 
 function day(fecha: string, extra: Partial<TrainingDay> = {}): TrainingDay {
@@ -59,6 +59,11 @@ describe("agendaGroups", () => {
       "Semana del 12 de octubre",
     ]);
     expect(g[0].entries.map((e) => e.day.fecha)).toEqual(["23/09/2026", "27/09/2026"]);
+  });
+
+  it("limitGroups recorta sin perder cabeceras", () => {
+    const g = limitGroups(agendaGroups(t, "upcoming", now), 3);
+    expect(g.map((x) => x.entries.length)).toEqual([2, 1]);
   });
 
   it("pasados en orden inverso", () => {

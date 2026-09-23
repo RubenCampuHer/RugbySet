@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, MapPin, Plus, Send, Trophy, X } from "lucide-react";
+import { Ban, Check, MapPin, Plus, Send, Trophy, X } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -25,6 +25,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { assignLineupToMatch, createLineup } from "@/lib/actions/lineup";
 import { sendAttendanceNotification } from "@/lib/actions/notify";
+import { cn } from "@/lib/utils";
 import type { Team, TrainingDay } from "@/lib/types";
 
 const NO_LINEUP = "__none__";
@@ -192,6 +193,7 @@ export function DayPanel({
   }
 
   const isMatch = day.eventType === "MATCH";
+  const cancelled = day.cancelled === true;
   const accepted = day.accepted_players[myUid] === true;
   const declined = day.declined_players[myUid] === true;
   // Rosters por uid (2026-09-04): sin resolver nombres — team.userplayers,
@@ -211,8 +213,12 @@ export function DayPanel({
         recipientUserIds: noAnswerUids,
         senderUserId: firebaseUser?.uid ?? "",
         senderUsername: profile?.username ?? "",
+        isMatch,
       });
-      toast.success(`Convocatoria enviada a ${noAnswerUids.length} jugadores (${sent} push)`);
+      toast.success(
+        `Aviso enviado a ${noAnswerUids.length} ${noAnswerUids.length === 1 ? "jugador" : "jugadores"}`,
+        { description: `${sent} lo reciben en el móvil; el resto lo verá en sus avisos.` },
+      );
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "No se pudo enviar");
     } finally {
@@ -224,7 +230,7 @@ export function DayPanel({
     <Card>
       <CardHeader>
         <CardTitle className="flex items-baseline justify-between gap-2 text-lg">
-          <span className="flex items-center gap-2">
+          <span className={cn("flex items-center gap-2", cancelled && "text-muted-foreground line-through")}>
             {isMatch && (
               <Badge className="gap-1 border-transparent bg-warning/15 text-warning">
                 <Trophy className="size-3" /> Partido
@@ -238,6 +244,12 @@ export function DayPanel({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4 text-sm">
+        {cancelled && (
+          <p className="flex items-center gap-2 rounded-lg border border-dashed p-3 text-muted-foreground">
+            <Ban className="size-4 shrink-0" />
+            {isMatch ? "Partido cancelado" : "Entreno cancelado"}. No cuenta para la asistencia.
+          </p>
+        )}
         {day.location && (
           <p className="flex items-center gap-1.5 text-muted-foreground">
             <MapPin className="size-4" /> {day.location}
@@ -256,7 +268,7 @@ export function DayPanel({
           </p>
         )}
 
-        {!isCoach && (
+        {!isCoach && !cancelled && (
           <div className="space-y-2">
             <p className="font-medium">¿Asistirás?</p>
             <AttendanceToggle
@@ -288,10 +300,10 @@ export function DayPanel({
                 </Badge>
                 <Badge variant="outline">{noAnswerCount} sin responder</Badge>
               </div>
-              {noAnswerCount > 0 && (
+              {noAnswerCount > 0 && !cancelled && (
                 <Button size="sm" variant="outline" disabled={sending} onClick={() => void sendConvocatoria()}>
                   <Send className="size-3.5" />
-                  {sending ? "Enviando…" : `Convocar (${noAnswerCount})`}
+                  {sending ? "Enviando…" : `Avisar a los que faltan (${noAnswerCount})`}
                 </Button>
               )}
             </TabsContent>

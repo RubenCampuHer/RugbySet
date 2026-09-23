@@ -70,6 +70,7 @@ export function MonthGrid({
           const key = toKey(year, month, day);
           const session = daysByFecha.get(key);
           const isMatch = session?.eventType === "MATCH";
+          const isCancelled = session?.cancelled === true;
           const wasAttended = attended.has(key);
           const isToday = key === today;
           const isSelected = selected === key;
@@ -81,6 +82,7 @@ export function MonthGrid({
               onClick={() => onSelect(key)}
               aria-current={isToday ? "date" : undefined}
               aria-pressed={isSelected}
+              aria-label={isCancelled ? `${day}, evento cancelado` : undefined}
               className={cn(
                 "relative flex aspect-square flex-col items-center justify-center gap-0.5 rounded-lg text-sm transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
                 isSelected && "bg-primary text-primary-foreground hover:bg-primary/90",
@@ -93,7 +95,13 @@ export function MonthGrid({
                   <span
                     className={cn(
                       "size-1.5 rounded-full",
-                      isSelected ? "bg-primary-foreground" : isMatch ? "bg-warning" : "bg-primary",
+                      isSelected
+                        ? "bg-primary-foreground"
+                        : isCancelled
+                          ? "bg-muted-foreground/50"
+                          : isMatch
+                            ? "bg-warning"
+                            : "bg-primary",
                     )}
                   />
                 )}

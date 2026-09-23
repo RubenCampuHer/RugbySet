@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronRight, Trash2, Trophy, Volleyball } from "lucide-react";
+import { Ban, ChevronRight, RotateCcw, Trash2, Trophy, Volleyball } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
@@ -15,8 +15,10 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { useTrainings } from "@/hooks/useTrainings";
-import { deleteTrainingDay, upsertTrainingDay } from "@/lib/actions/team";
+import { sendEventChangeNotification } from "@/lib/actions/notify";
+import { deleteTrainingDay, setEventCancelled, upsertTrainingDay } from "@/lib/actions/team";
 import { cn } from "@/lib/utils";
 import type { Team, TrainingDay } from "@/lib/types";
 
@@ -42,6 +44,7 @@ export function EventEditorSheet({
   onOpenChange: (open: boolean) => void;
 }) {
   const { trainings } = useTrainings();
+  const { firebaseUser, profile } = useAuth();
   const [horaInicio, setHoraInicio] = useState(day?.horaInicio ?? "18:00");
   const [horaFin, setHoraFin] = useState(day?.horaFin ?? "19:30");
   const [trainingName, setTrainingName] = useState(day?.training?.name ?? "");
@@ -55,6 +58,38 @@ export function EventEditorSheet({
   const selectedTraining = trainings.find((t) => t.name === trainingName);
 
   const isMatch = eventType === "MATCH";
+  const cancelled = day?.cancelled === true;
+  // Cambio que afecta a quien ya pensaba ir: se avisa a la plantilla al guardar.
+  const logisticsChanged =
+    day != null &&
+    !cancelled &&
+    (horaInicio !== (day.horaInicio ?? "") ||
+      horaFin !== (day.horaFin ?? "") ||
+      location.trim() !== (day.location ?? "").trim());
+
+  /** Aviso a toda la plantilla; un fallo del push no deshace el guardado. */
+  const notifyTeam = async (change: "updated" | "cancelled" | "reactivated") => {
+    try {
+      const recipients = Object.keys(team.userplayers);
+      const { sent } = await sendEventChangeNotification({
+        teamName: team.teamname!,
+        trainingDate: fecha,
+        trainingTime: `${horaInicio} - ${horaFin}`,
+        recipientUserIds: recipients,
+        change,
+        isMatch,
+        location: location.trim() || null,
+        senderUserId: firebaseUser?.uid ?? "",
+        senderUsername: profile?.username ?? "",
+      });
+      return { recipients: recipients.length, sent };
+    } catch (e) {
+      toast.error("Guardado, pero no se pudo avisar al equipo", {
+        description: e instanceof Error ? e.message : undefined,
+      });
+      return null;
+    }
+  };
 
   const save = async () => {
     if (!TIME_RE.test(horaInicio) || !TIME_RE.test(horaFin)) {
@@ -82,6 +117,7 @@ export function EventEditorSheet({
         team.teamname!,
         { fecha, horaInicio, horaFin, training, nameTrainingDay: eventName, eventType, location },
       );
+      const notified = logisticsChanged ? await notifyTeam("updated") : null;
       toast.success(
         day
           ? isMatch
@@ -90,6 +126,7 @@ export function EventEditorSheet({
           : isMatch
             ? "Partido creado"
             : "Entreno creado",
+        notified ? { description: `Avisados ${notified.recipients} jugadores (${notified.sent} en el móvil).` } : undefined,
       );
       onOpenChange(false);
     } catch (e) {
@@ -100,9 +137,31 @@ export function EventEditorSheet({
   };
 
   const remove = async () => {
-    await deleteTrainingDay(team.teamname!, fecha);
-    toast.success(isMatch ? "Partido borrado" : "Entreno borrado");
-    onOpenChange(false);
+    try {
+      await deleteTrainingDay(team.teamname!, fecha);
+      toast.success(isMatch ? "Partido borrado" : "Entreno borrado");
+      onOpenChange(false);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo borrar");
+    }
+  };
+
+  const toggleCancelled = async () => {
+    setBusy(true);
+    try {
+      await setEventCancelled(team.teamname!, fecha, !cancelled);
+      const notified = await notifyTeam(cancelled ? "reactivated" : "cancelled");
+      toast.success(cancelled ? "Evento reactivado" : "Evento cancelado", {
+        description: notified
+          ? `Avisados ${notified.recipients} jugadores (${notified.sent} en el móvil).`
+          : undefined,
+      });
+      onOpenChange(false);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo cambiar el evento");
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -211,8 +270,41 @@ export function EventEditorSheet({
 
         <SheetFooter>
           <Button size="xl" disabled={busy} onClick={() => void save()}>
-            {day ? "Guardar cambios" : isMatch ? "Crear partido" : "Crear entreno"}
+            {day
+              ? logisticsChanged
+                ? "Guardar y avisar"
+                : "Guardar cambios"
+              : isMatch
+                ? "Crear partido"
+                : "Crear entreno"}
           </Button>
+          {logisticsChanged && (
+            <p className="text-center text-xs text-muted-foreground">
+              Has cambiado la hora o el lugar: se avisará a toda la plantilla.
+            </p>
+          )}
+          {day && (
+            <ConfirmDialog
+              trigger={
+                <Button size="xl" variant="outline" disabled={busy}>
+                  {cancelled ? <RotateCcw className="size-4" /> : <Ban className="size-4" />}
+                  {cancelled ? "Reactivar evento" : "Cancelar evento"}
+                </Button>
+              }
+              title={
+                cancelled
+                  ? `¿Reactivar el ${isMatch ? "partido" : "entreno"} del ${fecha}?`
+                  : `¿Cancelar el ${isMatch ? "partido" : "entreno"} del ${fecha}?`
+              }
+              description={
+                cancelled
+                  ? "Vuelve a contar para la asistencia y se avisa a la plantilla."
+                  : "Sigue en el calendario marcado como cancelado, con sus respuestas, y no cuenta para la asistencia. Se avisa a la plantilla."
+              }
+              confirmLabel={cancelled ? "Reactivar" : "Cancelar evento"}
+              onConfirm={toggleCancelled}
+            />
+          )}
           {day && (
             <ConfirmDialog
               trigger={
@@ -221,6 +313,7 @@ export function EventEditorSheet({
                 </Button>
               }
               title={`¿Borrar el ${isMatch ? "partido" : "entreno"} del ${fecha}?`}
+              description="Se borra del todo, con sus respuestas. Si solo quieres avisar de que no se hace, cancélalo en vez de borrarlo."
               confirmLabel="Borrar"
               destructive
               onConfirm={remove}

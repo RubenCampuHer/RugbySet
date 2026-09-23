@@ -73,6 +73,19 @@ export function agendaGroups(
   return groups;
 }
 
+/** Recorta a los primeros `max` eventos conservando las cabeceras de semana. */
+export function limitGroups(groups: AgendaGroup[], max: number): AgendaGroup[] {
+  const out: AgendaGroup[] = [];
+  let left = max;
+  for (const g of groups) {
+    if (left <= 0) break;
+    const entries = g.entries.slice(0, left);
+    left -= entries.length;
+    out.push({ ...g, entries });
+  }
+  return out;
+}
+
 /** Jugadores del equipo que no han respondido (ni sí ni no) a un evento. */
 export function noAnswerUids(team: Team, day: TrainingDay): string[] {
   return Object.keys(team.userplayers).filter(

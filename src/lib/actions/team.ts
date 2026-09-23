@@ -237,6 +237,53 @@ function toDateList(v: unknown): string[] {
 }
 
 /**
+ * Pasar lista en bloque (2026-09-23): marca a varios jugadores de golpe en
+ * una sola escritura multi-path del equipo, y luego la lista personal
+ * assistedTrainingDays de cada uno (como setAttendance). Esa segunda parte
+ * puede fallar por reglas si el equipo activo del jugador es otro: se
+ * cuentan los fallos en vez de abortar, porque lo importante ya está escrito.
+ */
+export async function setAttendanceBulk(opts: {
+  teamname: string;
+  fecha: string;
+  playerUids: string[];
+  status: AttendanceStatus;
+}): Promise<{ marked: number; personalFailed: number }> {
+  const { teamname, fecha, playerUids, status } = opts;
+  if (playerUids.length === 0) return { marked: 0, personalFailed: 0 };
+  const daysSnap = await get(ref(db, `${PATHS.TEAMS}/${teamname}/trainingdays`));
+  let idx: string | null = null;
+  daysSnap.forEach((child) => {
+    if (child.child("fecha").val() === fecha) {
+      idx = child.key;
+      return true;
+    }
+    return false;
+  });
+  if (idx === null) throw new Error("Día de entreno no encontrado");
+
+  const updates: Record<string, unknown> = {};
+  for (const uid of playerUids) {
+    updates[`accepted_players/${uid}`] = status === "accepted" ? true : null;
+    updates[`declined_players/${uid}`] = status === "declined" ? true : null;
+  }
+  await update(ref(db, `${PATHS.TEAMS}/${teamname}/trainingdays/${idx}`), updates);
+
+  const results = await Promise.allSettled(
+    playerUids.map(async (uid) => {
+      const snap = await get(ref(db, `${PATHS.USERS}/${uid}/assistedTrainingDays`));
+      const days = toDateList(snap.val()).filter((d) => d !== fecha);
+      if (status === "accepted") days.push(fecha);
+      await update(ref(db, `${PATHS.USERS}/${uid}`), { assistedTrainingDays: days });
+    }),
+  );
+  return {
+    marked: playerUids.length,
+    personalFailed: results.filter((r) => r.status === "rejected").length,
+  };
+}
+
+/**
  * Confirmar/rechazar asistencia de un jugador en un día concreto. Escribe
  * SOLO la entrada propia de accepted/declined_players (rosters por uid,
  * 2026-09-04 — la regla ahora exige que sea TU entrada, o que quien escribe

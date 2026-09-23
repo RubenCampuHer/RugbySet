@@ -9,6 +9,7 @@ import {
   ClipboardList,
   Dumbbell,
   FolderKanban,
+  Home,
   LogOut,
   Shield,
   User,
@@ -34,23 +35,38 @@ import {
 import { useNotifications } from "@/hooks/useNotifications";
 import { useTeam } from "@/hooks/useTeam";
 import { isOnboardingDone } from "@/lib/onboarding-flag";
-import { isAdmin, isCoach } from "@/lib/permissions";
+import { isAdmin, isCoach, isTeamCoach } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 
-// 5 destinos como la bottom navigation Material de la app Android;
-// Perfil vive en el avatar del header.
-const NAV = [
-  { href: "/exercises", label: "Ejercicios", icon: Dumbbell },
-  { href: "/trainings", label: "Entrenos", icon: ClipboardList },
+// 5 destinos como la bottom navigation Material de la app Android. Desde
+// 2026-09-23 dependen del rol: el cuerpo técnico tiene sus herramientas y el
+// jugador no ve primero una biblioteca que no puede editar. Avisos pasa a la
+// campana del header (visible en móvil y escritorio).
+const STAFF_NAV = [
+  { href: "/home", label: "Inicio", icon: Home },
   { href: "/calendar", label: "Calendario", icon: CalendarDays },
   { href: "/team", label: "Equipo", icon: Users },
-  { href: "/notifications", label: "Avisos", icon: Bell },
+  { href: "/trainings", label: "Entrenos", icon: ClipboardList },
+  { href: "/exercises", label: "Ejercicios", icon: Dumbbell },
 ] as const;
 
-function UnreadDot({ count }: { count: number }) {
+const PLAYER_NAV = [
+  { href: "/home", label: "Inicio", icon: Home },
+  { href: "/calendar", label: "Calendario", icon: CalendarDays },
+  { href: "/team", label: "Equipo", icon: Users },
+  { href: "/trainings", label: "Entrenos", icon: ClipboardList },
+  { href: "/profile", label: "Perfil", icon: User },
+] as const;
+
+function UnreadDot({ count, className }: { count: number; className?: string }) {
   if (count === 0) return null;
   return (
-    <span className="absolute -top-1 right-2 flex size-4 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-white">
+    <span
+      className={cn(
+        "absolute -top-1 right-2 flex size-4 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-white",
+        className,
+      )}
+    >
       {count > 9 ? "9+" : count}
     </span>
   );
@@ -65,6 +81,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { team: activeTeam } = useTeam();
   const router = useRouter();
   const pathname = usePathname();
+  // Cuerpo técnico = quien crea contenido (COACH/ADMIN), dirige un club o
+  // entrena el equipo activo; el resto ve la navegación de jugador.
+  const isStaff =
+    isCoach(profile) ||
+    isAdmin(profile) ||
+    Boolean(profile?.directorOfClubId) ||
+    (activeTeam != null && isTeamCoach(activeTeam, firebaseUser?.uid));
+  const NAV = isStaff ? STAFF_NAV : PLAYER_NAV;
 
   useEffect(() => {
     if (firebaseUser === null) router.replace("/login");
@@ -98,7 +122,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <header className="sticky top-0 z-10 border-b bg-card/95 backdrop-blur print:hidden">
         <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-2 px-4 py-2">
           <Link
-            href="/exercises"
+            href="/home"
             aria-label="RugbySet — inicio"
             className="shrink-0 rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
           >
@@ -119,13 +143,26 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 )}
               >
                 {label}
-                {href === "/notifications" && <UnreadDot count={unreadCount} />}
               </Link>
             ))}
           </nav>
 
           {/* Selector de equipo activo — solo con más de un equipo (fase 2). */}
           <TeamSwitcher className="min-w-0" />
+
+          <Link
+            href="/notifications"
+            aria-label={unreadCount > 0 ? `Avisos, ${unreadCount} sin leer` : "Avisos"}
+            className={cn(
+              "relative ml-auto flex size-11 shrink-0 items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+              pathname.startsWith("/notifications")
+                ? "bg-primary/15 text-primary"
+                : "text-muted-foreground hover:bg-muted",
+            )}
+          >
+            <Bell className="size-5" />
+            <UnreadDot count={unreadCount} className="top-1 right-1" />
+          </Link>
 
           <DropdownMenu>
             <DropdownMenuTrigger
@@ -222,7 +259,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   )}
                 >
                   <Icon className="size-5" />
-                  {href === "/notifications" && <UnreadDot count={unreadCount} />}
                 </span>
                 {label}
               </Link>

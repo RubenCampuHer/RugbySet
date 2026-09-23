@@ -7,8 +7,8 @@
 // caché que no coincida con el nombre actual. Bug real 2026-09-04: se
 // quedó fijo en "v1" desde el principio, así que esa limpieza nunca hizo
 // nada en la práctica.
-const CACHE = "rugbyset-shell-v2";
-const SHELL = ["/", "/login", "/exercises", "/manifest.webmanifest"];
+const CACHE = "rugbyset-shell-v3";
+const SHELL = ["/", "/login", "/home", "/exercises", "/manifest.webmanifest"];
 
 // Con skipWaiting() automático, una pestaña abierta durante el deploy pasaba
 // a ejecutar el SW nuevo (y sus caches) a media navegación sin avisar. Ahora

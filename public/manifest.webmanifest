@@ -2,7 +2,7 @@
   "name": "RugbySet",
   "short_name": "RugbySet",
   "description": "Gestión de equipos, entrenamientos y ejercicios de rugby",
-  "start_url": "/exercises",
+  "start_url": "/home",
   "display": "standalone",
   "background_color": "#0f172a",
   "theme_color": "#0f172a",

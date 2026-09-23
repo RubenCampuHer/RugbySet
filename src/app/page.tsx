@@ -13,7 +13,7 @@ export default function Home() {
 
   useEffect(() => {
     if (firebaseUser === undefined) return; // resolviendo sesión
-    router.replace(firebaseUser ? "/exercises" : "/login");
+    router.replace(firebaseUser ? "/home" : "/login");
   }, [firebaseUser, router]);
 
   return <BrandLoader />;

@@ -12,8 +12,17 @@ function pastDateKeys(fechas: (string | null | undefined)[], now: Date): number[
     .sort((a, b) => a - b);
 }
 
+/**
+ * Días que cuentan para asistencia: todos salvo los cancelados (2026-09-23,
+ * TrainingDay.cancelled, solo web). Un evento cancelado sigue en el
+ * calendario pero no penaliza a nadie.
+ */
+export function countableDays(team: Team): TrainingDay[] {
+  return team.trainingdays.filter((d) => d.cancelled !== true);
+}
+
 function teamTrainingDates(team: Team, now: Date): number[] {
-  return pastDateKeys(team.trainingdays.map((d) => d.fecha), now);
+  return pastDateKeys(countableDays(team).map((d) => d.fecha), now);
 }
 
 /**
@@ -28,7 +37,7 @@ function teamTrainingDates(team: Team, now: Date): number[] {
  */
 export function attendedDatesFromTeam(team: Team | null | undefined, uid: string): string[] {
   if (!team || !uid) return [];
-  return team.trainingdays
+  return countableDays(team)
     .filter((d) => d.fecha && d.accepted_players[uid] === true)
     .map((d) => d.fecha!);
 }
@@ -115,7 +124,7 @@ export type DateRange = { from?: Date; to?: Date };
 export function sessionsInRange(team: Team, range: DateRange, now = new Date()): TrainingDay[] {
   const toMs = (range.to ?? now).getTime();
   const fromMs = range.from?.getTime();
-  return team.trainingdays
+  return countableDays(team)
     .map((d) => ({ d, ms: d.fecha ? parseKey(d.fecha)?.getTime() : undefined }))
     .filter((x): x is { d: TrainingDay; ms: number } => x.ms != null)
     .filter(({ ms }) => ms <= toMs && (fromMs == null || ms >= fromMs))
@@ -185,7 +194,7 @@ export function attendanceDetailForPlayer(
   }));
 }
 
-function startOfWeekMonday(d: Date): Date {
+export function startOfWeekMonday(d: Date): Date {
   const dayIdx = d.getDay(); // 0=domingo..6=sábado
   const diffFromMonday = (dayIdx + 6) % 7;
   return new Date(d.getFullYear(), d.getMonth(), d.getDate() - diffFromMonday);
@@ -223,4 +232,87 @@ export function presetRange(preset: AttendancePreset, now = new Date()): DateRan
     case "all":
       return {};
   }
+}
+
+// ── Comparación del jugador con su equipo (2026-09-23) ──
+// Se calcula en cliente sobre team.trainingdays (el jugador ya lee su equipo
+// entero): sin lecturas nuevas ni datos de otros equipos. No expone nombres de
+// compañeros, solo la media y la posición.
+
+export type TeamComparison = {
+  /** % propio (0-100). */
+  mine: number;
+  /** Media del % de todos los jugadores del equipo, redondeada. */
+  teamAverage: number;
+  /** Posición del jugador (1 = el que más asiste; empates comparten puesto). */
+  rank: number;
+  /** Número de jugadores del equipo. */
+  size: number;
+  /** Sesiones que cuentan en el rango (0 = sin datos todavía). */
+  sessions: number;
+};
+
+export function teamComparison(
+  team: Team,
+  uid: string,
+  range: DateRange,
+  now = new Date(),
+): TeamComparison | null {
+  const summaries = attendanceSummaryByPlayer(team, range, now);
+  const me = summaries.find((s) => s.uid === uid);
+  if (!me) return null;
+  const size = summaries.length;
+  const teamAverage = Math.round(summaries.reduce((sum, s) => sum + s.rate, 0) / size);
+  const rank = 1 + summaries.filter((s) => s.rate > me.rate).length;
+  return { mine: me.rate, teamAverage, rank, size, sessions: me.total };
+}
+
+export type MonthlyAttendance = {
+  /** "yyyy-MM" */
+  key: string;
+  year: number;
+  /** 0-11 */
+  month: number;
+  sessions: number;
+  /** % propio del mes, null si el uid no se pasa. */
+  mine: number | null;
+  /** Media del equipo en el mes. */
+  teamAverage: number;
+};
+
+/** Serie mensual (solo meses con sesiones) del % propio frente a la media del equipo. */
+export function attendanceByMonth(
+  team: Team,
+  uid: string | null,
+  range: DateRange,
+  now = new Date(),
+): MonthlyAttendance[] {
+  const players = Object.keys(team.userplayers);
+  const byMonth = new Map<string, TrainingDay[]>();
+  for (const s of sessionsInRange(team, range, now)) {
+    const date = parseKey(s.fecha!)!;
+    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+    const list = byMonth.get(key) ?? [];
+    list.push(s);
+    byMonth.set(key, list);
+  }
+  const pct = (sessions: TrainingDay[], id: string) =>
+    Math.round((sessions.filter((s) => s.accepted_players[id] === true).length / sessions.length) * 100);
+  return [...byMonth.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, sessions]) => {
+      const [y, m] = key.split("-").map(Number);
+      const teamAverage =
+        players.length === 0
+          ? 0
+          : Math.round(players.reduce((sum, p) => sum + pct(sessions, p), 0) / players.length);
+      return {
+        key,
+        year: y,
+        month: m - 1,
+        sessions: sessions.length,
+        mine: uid ? pct(sessions, uid) : null,
+        teamAverage,
+      };
+    });
 }

@@ -55,7 +55,7 @@ export default function LoginPage() {
   const [unverifiedUser, setUnverifiedUser] = useState<import("firebase/auth").User | null>(null);
 
   useEffect(() => {
-    if (firebaseUser) router.replace("/exercises");
+    if (firebaseUser) router.replace("/home");
   }, [firebaseUser, router]);
 
   const loginWithEmail = async (e: React.FormEvent) => {
@@ -71,7 +71,7 @@ export default function LoginPage() {
         await signOut(auth);
         return;
       }
-      router.replace("/exercises");
+      router.replace("/home");
     } catch (error) {
       setErrorMsg(loginErrorMessage(error));
     } finally {
@@ -85,7 +85,7 @@ export default function LoginPage() {
     setBusy(true);
     try {
       await signInWithPopup(auth, new GoogleAuthProvider());
-      router.replace("/exercises");
+      router.replace("/home");
     } catch (error) {
       setErrorMsg(loginErrorMessage(error));
     } finally {

@@ -9,6 +9,7 @@ import { AvatarInitials } from "@/components/AvatarInitials";
 import { PageHeader } from "@/components/PageHeader";
 import { RenamePersonDialog } from "@/components/RenamePersonDialog";
 import { ProfileSkeleton } from "@/components/skeletons";
+import { AttendanceComparisonCard } from "@/components/stats/AttendanceComparisonCard";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -171,6 +172,10 @@ export default function ProfilePage() {
             <AttendanceBar percent={rate} />
           </CardContent>
         </Card>
+      )}
+
+      {team && firebaseUser && team.userplayers[firebaseUser.uid] === true && (
+        <AttendanceComparisonCard team={team} uid={firebaseUser.uid} />
       )}
 
       {/* Como en Android (ReadUser): la cola de aprobación solo para ADMIN */}

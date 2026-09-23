@@ -86,7 +86,7 @@ export default function OnboardingPage() {
         // El flag local ya deja pasar en esta pestaña; no bloquear la salida.
       }
     }
-    router.replace("/exercises");
+    router.replace("/home");
   };
 
   if (firebaseUser === undefined || firebaseUser === null || !profile) {

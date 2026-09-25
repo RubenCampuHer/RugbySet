@@ -104,3 +104,25 @@ export async function clearEventData(teamname: string, fecha: string): Promise<v
   await set(dataRef, null);
   await deleteFileQuietly(typeof reportPath === "string" ? reportPath : null);
 }
+
+/**
+ * Convocatoria (eventData/{día}/squad): convocados y si la ven los jugadores.
+ * `publishedAt` guarda la primera vez que se hizo visible.
+ */
+export async function saveSquad(
+  teamname: string,
+  fecha: string,
+  squad: { players: string[]; visible: boolean },
+): Promise<void> {
+  const key = eventDataKey(fecha);
+  if (!key) throw new Error("Fecha no válida");
+  const squadRef = ref(db, `${PATHS.TEAMS}/${teamname}/eventData/${key}/squad`);
+  const prevPublished = (await get(ref(db, `${PATHS.TEAMS}/${teamname}/eventData/${key}/squad/publishedAt`))).val();
+  const players = Object.fromEntries(squad.players.map((uid) => [uid, true]));
+  await set(squadRef, {
+    players: squad.players.length > 0 ? players : null,
+    visible: squad.visible,
+    publishedAt: squad.visible ? (typeof prevPublished === "number" ? prevPublished : Date.now()) : null,
+    updatedAt: Date.now(),
+  });
+}

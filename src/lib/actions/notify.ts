@@ -152,3 +152,22 @@ export async function sendMatchResultNotification(
     message: `${opts.summary}. Mira el partido en RugbySet.`,
   });
 }
+
+/** Convocatoria publicada (2026-09-25): aviso opcional a los convocados. */
+export async function sendSquadNotification(
+  opts: Sender & {
+    teamName: string;
+    trainingDate: string;
+    trainingTime: string;
+    recipientUserIds: string[];
+    opponent?: string | null;
+  },
+) {
+  const rival = opts.opponent ? ` contra ${opts.opponent}` : "";
+  return notifyUsers({
+    ...opts,
+    type: "training_update",
+    title: `Convocatoria: ${opts.teamName}`,
+    message: `Estás convocado para el partido${rival} del ${opts.trainingDate} (${opts.trainingTime}).`,
+  });
+}

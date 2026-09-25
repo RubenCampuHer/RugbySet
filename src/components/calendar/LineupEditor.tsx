@@ -42,11 +42,14 @@ function SlotPicker({
   candidates,
   where,
   current,
+  squad,
   onPick,
   onClose,
 }: {
   target: SlotKey;
   candidates: Candidate[];
+  /** Convocados del partido (si hay convocatoria): el resto sale aparte. */
+  squad: Set<string> | null;
   /** Dónde está ya cada uid ("12", "S16"…). */
   where: Map<string, string>;
   current: LineupSlot | undefined;
@@ -60,9 +63,11 @@ function SlotPicker({
 
   const ranked = pos ? rankCandidates(candidates, pos) : [...candidates].sort((a, b) => a.name.localeCompare(b.name, "es"));
   const visible = ranked.filter((c) => c.name.toLowerCase().includes(search.toLowerCase()));
-  const fits = pos ? visible.filter((c) => !c.info.injured && positionFit(c.info, pos)) : [];
-  const rest = visible.filter((c) => !c.info.injured && !(pos && positionFit(c.info, pos)));
-  const injured = visible.filter((c) => c.info.injured);
+  const called = visible.filter((c) => !squad || squad.has(c.uid));
+  const fits = pos ? called.filter((c) => !c.info.injured && positionFit(c.info, pos)) : [];
+  const rest = called.filter((c) => !c.info.injured && !(pos && positionFit(c.info, pos)));
+  const injured = called.filter((c) => c.info.injured);
+  const notCalled = squad ? visible.filter((c) => !squad.has(c.uid)) : [];
 
   const row = (c: Candidate) => {
     const fit = pos ? positionFit(c.info, pos) : null;
@@ -112,8 +117,9 @@ function SlotPicker({
         {candidates.length > 6 && <SearchInput value={search} onChange={setSearch} placeholder="Buscar jugador…" />}
         <div>
           {pos && section("Su puesto", fits)}
-          {section(pos ? "Resto del equipo" : "Equipo", rest)}
+          {section(squad ? (pos ? "Resto de convocados" : "Convocados") : pos ? "Resto del equipo" : "Equipo", rest)}
           {section("Lesionados", injured)}
+          {section("No convocados", notCalled)}
           {visible.length === 0 && (
             <p className="py-4 text-center text-sm text-muted-foreground">
               {candidates.length === 0 ? "El equipo aún no tiene jugadores." : "Nadie con ese nombre."}
@@ -157,10 +163,13 @@ function SlotPicker({
 export function LineupEditor({
   team,
   lineup,
+  squad = null,
   onDeleted,
 }: {
   team: Team;
   lineup: LineupDoc;
+  /** Convocados del partido al que está asignada (desde el Calendario). */
+  squad?: string[] | null;
   /** Ya no queda nada que editar tras borrar — quien la aloja (p.ej. el Sheet) debe cerrarse. */
   onDeleted?: () => void;
 }) {
@@ -175,6 +184,7 @@ export function LineupEditor({
   const [saving, setSaving] = useState(false);
 
   const playerUids = useMemo(() => Object.keys(team.userplayers), [team.userplayers]);
+  const squadSet = useMemo(() => (squad && squad.length > 0 ? new Set(squad) : null), [squad]);
   const profiles = useProfilesByUid(playerUids);
   const candidates: Candidate[] = playerUids.map((uid) => ({
     uid,
@@ -400,6 +410,7 @@ export function LineupEditor({
           candidates={candidates}
           where={where}
           current={slots[picking.kind][picking.key]}
+          squad={squadSet}
           onPick={(slot) => pick(picking, slot)}
           onClose={() => setPicking(null)}
         />

@@ -79,6 +79,17 @@ export const EventDataSchema = z.object({
     .default({})
     .catch({}),
   match: MatchSchema.nullish().catch(null),
+  // Convocatoria (2026-09-25): convocados por uid; `visible` lo decide el
+  // cuerpo técnico en cada partido (hasta entonces los jugadores no la ven).
+  squad: z
+    .object({
+      players: rtdbRecord(z.literal(true)).default({}).catch({}),
+      visible: z.boolean().nullish().catch(null),
+      publishedAt: z.number().nullish().catch(null),
+      updatedAt: z.number().nullish().catch(null),
+    })
+    .nullish()
+    .catch(null),
 });
 
 /**

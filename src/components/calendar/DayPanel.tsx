@@ -10,6 +10,7 @@ import { EventEditorSheet } from "@/components/calendar/EventEditorSheet";
 import { LineupEditor } from "@/components/calendar/LineupEditor";
 import { LineupSummary } from "@/components/calendar/LineupSummary";
 import { MatchResultCard, MatchResultEditor } from "@/components/calendar/MatchResult";
+import { SquadCard, SquadEditor, SquadStatus } from "@/components/calendar/Squad";
 import { RollCall } from "@/components/calendar/RollCall";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -30,6 +31,7 @@ import { answerCounts } from "@/lib/agenda";
 import { ATTENDANCE_MARK_LABEL, attendanceMark, declineReason } from "@/lib/attendance";
 import { useProfilesByUid } from "@/hooks/useProfilesByUid";
 import { parseKey } from "@/lib/calendar";
+import { squadOf } from "@/lib/squad";
 import { cn } from "@/lib/utils";
 import type { Team, TrainingDay } from "@/lib/types";
 
@@ -141,7 +143,7 @@ function MatchLineupSection({ team, fecha, day }: { team: Team; fecha: string; d
         </div>
       )}
 
-      {current && <LineupEditor team={team} lineup={current} />}
+      {current && <LineupEditor team={team} lineup={current} squad={squadOf(team, day)?.players ?? null} />}
     </div>
   );
 }
@@ -344,6 +346,8 @@ export function DayPanel({
           </div>
         )}
 
+        {!isCoach && isMatch && !cancelled && <SquadCard team={team} day={day} myUid={myUid} />}
+
         {isMatch && <MatchResultCard team={team} day={day} />}
 
         {!isCoach && isMatch && day.lineupId && team.lineups[day.lineupId] && (
@@ -353,7 +357,7 @@ export function DayPanel({
         {isCoach && (
           <Tabs defaultValue={initialTab ?? "summary"}>
             <TabsList className="w-full [&>*]:min-w-0 [&>*]:px-1 [&>*]:text-xs sm:[&>*]:text-sm">
-              <TabsTrigger value="summary">Asistencia</TabsTrigger>
+              <TabsTrigger value="summary">{isMatch ? "Convocatoria" : "Asistencia"}</TabsTrigger>
               <TabsTrigger value="rollcall">Pasar lista</TabsTrigger>
               {isMatch && <TabsTrigger value="lineup">Alineación</TabsTrigger>}
               {isMatch && <TabsTrigger value="result">Resultado</TabsTrigger>}
@@ -367,14 +371,16 @@ export function DayPanel({
                   <X className="size-3" /> {answerCounts(team, day).notGoing}
                 </Badge>
                 <Badge variant="outline">{noAnswerCount} sin responder</Badge>
+                {isMatch && <SquadStatus team={team} day={day} />}
               </div>
-              <DeclinedList team={team} day={day} />
+              {!isMatch && <DeclinedList team={team} day={day} />}
               {noAnswerCount > 0 && !cancelled && !isPast && (
                 <Button size="sm" variant="outline" disabled={sending} onClick={() => void sendConvocatoria()}>
                   <Send className="size-3.5" />
                   {sending ? "Enviando…" : `Avisar a los que faltan (${noAnswerCount})`}
                 </Button>
               )}
+              {isMatch && !cancelled && <SquadEditor key={fecha} team={team} day={day} />}
             </TabsContent>
             <TabsContent value="rollcall" className="pt-3">
               <RollCall team={team} day={day} />

@@ -17,6 +17,8 @@ function JoinContent() {
   const router = useRouter();
   const params = useSearchParams();
   const code = params.get("code")?.trim() || null;
+  // El enlace decide el rol: jugador salvo ?as=coach (sin esto, una cuenta COACH
+  // entraría por defecto como entrenador con un enlace de jugador).
   const as = params.get("as") === "coach" ? "coach" : null;
 
   return (
@@ -29,7 +31,7 @@ function JoinContent() {
               ? "Te han invitado como entrenador. Revisa el equipo y envía tu solicitud."
               : "Te han invitado a un equipo. Revisa que es el tuyo y envía tu solicitud."}
           </p>
-          <JoinTeamForm initialCode={code} initialAs={as} onJoined={() => router.replace("/team")} />
+          <JoinTeamForm initialCode={code} initialAs={as ?? "player"} onJoined={() => router.replace("/team")} />
         </div>
       ) : (
         <EmptyState icon={LinkIcon} title="Enlace no válido" hint="Pide a tu entrenador que te vuelva a enviar la invitación." />

@@ -69,7 +69,7 @@ export function InviteLinkDialog({
         </DialogHeader>
 
         {options.length > 1 && (
-          <div className="inline-flex self-start rounded-lg border p-0.5" role="radiogroup" aria-label="Invitar como">
+          <div className="inline-flex w-fit rounded-lg border p-0.5" role="radiogroup" aria-label="Invitar como">
             {options.map((o) => (
               <button
                 key={o.key}

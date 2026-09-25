@@ -1,14 +1,15 @@
 import type { Metadata, Viewport } from "next";
-import { Geist_Mono, Inter } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/components/auth/AuthProvider";
 import { RegisterSW } from "@/components/RegisterSW";
 import "./globals.css";
 
-// Inter: la misma tipografía que la app Android (res/font/inter.xml,
-// aplicada en todos sus estilos).
-const inter = Inter({
+// Geist en toda la web (2026-09-25, más actual que Inter; la app Android
+// sigue con Inter en res/font/inter.xml). Títulos con tracking ajustado en
+// globals.css.
+const geist = Geist({
   variable: "--font-sans",
   subsets: ["latin"],
 });
@@ -45,7 +46,7 @@ export default function RootLayout({
   return (
     <html
       lang="es"
-      className={`dark ${inter.variable} ${geistMono.variable} h-full antialiased`}
+      className={`dark ${geist.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
         <TooltipProvider delay={200}>

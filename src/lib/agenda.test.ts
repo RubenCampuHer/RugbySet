@@ -20,6 +20,7 @@ function team(trainingdays: TrainingDay[]): Team {
     lineups: {},
     coaches: {},
     pendingCoaches: {},
+    delegates: {},
     eventData: {},
     playerInfo: {},
   };

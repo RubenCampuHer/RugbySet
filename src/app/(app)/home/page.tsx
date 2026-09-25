@@ -32,7 +32,7 @@ import { sendAttendanceNotification } from "@/lib/actions/notify";
 import { setAttendance } from "@/lib/actions/team";
 import { answerCounts, noAnswerUids, playerPending, relativeDayLabel, staffHome, type StaffTask } from "@/lib/agenda";
 import { keyToParam } from "@/lib/calendar";
-import { isAdmin, isCoach, isTeamCoach } from "@/lib/permissions";
+import { canManageEvents, isAdmin, isCoach, isTeamCoach, isTeamDelegate } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 import type { Team, TrainingDay } from "@/lib/types";
 
@@ -268,7 +268,8 @@ export default function HomePage() {
   }
 
   const isDirector = Boolean(profile?.directorOfClubId);
-  const isStaffHere = team != null && (isTeamCoach(team, uid) || isAdmin(profile));
+  const isStaffHere = team != null && (canManageEvents(team, uid) || isAdmin(profile));
+  const isDelegateHere = team != null && isTeamDelegate(team, uid) && !isTeamCoach(team, uid);
   const isPlayerHere = team != null && team.userplayers[uid] === true;
 
   return (
@@ -277,7 +278,7 @@ export default function HomePage() {
       {team && (
         <p className="-mt-2 text-sm text-muted-foreground">
           {team.teamname}
-          {isStaffHere ? " · Entrenas aquí" : isPlayerHere ? " · Juegas aquí" : ""}
+          {isDelegateHere ? " · Eres delegado" : isStaffHere ? " · Entrenas aquí" : isPlayerHere ? " · Juegas aquí" : ""}
         </p>
       )}
 

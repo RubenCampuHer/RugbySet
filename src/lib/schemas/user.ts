@@ -60,7 +60,8 @@ export const PublicProfileSchema = z.object({
   maxStreak: z.number().int().nullish(),
   attendanceRate: z.number().int().nullish(),
   teamStats: rtdbRecord(AttendanceStatsSchema).default({}),
-  teams: rtdbRecord(z.enum(["player", "coach"])).default({}),
+  // "delegate" desde 2026-09-25; un valor desconocido se lee como jugador.
+  teams: rtdbRecord(z.enum(["player", "coach", "delegate"]).catch("player")).default({}),
   directorOfClubId: z.string().nullish(),
 });
 

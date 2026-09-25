@@ -108,6 +108,7 @@ function buildTeam(opts: {
     lineups: {},
     coaches: {},
     pendingCoaches: {},
+    delegates: {},
     eventData: {},
     playerInfo: {},
   };

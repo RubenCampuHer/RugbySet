@@ -13,9 +13,10 @@ import { useClub } from "@/hooks/useClub";
 import { useProfilesByUid } from "@/hooks/useProfilesByUid";
 import { getRoleDisplayName } from "@/lib/permissions";
 
-const TEAM_ROLE_LABEL: Record<"player" | "coach", string> = {
+const TEAM_ROLE_LABEL: Record<"player" | "coach" | "delegate", string> = {
   player: "Jugador",
   coach: "Entrenador",
+  delegate: "Delegado",
 };
 
 /**

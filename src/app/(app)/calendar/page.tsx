@@ -19,7 +19,7 @@ import { setAttendance } from "@/lib/actions/team";
 import { attendedDatesFromTeam } from "@/lib/attendance";
 import { useDeclineReason } from "@/components/calendar/DeclineReasonDialog";
 import { paramToKey, todayKey } from "@/lib/calendar";
-import { isTeamCoach } from "@/lib/permissions";
+import { canManageEvents, isTeamCoach } from "@/lib/permissions";
 import type { TrainingDay } from "@/lib/types";
 
 function CalendarContent() {
@@ -101,7 +101,9 @@ function CalendarContent() {
     );
   }
 
-  const isCoach = isTeamCoach(team, firebaseUser?.uid);
+  // Delegado (2026-09-25): gestiona el día igual que el cuerpo técnico, salvo la alineación.
+  const isCoach = canManageEvents(team, firebaseUser?.uid);
+  const canEditLineup = isTeamCoach(team, firebaseUser?.uid);
   const selectedDay = selected ? (daysByFecha.get(selected) ?? null) : null;
 
   const prevMonth = () => {
@@ -172,6 +174,7 @@ function CalendarContent() {
           fecha={selected}
           day={selectedDay}
           isCoach={isCoach}
+          canEditLineup={canEditLineup}
           myUid={myUid}
           initialTab={selected === deepLinkFecha ? deepLinkTab : undefined}
           onAnswer={(status) => selectedDay && void submitOwnAttendance(selectedDay, status)}

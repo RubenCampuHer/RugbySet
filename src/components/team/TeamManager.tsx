@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDownCircle, ArrowUpCircle, Building2, Camera, Check, ClipboardList, Copy, Crown, Flame, LogOut, Megaphone, Pencil, ShieldCheck, Trash2, TriangleAlert, Trophy, UserPlus, Users, X } from "lucide-react";
+import { ArrowDownCircle, ArrowUpCircle, Building2, ClipboardCheck, Camera, Check, ClipboardList, Copy, Crown, Flame, LogOut, Megaphone, Pencil, ShieldCheck, Trash2, TriangleAlert, Trophy, UserPlus, Users, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useRef, useState } from "react";
@@ -39,9 +39,11 @@ import {
   acceptPendingCoach,
   acceptPendingPlayer,
   adminDeleteTeam,
+  delegateToPlayer,
   deleteTeam,
   demoteCoachToPlayer,
   leaveTeam,
+  makeDelegate,
   promoteToCoach,
   rejectPendingCoach,
   rejectPendingPlayer,
@@ -56,7 +58,7 @@ import { InviteLinkDialog } from "@/components/InviteLinkDialog";
 import { PlayerInfoDialog } from "@/components/team/PlayerInfoDialog";
 import { playerInfoOf, playerInfoSummary } from "@/lib/player-info";
 import { teamInviteUrl } from "@/lib/invite-links";
-import { isAdmin, isCoach, isTeamCoach, isTeamFounder } from "@/lib/permissions";
+import { isAdmin, isCoach, isTeamCoach, isTeamDelegate, isTeamFounder } from "@/lib/permissions";
 import { resizeAndUpload } from "@/lib/storage";
 import { validateTeamCode } from "@/lib/team-validation";
 import type { AttendanceStats, Club, PublicProfile, Team } from "@/lib/types";
@@ -80,7 +82,10 @@ function GeneralMessageDialog({ team }: { team: Team }) {
     setSending(true);
     try {
       // Rosters por uid (2026-09-04): userplayers ya son claves de uid.
-      const uids = Object.keys(team.userplayers);
+      // Delegados (2026-09-25) también reciben los avisos del equipo.
+      const uids = [...Object.keys(team.userplayers), ...Object.keys(team.delegates)].filter(
+        (u) => u !== firebaseUser?.uid,
+      );
       const { sent } = await sendGeneralMessage({
         teamName: team.teamname!,
         message: message.trim(),
@@ -88,7 +93,7 @@ function GeneralMessageDialog({ team }: { team: Team }) {
         senderUserId: firebaseUser?.uid ?? "",
         senderUsername: profile?.username ?? "",
       });
-      toast.success(`Mensaje enviado a ${uids.length} jugadores (${sent} push)`);
+      toast.success(`Mensaje enviado a ${uids.length} ${uids.length === 1 ? "persona" : "personas"} (${sent} push)`);
       setMessage("");
       setOpen(false);
     } catch (e) {
@@ -280,6 +285,89 @@ function PlayerRow({
 // Gestión visible para el coach (o un ADMIN viendo el equipo, ver canManage
 // en TeamManager) — mismo discriminador que Android (ReadTeam: usercoach ==
 // uid), no el rol, ampliado a ADMIN y al director del club del equipo.
+/**
+ * Delegados (2026-09-25): logística del día (calendario, pasar lista,
+ * convocatoria, resultado, avisos). No son jugadores: al nombrarlos salen de
+ * la lista de jugadores. El cuerpo técnico puede devolverlos a jugador o
+ * sacarlos del equipo.
+ */
+function DelegatesSection({ team, canManage }: { team: Team; canManage: boolean }) {
+  const uids = Object.keys(team.delegates);
+  const profiles = useProfilesByUid(uids);
+  if (uids.length === 0) return null;
+
+  const toPlayer = async (uid: string, name: string) => {
+    try {
+      await delegateToPlayer(team, uid);
+      toast.success(`${name} vuelve a ser jugador`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo cambiar");
+    }
+  };
+  const kick = async (uid: string, name: string) => {
+    try {
+      await removePlayer(team, uid);
+      toast.success(`${name} ya no está en el equipo`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo sacar del equipo");
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-lg">Delegados ({uids.length})</CardTitle>
+      </CardHeader>
+      <CardContent className="divide-y divide-border">
+        {uids.map((uid) => {
+          const name = profiles[uid]?.nameSurname || "Delegado";
+          return (
+            <PlayerRow
+              key={uid}
+              uid={uid}
+              name={name}
+              src={profiles[uid]?.usericon}
+              action={
+                canManage ? (
+                  <span className="flex gap-1">
+                    <Button
+                      size="icon-xl"
+                      variant="ghost"
+                      className="rounded-full"
+                      aria-label={`Pasar a ${name} a jugador`}
+                      title="Pasar a jugador"
+                      onClick={() => void toPlayer(uid, name)}
+                    >
+                      <ArrowDownCircle className="size-4" />
+                    </Button>
+                    <ConfirmDialog
+                      trigger={
+                        <Button
+                          size="icon-xl"
+                          variant="ghost"
+                          className="rounded-full text-destructive hover:text-destructive"
+                          aria-label={`Sacar a ${name} del equipo`}
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      }
+                      title={`¿Sacar a ${name} del equipo?`}
+                      description="Dejará de ser delegado y perderá el acceso al equipo."
+                      confirmLabel="Sacar del equipo"
+                      destructive
+                      onConfirm={() => kick(uid, name)}
+                    />
+                  </span>
+                ) : undefined
+              }
+            />
+          );
+        })}
+      </CardContent>
+    </Card>
+  );
+}
+
 /** Rosters por uid (2026-09-04): pendingplayers es {uid: true} — el nombre se resuelve vía useProfilesByUid, como CoachesSection. */
 function PendingSection({ team, canManage }: { team: Team; canManage: boolean }) {
   const [busy, setBusy] = useState<string | null>(null);
@@ -742,7 +830,8 @@ export function TeamManager({ teamname }: { teamname: string | null }) {
     club && uid && (club.adminUserId === uid || club.directors[uid] === true),
   );
   const isPlayerHere = Boolean(uid && team.userplayers[uid] === true);
-  const isMemberHere = isPlayerHere || isMyCoach;
+  const isDelegateHere = isTeamDelegate(team, uid);
+  const isMemberHere = isPlayerHere || isMyCoach || isDelegateHere;
   const canManage = isMyCoach || isAdmin(profile) || isDirectorOfTeamClub;
   // Borrar es más grave que gestionar: nunca un co-entrenador cualquiera.
   const canDeleteTeam = isFounder || isAdmin(profile) || isDirectorOfTeamClub;
@@ -837,6 +926,15 @@ export function TeamManager({ teamname }: { teamname: string | null }) {
     toast.success(`Equipo "${team.teamname}" eliminado`);
   };
 
+  const delegate = async (uid: string, name: string) => {
+    try {
+      await makeDelegate(team, uid);
+      toast.success(`${name} es ahora delegado`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo nombrar delegado");
+    }
+  };
+
   const promote = async (uid: string, name: string) => {
     try {
       await promoteToCoach(team, uid);
@@ -928,6 +1026,11 @@ export function TeamManager({ teamname }: { teamname: string | null }) {
                 Eres co-entrenador
               </Badge>
             )}
+            {isDelegateHere && (
+              <Badge className="border-transparent bg-primary/15 text-brand">
+                Eres delegado
+              </Badge>
+            )}
           </div>
           {/* Club del equipo (2026-09-04, aviso explícito 2026-09-07): el club
               es contexto del equipo, no al revés — se llega a él desde aquí,
@@ -948,7 +1051,7 @@ export function TeamManager({ teamname }: { teamname: string | null }) {
         </div>
       </div>
 
-      {canManage && <GeneralMessageDialog team={team} />}
+      {(canManage || isDelegateHere) && <GeneralMessageDialog team={team} />}
 
       {/* Informe de asistencia: quien gestiona el equipo (coach, ADMIN,
           director del club — team/attendance reconoce a los tres). Siempre
@@ -982,6 +1085,8 @@ export function TeamManager({ teamname }: { teamname: string | null }) {
         canRemoveCoach={canDeleteTeam}
         canAppointDirector={canAppointDirector}
       />
+
+      <DelegatesSection team={team} canManage={canManage} />
 
       <Card>
         <CardHeader>
@@ -1030,6 +1135,23 @@ export function TeamManager({ teamname }: { teamname: string | null }) {
                           >
                             <ArrowUpCircle className="size-4" />
                           </Button>
+                          <ConfirmDialog
+                            trigger={
+                              <Button
+                                size="icon-xl"
+                                variant="ghost"
+                                className="rounded-full"
+                                aria-label={`Nombrar a ${name} delegado`}
+                                title="Nombrar delegado"
+                              >
+                                <ClipboardCheck className="size-4" />
+                              </Button>
+                            }
+                            title={`¿Nombrar a ${name} delegado?`}
+                            description="Llevará el calendario, pasar lista, la convocatoria, el resultado y los avisos. Deja de ser jugador: no cuenta para la asistencia ni sale en las alineaciones."
+                            confirmLabel="Nombrar delegado"
+                            onConfirm={() => delegate(uid, name)}
+                          />
                           <ConfirmDialog
                             trigger={
                               <Button

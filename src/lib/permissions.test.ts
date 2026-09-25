@@ -5,6 +5,7 @@
 import { describe, expect, it } from "vitest";
 import {
   canCreateContent,
+  canManageEvents,
   canDeleteExercise,
   canDeleteTraining,
   canEditExercise,
@@ -16,6 +17,7 @@ import {
   isAdmin,
   isCoach,
   isTeamCoach,
+  isTeamDelegate,
   isTeamFounder,
 } from "./permissions";
 import { ExerciseSchema } from "./schemas/exercise";
@@ -300,5 +302,20 @@ describe("getRoleDisplayName", () => {
     expect(getRoleDisplayName(null)).toBe("Desconocido");
     expect(getRoleDisplayName(undefined)).toBe("Desconocido");
     expect(getRoleDisplayName("ROL_INVENTADO")).toBe("Desconocido");
+  });
+});
+
+describe("delegado (2026-09-25)", () => {
+  const team = TeamSchema.parse({ usercoach: "c", coaches: { cc: true }, delegates: { d: true }, userplayers: { p: true } });
+  it("gestiona el día pero no es entrenador", () => {
+    expect(isTeamDelegate(team, "d")).toBe(true);
+    expect(canManageEvents(team, "d")).toBe(true);
+    expect(isTeamCoach(team, "d")).toBe(false);
+  });
+  it("entrenadores sí, jugadores no", () => {
+    expect(canManageEvents(team, "c")).toBe(true);
+    expect(canManageEvents(team, "cc")).toBe(true);
+    expect(canManageEvents(team, "p")).toBe(false);
+    expect(canManageEvents(team, null)).toBe(false);
   });
 });

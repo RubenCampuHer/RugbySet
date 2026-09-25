@@ -184,6 +184,7 @@ export function DayPanel({
   fecha,
   day,
   isCoach,
+  canEditLineup = isCoach,
   myUid,
   initialTab,
   onAnswer,
@@ -192,7 +193,10 @@ export function DayPanel({
   team: Team;
   fecha: string;
   day: TrainingDay | null;
+  /** Cuerpo técnico del día: entrenador o delegado. */
   isCoach: boolean;
+  /** Solo el entrenador edita la alineación (el delegado no). */
+  canEditLineup?: boolean;
   myUid: string;
   /** Pestaña del coach al abrir (deep-link "Pasar lista" desde el inicio). */
   initialTab?: "summary" | "rollcall";
@@ -359,7 +363,7 @@ export function DayPanel({
             <TabsList className="w-full [&>*]:min-w-0 [&>*]:px-1 [&>*]:text-xs sm:[&>*]:text-sm">
               <TabsTrigger value="summary">{isMatch ? "Convocatoria" : "Asistencia"}</TabsTrigger>
               <TabsTrigger value="rollcall">Pasar lista</TabsTrigger>
-              {isMatch && <TabsTrigger value="lineup">Alineación</TabsTrigger>}
+              {isMatch && canEditLineup && <TabsTrigger value="lineup">Alineación</TabsTrigger>}
               {isMatch && <TabsTrigger value="result">Resultado</TabsTrigger>}
             </TabsList>
             <TabsContent value="summary" className="space-y-3 pt-3">
@@ -385,7 +389,7 @@ export function DayPanel({
             <TabsContent value="rollcall" className="pt-3">
               <RollCall team={team} day={day} />
             </TabsContent>
-            {isMatch && (
+            {isMatch && canEditLineup && (
               <TabsContent value="lineup" className="pt-3">
                 <MatchLineupSection team={team} fecha={fecha} day={day} />
               </TabsContent>

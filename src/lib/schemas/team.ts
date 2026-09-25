@@ -124,6 +124,9 @@ export const TeamSchema = z.object({
   // del fundador, que sí, ver buildTeam) — coach y jugador son cosas distintas.
   coaches: rtdbRecord(z.literal(true)).default({}),
   pendingCoaches: rtdbRecord(z.literal(true)).default({}),
+  // Delegados (2026-09-25, solo web): logística del día (calendario, pasar
+  // lista, convocatoria, resultado, avisos). Al nombrarlo deja de ser jugador.
+  delegates: rtdbRecord(z.literal(true)).default({}),
   eventData: z.record(z.string(), EventDataSchema).default({}).catch({}),
   playerInfo: z.record(z.string(), PlayerInfoSchema).default({}).catch({}),
 });

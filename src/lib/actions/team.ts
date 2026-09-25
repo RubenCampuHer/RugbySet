@@ -196,6 +196,28 @@ export async function promoteToCoach(team: Team, uid: string) {
 }
 
 /**
+ * Nombrar delegado (2026-09-25): sale de userplayers (deja de contar para
+ * asistencia y alineaciones) y entra en delegates. Sigue en el equipo
+ * (UserTeams intacto). Su rol global no cambia.
+ */
+export async function makeDelegate(team: Team, uid: string) {
+  const teamname = team.teamname!;
+  await update(ref(db), {
+    [`${PATHS.TEAMS}/${teamname}/userplayers/${uid}`]: null,
+    [`${PATHS.TEAMS}/${teamname}/delegates/${uid}`]: true,
+  });
+}
+
+/** Inverso de makeDelegate: vuelve a la lista de jugadores. */
+export async function delegateToPlayer(team: Team, uid: string) {
+  const teamname = team.teamname!;
+  await update(ref(db), {
+    [`${PATHS.TEAMS}/${teamname}/delegates/${uid}`]: null,
+    [`${PATHS.TEAMS}/${teamname}/userplayers/${uid}`]: true,
+  });
+}
+
+/**
  * Inverso de promoteToCoach (2026-09-04): un co-entrenador (nunca el
  * fundador — para eso está transferTeamOwnership) baja a jugador del mismo
  * equipo. Sigue en el equipo (UserTeams y equipo activo intactos); solo
@@ -220,6 +242,7 @@ export async function removePlayer(team: Team, uid: string) {
   const teamname = team.teamname!;
   const updates: Record<string, unknown> = {
     [`${PATHS.TEAMS}/${teamname}/userplayers/${uid}`]: null,
+    [`${PATHS.TEAMS}/${teamname}/delegates/${uid}`]: null,
     [`${PATHS.USER_TEAMS}/${uid}/${teamname}`]: null,
   };
   // Fase 2: su activo solo se limpia si era ESTE equipo (ver removeCoach).
@@ -510,7 +533,7 @@ export async function deleteTeam(team: Team): Promise<void> {
   // Rosters por uid: userplayers ya son claves de uid, sin resolver nombres.
   const uids = Array.from(
     new Set(
-      [...Object.keys(team.userplayers), team.usercoach, ...Object.keys(team.coaches)].filter(
+      [...Object.keys(team.userplayers), team.usercoach, ...Object.keys(team.coaches), ...Object.keys(team.delegates)].filter(
         (uid): uid is string => Boolean(uid),
       ),
     ),

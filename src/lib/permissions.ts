@@ -24,6 +24,20 @@ export function isTeamCoach(team: Team, uid: string | null | undefined): boolean
   return team.usercoach === uid || team.coaches[uid] === true;
 }
 
+/** Delegado del equipo (2026-09-25): no es jugador ni entrenador. */
+export function isTeamDelegate(team: Team, uid: string | null | undefined): boolean {
+  return Boolean(uid) && team.delegates[uid!] === true;
+}
+
+/**
+ * Logística del día: calendario, pasar lista, convocatoria, resultado y
+ * avisos. Entrenadores y delegados; la alineación, el roster y las fichas
+ * siguen siendo solo del entrenador (isTeamCoach).
+ */
+export function canManageEvents(team: Team, uid: string | null | undefined): boolean {
+  return isTeamCoach(team, uid) || isTeamDelegate(team, uid);
+}
+
 /** El fundador del equipo — el único que no puede "salir" (debe borrar el equipo) y el único que puede quitar a un co-entrenador. */
 export function isTeamFounder(team: Team, uid: string | null | undefined): boolean {
   return Boolean(uid) && team.usercoach === uid;

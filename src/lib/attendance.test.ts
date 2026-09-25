@@ -29,6 +29,7 @@ function team(overrides: Partial<Team> = {}): Team {
     lineups: {},
     coaches: {},
     pendingCoaches: {},
+    delegates: {},
     eventData: {},
     playerInfo: {},
     ...overrides,

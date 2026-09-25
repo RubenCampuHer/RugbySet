@@ -28,7 +28,9 @@ import { TeamSwitcher } from "@/components/team/TeamSwitcher";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -119,117 +121,135 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-10 border-b bg-card/95 backdrop-blur print:hidden">
-        <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-2 px-4 py-2">
+      {/* Cabecera (rediseño 2026-09-25): translúcida, nav con icono y línea
+          inferior en la pestaña activa (sin píldora rellena), marca sobria. */}
+      <header className="sticky top-0 z-20 border-b border-border/60 bg-background/80 backdrop-blur-xl print:hidden">
+        <div className="mx-auto flex h-16 w-full max-w-5xl items-center gap-2 px-4 md:gap-6">
           <Link
             href="/home"
             aria-label="RugbySet — inicio"
             className="shrink-0 rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
           >
-            <BrandMark />
+            <BrandMark logoClassName="size-8" textClassName="text-base font-semibold text-foreground" />
           </Link>
 
           {/* Nav superior solo en escritorio */}
-          <nav className="hidden gap-1 md:flex">
-            {NAV.map(({ href, label }) => (
-              <Link
-                key={href}
-                href={href}
-                className={cn(
-                  "relative rounded-md px-3 py-1.5 text-sm whitespace-nowrap focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
-                  pathname.startsWith(href)
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-muted",
-                )}
-              >
-                {label}
-              </Link>
-            ))}
+          <nav className="hidden h-full items-stretch md:flex">
+            {NAV.map(({ href, label, icon: Icon }) => {
+              const active = pathname.startsWith(href);
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  aria-current={active ? "page" : undefined}
+                  className={cn(
+                    "relative flex items-center gap-2 px-3 text-sm font-medium whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring",
+                    active ? "text-foreground" : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  <Icon className={cn("size-4", active ? "text-brand" : "opacity-70")} />
+                  {label}
+                  {active && <span aria-hidden className="absolute inset-x-3 -bottom-px h-0.5 rounded-full bg-brand" />}
+                </Link>
+              );
+            })}
           </nav>
 
-          {/* Selector de equipo activo — solo con más de un equipo (fase 2). */}
-          <TeamSwitcher className="min-w-0" />
+          <div className="ml-auto flex min-w-0 items-center gap-1.5">
+            {/* Selector de equipo activo — solo con más de un equipo (fase 2). */}
+            <TeamSwitcher className="min-w-0" />
 
-          <Link
-            href="/notifications"
-            aria-label={unreadCount > 0 ? `Avisos, ${unreadCount} sin leer` : "Avisos"}
-            className={cn(
-              "relative ml-auto flex size-11 shrink-0 items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
-              pathname.startsWith("/notifications")
-                ? "bg-primary/15 text-primary"
-                : "text-muted-foreground hover:bg-muted",
-            )}
-          >
-            <Bell className="size-5" />
-            <UnreadDot count={unreadCount} className="top-1 right-1" />
-          </Link>
+            <span aria-hidden className="mx-1.5 hidden h-6 w-px bg-border md:block" />
 
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              aria-label="Cuenta"
-              className="shrink-0 rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            <Link
+              href="/notifications"
+              aria-label={unreadCount > 0 ? `Avisos, ${unreadCount} sin leer` : "Avisos"}
+              className={cn(
+                "relative flex size-10 shrink-0 items-center justify-center rounded-full transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+                pathname.startsWith("/notifications")
+                  ? "bg-muted text-foreground"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
+              )}
             >
-              <AvatarInitials
-                name={profile?.nameSurname}
-                src={profile?.usericon}
-                className="size-9"
-                fallbackClassName="text-xs"
-              />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem render={<Link href="/profile" />}>
-                <User /> Perfil
-              </DropdownMenuItem>
-              {/* 2026-09-04: también quien dirige un club sin ser COACH global
-                  (p.ej. un ADMIN que fundó/dirige un club) — antes solo isCoach.
-                  2026-09-07: y cualquier miembro cuyo equipo activo está en un
-                  club (jugador incluido) — ve la tarjeta informativa. "Club",
-                  no "Mi club": para el jugador es el club de su equipo. */}
-              {(isCoach(profile) ||
-                isAdmin(profile) ||
-                Boolean(profile?.directorOfClubId) ||
-                Boolean(activeTeam?.clubId)) && (
-                <DropdownMenuItem render={<Link href="/club" />}>
-                  <Building2 /> Club
-                </DropdownMenuItem>
-              )}
-              {isAdmin(profile) && (
-                <DropdownMenuItem render={<Link href="/admin/approvals" />}>
-                  <ClipboardCheck /> Cola de aprobación
-                </DropdownMenuItem>
-              )}
-              {isAdmin(profile) && (
-                <DropdownMenuItem render={<Link href="/admin/users" />}>
-                  <UserCog /> Gestionar usuarios
-                </DropdownMenuItem>
-              )}
-              {isAdmin(profile) && (
-                <DropdownMenuItem render={<Link href="/admin/organization" />}>
-                  <Shield /> Organización
-                </DropdownMenuItem>
-              )}
-              {isAdmin(profile) && (
-                <DropdownMenuItem render={<Link href="/admin/content" />}>
-                  <FolderKanban /> Todo el contenido
-                </DropdownMenuItem>
-              )}
-              {isAdmin(profile) && (
-                <DropdownMenuItem render={<Link href="/admin/metrics" />}>
-                  <BarChart3 /> Métricas
-                </DropdownMenuItem>
-              )}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                variant="destructive"
-                onClick={async () => {
-                  await logout();
-                  router.replace("/login");
-                }}
+              <Bell className="size-[18px]" />
+              <UnreadDot count={unreadCount} className="top-1.5 right-1.5 ring-2 ring-background" />
+            </Link>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                aria-label="Cuenta"
+                className="shrink-0 rounded-full ring-1 ring-border transition-shadow hover:ring-brand/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
               >
-                <LogOut /> Cerrar sesión
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                <AvatarInitials
+                  name={profile?.nameSurname}
+                  src={profile?.usericon}
+                  className="size-8"
+                  fallbackClassName="text-xs"
+                />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-56">
+                {/* Base UI: el Label debe ir dentro de un Group (error #31). */}
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel className="flex flex-col gap-0.5 py-2">
+                    <span className="truncate text-sm font-medium text-foreground">{profile?.nameSurname || "Mi cuenta"}</span>
+                    {profile?.mail && <span className="truncate text-xs font-normal text-muted-foreground">{profile.mail}</span>}
+                  </DropdownMenuLabel>
+                </DropdownMenuGroup>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem render={<Link href="/profile" />}>
+                  <User /> Perfil
+                </DropdownMenuItem>
+                {/* 2026-09-04: también quien dirige un club sin ser COACH global
+                    (p.ej. un ADMIN que fundó/dirige un club) — antes solo isCoach.
+                    2026-09-07: y cualquier miembro cuyo equipo activo está en un
+                    club (jugador incluido) — ve la tarjeta informativa. "Club",
+                    no "Mi club": para el jugador es el club de su equipo. */}
+                {(isCoach(profile) ||
+                  isAdmin(profile) ||
+                  Boolean(profile?.directorOfClubId) ||
+                  Boolean(activeTeam?.clubId)) && (
+                  <DropdownMenuItem render={<Link href="/club" />}>
+                    <Building2 /> Club
+                  </DropdownMenuItem>
+                )}
+                {isAdmin(profile) && (
+                  <DropdownMenuItem render={<Link href="/admin/approvals" />}>
+                    <ClipboardCheck /> Cola de aprobación
+                  </DropdownMenuItem>
+                )}
+                {isAdmin(profile) && (
+                  <DropdownMenuItem render={<Link href="/admin/users" />}>
+                    <UserCog /> Gestionar usuarios
+                  </DropdownMenuItem>
+                )}
+                {isAdmin(profile) && (
+                  <DropdownMenuItem render={<Link href="/admin/organization" />}>
+                    <Shield /> Organización
+                  </DropdownMenuItem>
+                )}
+                {isAdmin(profile) && (
+                  <DropdownMenuItem render={<Link href="/admin/content" />}>
+                    <FolderKanban /> Todo el contenido
+                  </DropdownMenuItem>
+                )}
+                {isAdmin(profile) && (
+                  <DropdownMenuItem render={<Link href="/admin/metrics" />}>
+                    <BarChart3 /> Métricas
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  variant="destructive"
+                  onClick={async () => {
+                    await logout();
+                    router.replace("/login");
+                  }}
+                >
+                  <LogOut /> Cerrar sesión
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
         <OfflineBanner />
       </header>

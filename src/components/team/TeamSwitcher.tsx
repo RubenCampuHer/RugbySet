@@ -50,7 +50,7 @@ export function TeamSwitcher({ className }: { className?: string }) {
         aria-label="Cambiar de equipo"
         disabled={switching}
         className={cn(
-          "inline-flex min-h-9 max-w-[11rem] items-center gap-1.5 rounded-full bg-secondary px-3 text-sm font-medium text-secondary-foreground hover:bg-secondary/80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:opacity-60",
+          "inline-flex h-9 max-w-[12rem] items-center gap-2 rounded-lg border border-border/70 bg-muted/30 px-3 text-sm font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:opacity-60",
           className,
         )}
       >

@@ -131,3 +131,24 @@ export async function sendEventChangeNotification(
     message,
   });
 }
+
+/**
+ * Resultado del partido (2026-09-25): aviso opcional al equipo al guardarlo.
+ * Tipo "training_update" para que la bandeja abra el día del calendario.
+ */
+export async function sendMatchResultNotification(
+  opts: Sender & {
+    teamName: string;
+    trainingDate: string;
+    recipientUserIds: string[];
+    /** p. ej. "Victoria 24 – 10 contra Leones RC". */
+    summary: string;
+  },
+) {
+  return notifyUsers({
+    ...opts,
+    type: "training_update",
+    title: `Resultado: ${opts.teamName}`,
+    message: `${opts.summary}. Mira el partido en RugbySet.`,
+  });
+}

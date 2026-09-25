@@ -4,6 +4,7 @@
 // denegada en varios casos. Referencia: TeamRepository.kt (multi-path).
 import { get, ref, set, update } from "firebase/database";
 import { httpsCallable } from "firebase/functions";
+import { clearEventData } from "@/lib/actions/match";
 import { eventDataKey, type AttendanceMark } from "@/lib/attendance";
 import { PATHS } from "@/lib/constants";
 import { db, functions } from "@/lib/firebase";
@@ -432,10 +433,13 @@ export async function setEventCancelled(teamname: string, fecha: string, cancell
  * Coach borra un día — reescribe trainingdays sin él y limpia la fecha del
  * assistedTrainingDays de cada jugador que había confirmado (escritura por
  * hijo — la vía legacy Android con setValue del User completo estaba
- * denegada y dejaba asistencias huérfanas).
+ * denegada y dejaba asistencias huérfanas). También limpia eventData del día
+ * (asistencia real, motivos, partido y acta): si no, un evento nuevo en la
+ * misma fecha heredaría todo.
  */
 export async function deleteTrainingDay(teamname: string, fecha: string) {
   const before = await mutateTrainingDays(teamname, (days) => removeRawDay(days, fecha));
+  await clearEventData(teamname, fecha).catch(() => {}); // el día ya no existe: lo que quede no se ve
   const removed = findRawDay(before, fecha);
   const accepted = removed?.accepted_players;
   // Rosters por uid: accepted_players ya son claves de uid directamente.

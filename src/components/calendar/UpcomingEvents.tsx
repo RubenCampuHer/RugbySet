@@ -3,6 +3,7 @@
 import { Ban, CalendarClock, MapPin } from "lucide-react";
 import { useMemo, useState } from "react";
 import { AttendanceToggle } from "@/components/AttendanceToggle";
+import { MatchOutcomeChip } from "@/components/calendar/MatchResult";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -145,6 +146,8 @@ export function UpcomingEvents({
                     </p>
                   )}
                 </div>
+
+                {isMatch && !cancelled && <MatchOutcomeChip team={team} day={day} />}
 
                 {!isCoach && !cancelled && mode === "upcoming" && (
                   <span onClick={(e) => e.stopPropagation()} className="shrink-0">

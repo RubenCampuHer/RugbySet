@@ -41,6 +41,35 @@ export const TrainingDaySchema = z.object({
  * los valores se interpretan en lib/attendance.ts (un valor raro no debe
  * tumbar el parseo del equipo entero).
  */
+/**
+ * Resultado del partido (2026-09-25): eventData/{día}/match. Lo escribe el
+ * cuerpo técnico con el .write del equipo. Puntos y ensayos siempre desde
+ * nuestro lado (For = nosotros); `home` decide el orden al pintar el marcador.
+ * Vídeos por enlace; el acta es un PDF en Storage (match_reports/{equipo}/).
+ */
+const nullableCount = z.number().int().min(0).nullish().catch(null);
+export const MatchSchema = z.object({
+  opponent: z.string().nullish().catch(null),
+  home: z.boolean().nullish().catch(null),
+  status: z.enum(["pending", "played", "abandoned"]).nullish().catch(null),
+  pointsFor: nullableCount,
+  pointsAgainst: nullableCount,
+  triesFor: nullableCount,
+  triesAgainst: nullableCount,
+  videos: z
+    .record(
+      z.string(),
+      z.object({ url: z.string(), title: z.string().nullish(), addedAt: z.number().nullish() }).nullable().catch(null),
+    )
+    .default({})
+    .catch({}),
+  report: z
+    .object({ url: z.string(), path: z.string(), name: z.string().nullish(), uploadedAt: z.number().nullish() })
+    .nullish()
+    .catch(null),
+  updatedAt: z.number().nullish().catch(null),
+});
+
 export const EventDataSchema = z.object({
   // Asistencia real al pasar lista: present | late | absent | injured | excused.
   attendance: z.record(z.string(), z.string()).default({}).catch({}),
@@ -49,6 +78,7 @@ export const EventDataSchema = z.object({
     .record(z.string(), z.object({ reason: z.string().nullish(), at: z.number().nullish() }).catch({}))
     .default({})
     .catch({}),
+  match: MatchSchema.nullish().catch(null),
 });
 
 /**

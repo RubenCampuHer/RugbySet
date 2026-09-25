@@ -9,6 +9,7 @@ import { AttendanceToggle } from "@/components/AttendanceToggle";
 import { EventEditorSheet } from "@/components/calendar/EventEditorSheet";
 import { LineupEditor } from "@/components/calendar/LineupEditor";
 import { LineupSummary } from "@/components/calendar/LineupSummary";
+import { MatchResultCard, MatchResultEditor } from "@/components/calendar/MatchResult";
 import { RollCall } from "@/components/calendar/RollCall";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -343,6 +344,8 @@ export function DayPanel({
           </div>
         )}
 
+        {isMatch && <MatchResultCard team={team} day={day} />}
+
         {!isCoach && isMatch && day.lineupId && team.lineups[day.lineupId] && (
           <LineupSummary lineup={team.lineups[day.lineupId]} />
         )}
@@ -353,6 +356,7 @@ export function DayPanel({
               <TabsTrigger value="summary">Asistencia</TabsTrigger>
               <TabsTrigger value="rollcall">Pasar lista</TabsTrigger>
               {isMatch && <TabsTrigger value="lineup">Alineación</TabsTrigger>}
+              {isMatch && <TabsTrigger value="result">Resultado</TabsTrigger>}
             </TabsList>
             <TabsContent value="summary" className="space-y-3 pt-3">
               <div className="flex flex-wrap gap-1">
@@ -378,6 +382,11 @@ export function DayPanel({
             {isMatch && (
               <TabsContent value="lineup" className="pt-3">
                 <MatchLineupSection team={team} fecha={fecha} day={day} />
+              </TabsContent>
+            )}
+            {isMatch && (
+              <TabsContent value="result" className="pt-3">
+                <MatchResultEditor key={fecha} team={team} day={day} />
               </TabsContent>
             )}
           </Tabs>

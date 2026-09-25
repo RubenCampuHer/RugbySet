@@ -78,7 +78,7 @@ export function SquadEditor({ team, day }: { team: Team; day: TrainingDay }) {
           senderUserId: firebaseUser?.uid ?? "",
           senderUsername: profile?.username ?? "",
         });
-        description = `Aviso a ${list.length} convocados: ${sent} lo reciben en el móvil; el resto lo verá en sus avisos.`;
+        description = `Aviso a ${list.length} ${list.length === 1 ? "convocado" : "convocados"}: ${sent} lo reciben en el móvil; el resto lo verá en sus avisos.`;
         setNotify(false);
       }
       toast.success(visible ? "Convocatoria guardada y visible" : "Convocatoria guardada (solo la ve el cuerpo técnico)", {
@@ -197,7 +197,7 @@ export function SquadStatus({ team, day }: { team: Team; day: TrainingDay }) {
   return (
     <Badge variant="outline" className="gap-1">
       {squad.visible ? <Eye className="size-3" /> : <EyeOff className="size-3" />}
-      {squad.players.length} convocados{squad.visible ? "" : " · borrador"}
+      {squad.players.length} {squad.players.length === 1 ? "convocado" : "convocados"}{squad.visible ? "" : " · borrador"}
     </Badge>
   );
 }

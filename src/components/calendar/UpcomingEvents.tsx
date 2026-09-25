@@ -6,7 +6,7 @@ import { AttendanceToggle } from "@/components/AttendanceToggle";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { agendaGroups, limitGroups, relativeDayLabel } from "@/lib/agenda";
+import { agendaGroups, answerCounts, limitGroups, relativeDayLabel } from "@/lib/agenda";
 import { WEEKDAY_SHORT } from "@/lib/calendar";
 import { cn } from "@/lib/utils";
 import type { Team, TrainingDay } from "@/lib/types";
@@ -77,7 +77,7 @@ export function UpcomingEvents({
             const cancelled = day.cancelled === true;
             const accepted = day.accepted_players[myUid] === true;
             const declined = day.declined_players[myUid] === true;
-            const going = Object.keys(day.accepted_players).length;
+            const { going } = answerCounts(team, day);
             const activate = () => onSelectDay(day.fecha!);
 
             return (

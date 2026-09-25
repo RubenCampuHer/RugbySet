@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { agendaGroups, limitGroups, noAnswerUids, playerPending, relativeDayLabel, staffHome } from "./agenda";
+import { agendaGroups, answerCounts, limitGroups, noAnswerUids, playerPending, relativeDayLabel, staffHome } from "./agenda";
 import type { Team, TrainingDay } from "./types";
 
 function day(fecha: string, extra: Partial<TrainingDay> = {}): TrainingDay {
@@ -91,6 +91,15 @@ describe("staffHome", () => {
       ["rollcall", "20/09/2026", 1],
     ]);
     expect(nextMatch?.day.fecha).toBe("26/09/2026");
+  });
+
+  it("answerCounts ignora uids fuera del roster (entrenador, exjugadores) y valores false", () => {
+    const d = day("01/09/2026", {
+      accepted_players: { ana: true, coach: true, exjugador: true },
+      declined_players: { marc: true, otro: true },
+    });
+    expect(answerCounts(t, d)).toEqual({ going: 1, notGoing: 1 });
+    expect(answerCounts(t, day("02/09/2026", { accepted_players: { ana: false } as never }))).toEqual({ going: 0, notGoing: 0 });
   });
 
   it("noAnswerUids", () => {

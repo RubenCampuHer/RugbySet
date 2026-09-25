@@ -86,6 +86,20 @@ export function limitGroups(groups: AgendaGroup[], max: number): AgendaGroup[] {
   return out;
 }
 
+/**
+ * Jugadores del equipo que van / no van a un evento. Solo cuenta uids del
+ * roster con valor true: accepted_players también puede traer al entrenador
+ * o a exjugadores (datos reales de Android), y contar sus claves daba
+ * "Fueron 3 de 3" con dos jugadores.
+ */
+export function answerCounts(team: Team, day: TrainingDay): { going: number; notGoing: number } {
+  const players = Object.keys(team.userplayers);
+  return {
+    going: players.filter((uid) => day.accepted_players[uid] === true).length,
+    notGoing: players.filter((uid) => day.declined_players[uid] === true).length,
+  };
+}
+
 /** Jugadores del equipo que no han respondido (ni sí ni no) a un evento. */
 export function noAnswerUids(team: Team, day: TrainingDay): string[] {
   return Object.keys(team.userplayers).filter(

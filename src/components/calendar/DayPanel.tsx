@@ -25,6 +25,8 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { assignLineupToMatch, createLineup } from "@/lib/actions/lineup";
 import { sendAttendanceNotification } from "@/lib/actions/notify";
+import { answerCounts } from "@/lib/agenda";
+import { parseKey } from "@/lib/calendar";
 import { cn } from "@/lib/utils";
 import type { Team, TrainingDay } from "@/lib/types";
 
@@ -196,6 +198,13 @@ export function DayPanel({
   const cancelled = day.cancelled === true;
   const accepted = day.accepted_players[myUid] === true;
   const declined = day.declined_players[myUid] === true;
+  // Días anteriores a hoy: el jugador ve su estado pero ya no lo cambia (la
+  // respuesta es también la asistencia y editarla después altera los %).
+  const eventDate = parseKey(fecha);
+  const today = new Date();
+  const isPast =
+    eventDate != null &&
+    eventDate < new Date(today.getFullYear(), today.getMonth(), today.getDate());
   // Rosters por uid (2026-09-04): sin resolver nombres — team.userplayers,
   // accepted_players y declined_players ya son mapas {uid: true}.
   const noAnswerUids = Object.keys(team.userplayers).filter(
@@ -268,7 +277,13 @@ export function DayPanel({
           </p>
         )}
 
-        {!isCoach && !cancelled && (
+        {!isCoach && !cancelled && isPast && (
+          <p className="text-sm text-muted-foreground">
+            {accepted ? "Asististe." : declined ? "No asististe." : "No respondiste."}
+          </p>
+        )}
+
+        {!isCoach && !cancelled && !isPast && (
           <div className="space-y-2">
             <p className="font-medium">¿Asistirás?</p>
             <AttendanceToggle
@@ -293,10 +308,10 @@ export function DayPanel({
             <TabsContent value="summary" className="space-y-3 pt-3">
               <div className="flex flex-wrap gap-1">
                 <Badge variant="outline" className="gap-1">
-                  <Check className="size-3" /> {Object.keys(day.accepted_players).length}
+                  <Check className="size-3" /> {answerCounts(team, day).going}
                 </Badge>
                 <Badge variant="outline" className="gap-1">
-                  <X className="size-3" /> {Object.keys(day.declined_players).length}
+                  <X className="size-3" /> {answerCounts(team, day).notGoing}
                 </Badge>
                 <Badge variant="outline">{noAnswerCount} sin responder</Badge>
               </div>

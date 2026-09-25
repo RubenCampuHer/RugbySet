@@ -29,7 +29,7 @@ import { useMyTeams } from "@/hooks/useMyTeams";
 import { useTeam } from "@/hooks/useTeam";
 import { sendAttendanceNotification } from "@/lib/actions/notify";
 import { setAttendance } from "@/lib/actions/team";
-import { noAnswerUids, playerPending, relativeDayLabel, staffHome, type StaffTask } from "@/lib/agenda";
+import { answerCounts, noAnswerUids, playerPending, relativeDayLabel, staffHome, type StaffTask } from "@/lib/agenda";
 import { keyToParam } from "@/lib/calendar";
 import { isAdmin, isCoach, isTeamCoach } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
@@ -135,7 +135,7 @@ function StaffSection({ team }: { team: Team }) {
                 {nextMatch.day.location ? ` · ${nextMatch.day.location}` : ""}
               </p>
               <p className="text-muted-foreground">
-                Van {Object.keys(nextMatch.day.accepted_players).length} de {playerCount}
+                Van {answerCounts(team, nextMatch.day).going} de {playerCount}
               </p>
             </div>
             <Link href={calendarHref(nextMatch.day.fecha!)} className={buttonVariants({ size: "sm" })}>

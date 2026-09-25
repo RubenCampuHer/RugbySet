@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { AvatarInitials } from "@/components/AvatarInitials";
@@ -22,18 +22,28 @@ import { cn } from "@/lib/utils";
  * como qué entra (antes un COACH solo podía pedir ser co-entrenador). El
  * rol global no cambia — sigue pudiendo crear contenido.
  */
-export function JoinTeamForm({ onJoined }: { onJoined?: () => void }) {
+export function JoinTeamForm({
+  onJoined,
+  initialCode,
+  initialAs,
+}: {
+  onJoined?: () => void;
+  /** Enlace de invitación (/join?code=, 2026-09-25): se rellena y se busca solo. */
+  initialCode?: string | null;
+  /** /join?as=coach: preselecciona "Entrenador" (solo si puede elegir). */
+  initialAs?: JoinAs | null;
+}) {
   const { firebaseUser, profile } = useAuth();
-  const [code, setCode] = useState("");
+  const [code, setCode] = useState(initialCode ?? "");
   const [busy, setBusy] = useState(false);
   const [preview, setPreview] = useState<{ teamname: string; teamicon: string | null } | null>(null);
   const canChooseRole = profile?.role === "COACH" || profile?.role === "ADMIN";
   const defaultJoinAs: JoinAs = profile?.role === "COACH" ? "coach" : "player";
-  const [joinAsOverride, setJoinAsOverride] = useState<JoinAs | null>(null);
+  const [joinAsOverride, setJoinAsOverride] = useState<JoinAs | null>(initialAs ?? null);
   const joinAs = joinAsOverride ?? defaultJoinAs;
 
-  const search = async () => {
-    const trimmed = code.trim();
+  const search = async (value = code) => {
+    const trimmed = value.trim();
     if (!trimmed) return;
     setBusy(true);
     setPreview(null);
@@ -50,6 +60,15 @@ export function JoinTeamForm({ onJoined }: { onJoined?: () => void }) {
       setBusy(false);
     }
   };
+
+  // Enlace de invitación: previsualizar el equipo sin que el usuario pulse "Buscar".
+  const autoSearched = useRef(false);
+  useEffect(() => {
+    if (!initialCode || autoSearched.current || !firebaseUser) return;
+    autoSearched.current = true;
+    void search(initialCode);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- una sola vez, al tener sesión
+  }, [initialCode, firebaseUser]);
 
   const join = async () => {
     setBusy(true);

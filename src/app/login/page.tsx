@@ -27,6 +27,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { auth } from "@/lib/firebase";
+import { readNextParam } from "@/lib/invite-links";
 
 function loginErrorMessage(error: unknown): string {
   if (error instanceof FirebaseError) {
@@ -55,7 +56,7 @@ export default function LoginPage() {
   const [unverifiedUser, setUnverifiedUser] = useState<import("firebase/auth").User | null>(null);
 
   useEffect(() => {
-    if (firebaseUser) router.replace("/home");
+    if (firebaseUser) router.replace(readNextParam() ?? "/home");
   }, [firebaseUser, router]);
 
   const loginWithEmail = async (e: React.FormEvent) => {
@@ -71,7 +72,7 @@ export default function LoginPage() {
         await signOut(auth);
         return;
       }
-      router.replace("/home");
+      router.replace(readNextParam() ?? "/home");
     } catch (error) {
       setErrorMsg(loginErrorMessage(error));
     } finally {
@@ -85,7 +86,7 @@ export default function LoginPage() {
     setBusy(true);
     try {
       await signInWithPopup(auth, new GoogleAuthProvider());
-      router.replace("/home");
+      router.replace(readNextParam() ?? "/home");
     } catch (error) {
       setErrorMsg(loginErrorMessage(error));
     } finally {

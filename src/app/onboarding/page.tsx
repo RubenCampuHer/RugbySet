@@ -8,6 +8,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { BrandLoader } from "@/components/BrandLoader";
 import { Logo } from "@/components/Brand";
 import { JoinTeamForm } from "@/components/team/JoinTeamForm";
+import { nextSuffix, readNextParam, teamCodeFromNext } from "@/lib/invite-links";
 import { IconPicker, TeamForm } from "@/components/team/TeamForm";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -71,7 +72,7 @@ export default function OnboardingPage() {
   };
 
   useEffect(() => {
-    if (firebaseUser === null) router.replace("/login");
+    if (firebaseUser === null) router.replace(`/login${nextSuffix()}`);
   }, [firebaseUser, router]);
 
   const finish = async () => {
@@ -86,7 +87,7 @@ export default function OnboardingPage() {
         // El flag local ya deja pasar en esta pestaña; no bloquear la salida.
       }
     }
-    router.replace("/home");
+    router.replace(readNextParam() ?? "/home");
   };
 
   if (firebaseUser === undefined || firebaseUser === null || !profile) {
@@ -143,7 +144,7 @@ export default function OnboardingPage() {
 
           {step === "player" && (
             <div className="space-y-3">
-              <JoinTeamForm onJoined={() => void finish()} />
+              <JoinTeamForm initialCode={teamCodeFromNext(readNextParam())} onJoined={() => void finish()} />
               <Button variant="ghost" className="w-full" onClick={() => void finish()}>
                 Saltar por ahora
               </Button>

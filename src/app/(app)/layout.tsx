@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useTeam } from "@/hooks/useTeam";
+import { nextSuffix } from "@/lib/invite-links";
 import { isOnboardingDone } from "@/lib/onboarding-flag";
 import { isAdmin, isCoach, isTeamCoach } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
@@ -93,7 +94,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const NAV = isStaff ? STAFF_NAV : PLAYER_NAV;
 
   useEffect(() => {
-    if (firebaseUser === null) router.replace("/login");
+    if (firebaseUser === null) router.replace(`/login${nextSuffix()}`);
   }, [firebaseUser, router]);
 
   // Usuario nuevo (típicamente primer login con Google — la web no tiene
@@ -111,7 +112,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (firebaseUser && needsOnboarding) {
-      router.replace("/onboarding");
+      router.replace(`/onboarding${nextSuffix()}`);
     }
   }, [firebaseUser, needsOnboarding, router]);
 

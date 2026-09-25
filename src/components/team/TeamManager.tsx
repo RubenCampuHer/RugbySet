@@ -52,6 +52,8 @@ import {
   updateTeamIcon,
 } from "@/lib/actions/team";
 import { sendGeneralMessage } from "@/lib/actions/notify";
+import { InviteLinkDialog } from "@/components/InviteLinkDialog";
+import { teamInviteUrl } from "@/lib/invite-links";
 import { isAdmin, isCoach, isTeamCoach, isTeamFounder } from "@/lib/permissions";
 import { resizeAndUpload } from "@/lib/storage";
 import { validateTeamCode } from "@/lib/team-validation";
@@ -893,6 +895,28 @@ export function TeamManager({ teamname }: { teamname: string | null }) {
               </button>
             )}
             {canManage && <ChangeTeamCodeDialog teamname={team.teamname!} currentCode={team.teamcode ?? ""} />}
+            {canManage && team.teamcode && (
+              <InviteLinkDialog
+                title={`Invitar a ${team.teamname}`}
+                description="Quien abra el enlace podrá pedir entrar en el equipo. Tendrás que aceptarle, igual que con el código."
+                options={[
+                  {
+                    key: "player",
+                    label: "Jugador",
+                    url: teamInviteUrl(team.teamcode, "player"),
+                    hint: "Entrará como jugador cuando le aceptes.",
+                    shareText: `Únete a ${team.teamname} en RugbySet:`,
+                  },
+                  {
+                    key: "coach",
+                    label: "Co-entrenador",
+                    url: teamInviteUrl(team.teamcode, "coach"),
+                    hint: "Pedirá entrar como co-entrenador; lo aceptas tú.",
+                    shareText: `Únete como entrenador de ${team.teamname} en RugbySet:`,
+                  },
+                ]}
+              />
+            )}
             {isFounder && (
               <Badge className="border-transparent bg-primary/15 text-brand">
                 Eres el entrenador

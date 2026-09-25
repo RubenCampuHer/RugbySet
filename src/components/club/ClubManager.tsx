@@ -9,6 +9,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { AvatarInitials } from "@/components/AvatarInitials";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
+import { InviteLinkDialog } from "@/components/InviteLinkDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -49,6 +50,7 @@ import { PATHS } from "@/lib/constants";
 import { db } from "@/lib/firebase";
 import { parseMapOr, parseOr } from "@/lib/schemas/common";
 import { ExerciseSchema } from "@/lib/schemas/exercise";
+import { clubInviteUrl } from "@/lib/invite-links";
 import { isAdmin } from "@/lib/permissions";
 import { TeamSchema } from "@/lib/schemas/team";
 import { CLUB_CATEGORIES, validateClubName } from "@/lib/team-validation";
@@ -581,6 +583,21 @@ export function ClubManager({ club, viewingAsAdmin = false }: { club: Club; view
           <div className="flex flex-wrap items-center gap-1">
             {club.clubcode && (
               <span className="text-sm text-muted-foreground">Código: {club.clubcode}</span>
+            )}
+            {canManage && club.clubcode && (
+              <InviteLinkDialog
+                title={`Invitar equipos a ${club.clubname}`}
+                description="Envía el enlace al entrenador de un equipo: podrá pedir que su equipo entre en el club y un director lo aprobará."
+                options={[
+                  {
+                    key: "club",
+                    label: "Equipo",
+                    url: clubInviteUrl(club.clubcode),
+                    hint: "Solo sirve a entrenadores de equipos que aún no están en ningún club.",
+                    shareText: `Une tu equipo al club ${club.clubname} en RugbySet:`,
+                  },
+                ]}
+              />
             )}
             {isFounder && (
               <Badge className="border-transparent bg-primary/15 text-brand">

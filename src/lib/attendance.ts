@@ -46,6 +46,13 @@ export function attendanceMark(team: Team, day: TrainingDay, uid: string): Atten
   return (ATTENDANCE_MARKS as readonly string[]).includes(value ?? "") ? (value as AttendanceMark) : undefined;
 }
 
+/** Motivo que dio el jugador al decir que no, si lo hay (eventData/{día}/rsvpNotes/{uid}). */
+export function declineReason(team: Team, day: TrainingDay, uid: string): string | null {
+  const key = day.fecha ? eventDataKey(day.fecha) : null;
+  const reason = key ? team.eventData[key]?.rsvpNotes[uid]?.reason?.trim() : undefined;
+  return reason || null;
+}
+
 /**
  * Cómo cuenta un día para un jugador — mismo criterio que
  * functions/attendance.js del repo Android (mantener en sincronía): con marca

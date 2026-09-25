@@ -84,7 +84,7 @@ describe("staffHome", () => {
     day("01/08/2026"), // demasiado antiguo
     day("10/10/2026", { eventType: "MATCH" }), // lejano
   ]);
-  t.eventData = { "2026-09-20": { attendance: { ana: "present" } } };
+  t.eventData = { "2026-09-20": { rsvpNotes: {}, attendance: { ana: "present" } } };
 
   it("lista avisos pendientes primero y luego pasar lista", () => {
     const { tasks, nextMatch } = staffHome(t, now);

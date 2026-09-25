@@ -15,6 +15,7 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { AttendanceToggle } from "@/components/AttendanceToggle";
+import { useDeclineReason } from "@/components/calendar/DeclineReasonDialog";
 import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/PageHeader";
 import { ListRowsSkeleton } from "@/components/skeletons";
@@ -165,12 +166,15 @@ function StaffSection({ team }: { team: Team }) {
 function PlayerSection({ team, uid }: { team: Team; uid: string }) {
   const pending = useMemo(() => playerPending(team, uid), [team, uid]);
   const [busy, setBusy] = useState<string | null>(null);
+  const reasonFlow = useDeclineReason(team, uid);
 
   const answer = async (day: TrainingDay, status: "accepted" | "declined") => {
     setBusy(day.fecha!);
     try {
       await setAttendance({ teamname: team.teamname!, fecha: day.fecha!, playerUid: uid, status });
       toast.success(status === "accepted" ? "¡Apuntado!" : "Respuesta guardada");
+      if (status === "declined") reasonFlow.ask(day);
+      else void reasonFlow.clear(day);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "No se pudo guardar tu respuesta");
     } finally {
@@ -214,6 +218,7 @@ function PlayerSection({ team, uid }: { team: Team; uid: string }) {
         </CardContent>
       </Card>
       <AttendanceComparisonCard team={team} uid={uid} />
+      {reasonFlow.dialog}
     </>
   );
 }

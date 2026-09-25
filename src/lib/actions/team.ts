@@ -273,6 +273,26 @@ export async function setAttendanceMarks(opts: {
 }
 
 /**
+ * Motivo del propio jugador al decir que no (eventData/{día}/rsvpNotes/{uid},
+ * regla: solo él y solo si es jugador del equipo). null lo borra — p. ej. al
+ * cambiar a "sí". Solo web: Android no lo muestra.
+ */
+export async function setDeclineReason(opts: {
+  teamname: string;
+  fecha: string;
+  uid: string;
+  reason: string | null;
+}): Promise<void> {
+  const key = eventDataKey(opts.fecha);
+  if (!key) throw new Error("Fecha no válida");
+  const reason = opts.reason?.trim().slice(0, 200) || null;
+  await set(
+    ref(db, `${PATHS.TEAMS}/${opts.teamname}/eventData/${key}/rsvpNotes/${opts.uid}`),
+    reason ? { reason, at: Date.now() } : null,
+  );
+}
+
+/**
  * Confirmar/rechazar asistencia de un jugador en un día concreto. Escribe
  * SOLO la entrada propia de accepted/declined_players (rosters por uid,
  * 2026-09-04 — la regla ahora exige que sea TU entrada, o que quien escribe

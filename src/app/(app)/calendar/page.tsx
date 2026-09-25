@@ -17,6 +17,7 @@ import { useLoadingTimeout } from "@/hooks/useLoadingTimeout";
 import { useTeam } from "@/hooks/useTeam";
 import { setAttendance } from "@/lib/actions/team";
 import { attendedDatesFromTeam } from "@/lib/attendance";
+import { useDeclineReason } from "@/components/calendar/DeclineReasonDialog";
 import { paramToKey, todayKey } from "@/lib/calendar";
 import { isTeamCoach } from "@/lib/permissions";
 import type { TrainingDay } from "@/lib/types";
@@ -48,6 +49,7 @@ function CalendarContent() {
     deepLinkFecha ? Number(deepLinkFecha.split("/")[1]) - 1 : now.getMonth(),
   );
   const [selected, setSelected] = useState<string | null>(deepLinkFecha);
+  const reasonFlow = useDeclineReason(team, firebaseUser?.uid);
 
   const daysByFecha = useMemo(() => {
     const map = new Map<string, TrainingDay>();
@@ -125,6 +127,8 @@ function CalendarContent() {
         status,
       });
       toast.success(status === "accepted" ? "Asistencia confirmada" : "Asistencia rechazada");
+      if (status === "declined") reasonFlow.ask(day);
+      else void reasonFlow.clear(day);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "No se pudo guardar");
     }
@@ -171,8 +175,10 @@ function CalendarContent() {
           myUid={myUid}
           initialTab={selected === deepLinkFecha ? deepLinkTab : undefined}
           onAnswer={(status) => selectedDay && void submitOwnAttendance(selectedDay, status)}
+          onEditReason={() => selectedDay && reasonFlow.ask(selectedDay)}
         />
       )}
+      {reasonFlow.dialog}
     </div>
   );
 }

@@ -19,7 +19,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useProfilesByUid } from "@/hooks/useProfilesByUid";
 import { setAttendanceMarks } from "@/lib/actions/team";
-import { ATTENDANCE_MARK_LABEL, attendanceMark, type AttendanceMark } from "@/lib/attendance";
+import { ATTENDANCE_MARK_LABEL, attendanceMark, declineReason, type AttendanceMark } from "@/lib/attendance";
 import type { Team, TrainingDay } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -154,6 +154,7 @@ export function RollCall({ team, day }: { team: Team; day: TrainingDay }) {
                     <span className="block truncate text-sm">{name || "Jugador"}</span>
                     <span className="block truncate text-xs text-muted-foreground">
                       {RESPONSE_HINT[response(uid)]}
+                      {response(uid) === "declined" && declineReason(team, day, uid) && ` (${declineReason(team, day, uid)})`}
                       {extra && (
                         <>
                           {" · "}

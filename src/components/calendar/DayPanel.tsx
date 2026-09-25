@@ -26,7 +26,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { assignLineupToMatch, createLineup } from "@/lib/actions/lineup";
 import { sendAttendanceNotification } from "@/lib/actions/notify";
 import { answerCounts } from "@/lib/agenda";
-import { ATTENDANCE_MARK_LABEL, attendanceMark } from "@/lib/attendance";
+import { ATTENDANCE_MARK_LABEL, attendanceMark, declineReason } from "@/lib/attendance";
+import { useProfilesByUid } from "@/hooks/useProfilesByUid";
 import { parseKey } from "@/lib/calendar";
 import { cn } from "@/lib/utils";
 import type { Team, TrainingDay } from "@/lib/types";
@@ -144,6 +145,31 @@ function MatchLineupSection({ team, fecha, day }: { team: Team; fecha: string; d
   );
 }
 
+/** Quién ha dicho que no y por qué (motivo opcional, 2026-09-25) — vista del cuerpo técnico. */
+function DeclinedList({ team, day }: { team: Team; day: TrainingDay }) {
+  const uids = Object.keys(team.userplayers).filter((uid) => day.declined_players[uid] === true);
+  const profiles = useProfilesByUid(uids);
+  if (uids.length === 0) return null;
+  return (
+    <div className="space-y-1">
+      <p className="text-xs font-medium text-muted-foreground">No van</p>
+      <ul className="space-y-1 text-sm">
+        {uids.map((uid) => {
+          const reason = declineReason(team, day, uid);
+          return (
+            <li key={uid} className="flex min-w-0 items-baseline gap-2">
+              <span className="truncate">{profiles[uid]?.nameSurname || "Jugador"}</span>
+              <span className={cn("truncate text-xs", reason ? "text-muted-foreground" : "text-muted-foreground/60")}>
+                {reason ?? "sin motivo"}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
 /**
  * Panel del día seleccionado. Sin evento: mensaje claro para el jugador
  * (antes tocar un día vacío no daba ningún feedback) o botón de alta para
@@ -158,6 +184,7 @@ export function DayPanel({
   myUid,
   initialTab,
   onAnswer,
+  onEditReason,
 }: {
   team: Team;
   fecha: string;
@@ -167,6 +194,8 @@ export function DayPanel({
   /** Pestaña del coach al abrir (deep-link "Pasar lista" desde el inicio). */
   initialTab?: "summary" | "rollcall";
   onAnswer: (status: "accepted" | "declined") => void;
+  /** Abre el diálogo del motivo (jugador que ha dicho que no). */
+  onEditReason?: () => void;
 }) {
   const { profile, firebaseUser } = useAuth();
   const [editorOpen, setEditorOpen] = useState(false);
@@ -203,6 +232,7 @@ export function DayPanel({
   const accepted = day.accepted_players[myUid] === true;
   const declined = day.declined_players[myUid] === true;
   const myMark = attendanceMark(team, day, myUid);
+  const myReason = declineReason(team, day, myUid);
   // Días anteriores a hoy: el jugador ve su estado pero ya no lo cambia (la
   // respuesta es también la asistencia y editarla después altera los %).
   const eventDate = parseKey(fecha);
@@ -289,7 +319,7 @@ export function DayPanel({
               : accepted
                 ? "Dijiste que sí."
                 : declined
-                  ? "Dijiste que no."
+                  ? `Dijiste que no${myReason ? ` (${myReason})` : ""}.`
                   : "No respondiste."}
           </p>
         )}
@@ -302,6 +332,14 @@ export function DayPanel({
               onChange={onAnswer}
               labels
             />
+            {declined && onEditReason && (
+              <p className="text-sm text-muted-foreground">
+                {myReason ? <>Motivo: {myReason} · </> : null}
+                <button type="button" className="font-medium text-brand hover:underline" onClick={onEditReason}>
+                  {myReason ? "Cambiar" : "Añadir motivo"}
+                </button>
+              </p>
+            )}
           </div>
         )}
 
@@ -326,6 +364,7 @@ export function DayPanel({
                 </Badge>
                 <Badge variant="outline">{noAnswerCount} sin responder</Badge>
               </div>
+              <DeclinedList team={team} day={day} />
               {noAnswerCount > 0 && !cancelled && !isPast && (
                 <Button size="sm" variant="outline" disabled={sending} onClick={() => void sendConvocatoria()}>
                   <Send className="size-3.5" />

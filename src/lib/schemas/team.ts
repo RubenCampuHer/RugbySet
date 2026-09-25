@@ -44,6 +44,11 @@ export const TrainingDaySchema = z.object({
 export const EventDataSchema = z.object({
   // Asistencia real al pasar lista: present | late | absent | injured | excused.
   attendance: z.record(z.string(), z.string()).default({}).catch({}),
+  // Motivo opcional del jugador al decir que no (2026-09-25).
+  rsvpNotes: z
+    .record(z.string(), z.object({ reason: z.string().nullish(), at: z.number().nullish() }).catch({}))
+    .default({})
+    .catch({}),
 });
 
 export const TeamSchema = z.object({

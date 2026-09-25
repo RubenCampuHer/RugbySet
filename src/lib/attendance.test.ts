@@ -216,8 +216,8 @@ describe("dayOutcome / asistencia real", () => {
     const t = team({
       trainingdays: [d("01/09/2026", { accepted_players: { ana: true } }), d("08/09/2026")],
       eventData: {
-        "2026-09-01": { attendance: { ana: "absent" } },
-        "2026-09-08": { attendance: { ana: "late" } },
+        "2026-09-01": { rsvpNotes: {}, attendance: { ana: "absent" } },
+        "2026-09-08": { rsvpNotes: {}, attendance: { ana: "late" } },
       },
     });
     expect(dayOutcome(t, t.trainingdays[0], "ana")).toBe("missed");
@@ -230,9 +230,9 @@ describe("dayOutcome / asistencia real", () => {
     const t = team({
       trainingdays: [d("01/09/2026"), d("08/09/2026"), d("22/09/2026", { accepted_players: { ana: true } })],
       eventData: {
-        "2026-09-01": { attendance: { ana: "injured" } },
-        "2026-09-08": { attendance: { ana: "excused" } },
-        "2026-09-22": { attendance: { ana: "vino" } },
+        "2026-09-01": { rsvpNotes: {}, attendance: { ana: "injured" } },
+        "2026-09-08": { rsvpNotes: {}, attendance: { ana: "excused" } },
+        "2026-09-22": { rsvpNotes: {}, attendance: { ana: "vino" } },
       },
     });
     const dates = attendedDatesFromTeam(t, "ana");

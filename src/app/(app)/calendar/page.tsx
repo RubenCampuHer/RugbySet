@@ -34,6 +34,11 @@ function CalendarContent() {
     const dateParam = searchParams.get("date");
     return dateParam ? paramToKey(dateParam) : null;
   });
+  // ?tab=rollcall (enlace "Pasar lista" del inicio): abre esa pestaña del
+  // día enlazado; al elegir otro día vuelve la pestaña por defecto.
+  const [deepLinkTab] = useState(() =>
+    searchParams.get("tab") === "rollcall" ? ("rollcall" as const) : undefined,
+  );
 
   const now = new Date();
   const [year, setYear] = useState(() =>
@@ -164,6 +169,7 @@ function CalendarContent() {
           day={selectedDay}
           isCoach={isCoach}
           myUid={myUid}
+          initialTab={selected === deepLinkFecha ? deepLinkTab : undefined}
           onAnswer={(status) => selectedDay && void submitOwnAttendance(selectedDay, status)}
         />
       )}

@@ -39,8 +39,8 @@ function eventTitle(day: TrainingDay): string {
   return day.nameTrainingDay || day.training?.name || (day.eventType === "MATCH" ? "Partido" : "Entreno");
 }
 
-function calendarHref(fecha: string): string {
-  return `/calendar?date=${keyToParam(fecha)}`;
+function calendarHref(fecha: string, tab?: "rollcall"): string {
+  return `/calendar?date=${keyToParam(fecha)}${tab ? `&tab=${tab}` : ""}`;
 }
 
 function StaffTaskRow({ team, task }: { team: Team; task: StaffTask }) {
@@ -91,7 +91,7 @@ function StaffTaskRow({ team, task }: { team: Team; task: StaffTask }) {
           <Send className="size-3.5" /> {sending ? "Enviando…" : "Avisar"}
         </Button>
       ) : (
-        <Link href={calendarHref(task.fecha)} className={buttonVariants({ size: "sm", variant: "outline" })}>
+        <Link href={calendarHref(task.fecha, "rollcall")} className={buttonVariants({ size: "sm", variant: "outline" })}>
           <CalendarCheck className="size-3.5" /> Pasar lista
         </Link>
       )}

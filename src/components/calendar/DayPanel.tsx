@@ -155,6 +155,7 @@ export function DayPanel({
   day,
   isCoach,
   myUid,
+  initialTab,
   onAnswer,
 }: {
   team: Team;
@@ -162,6 +163,8 @@ export function DayPanel({
   day: TrainingDay | null;
   isCoach: boolean;
   myUid: string;
+  /** Pestaña del coach al abrir (deep-link "Pasar lista" desde el inicio). */
+  initialTab?: "summary" | "rollcall";
   onAnswer: (status: "accepted" | "declined") => void;
 }) {
   const { profile, firebaseUser } = useAuth();
@@ -299,7 +302,7 @@ export function DayPanel({
         )}
 
         {isCoach && (
-          <Tabs defaultValue="summary">
+          <Tabs defaultValue={initialTab ?? "summary"}>
             <TabsList>
               <TabsTrigger value="summary">Asistencia</TabsTrigger>
               <TabsTrigger value="rollcall">Pasar lista</TabsTrigger>
@@ -315,7 +318,7 @@ export function DayPanel({
                 </Badge>
                 <Badge variant="outline">{noAnswerCount} sin responder</Badge>
               </div>
-              {noAnswerCount > 0 && !cancelled && (
+              {noAnswerCount > 0 && !cancelled && !isPast && (
                 <Button size="sm" variant="outline" disabled={sending} onClick={() => void sendConvocatoria()}>
                   <Send className="size-3.5" />
                   {sending ? "Enviando…" : `Avisar a los que faltan (${noAnswerCount})`}

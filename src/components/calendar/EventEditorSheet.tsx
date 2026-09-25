@@ -126,7 +126,7 @@ export function EventEditorSheet({
           : isMatch
             ? "Partido creado"
             : "Entreno creado",
-        notified ? { description: `Avisados ${notified.recipients} jugadores (${notified.sent} en el móvil).` } : undefined,
+        notified ? { description: `Avisados ${notified.recipients} ${notified.recipients === 1 ? "jugador" : "jugadores"} (${notified.sent} en el móvil).` } : undefined,
       );
       onOpenChange(false);
     } catch (e) {
@@ -153,7 +153,7 @@ export function EventEditorSheet({
       const notified = await notifyTeam(cancelled ? "reactivated" : "cancelled");
       toast.success(cancelled ? "Evento reactivado" : "Evento cancelado", {
         description: notified
-          ? `Avisados ${notified.recipients} jugadores (${notified.sent} en el móvil).`
+          ? `Avisados ${notified.recipients} ${notified.recipients === 1 ? "jugador" : "jugadores"} (${notified.sent} en el móvil).`
           : undefined,
       });
       onOpenChange(false);

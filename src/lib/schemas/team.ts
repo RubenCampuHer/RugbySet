@@ -34,6 +34,18 @@ export const TrainingDaySchema = z.object({
   cancelled: z.boolean().nullish().catch(null),
 });
 
+/**
+ * Datos por evento fuera de trainingdays (paso 2 Kanteo, 2026-09-25): Android
+ * reescribe ese array entero, así que lo nuevo vive en
+ * Teams/{t}/eventData/{yyyy-MM-dd}. Solo lo usa la web. Lectura tolerante:
+ * los valores se interpretan en lib/attendance.ts (un valor raro no debe
+ * tumbar el parseo del equipo entero).
+ */
+export const EventDataSchema = z.object({
+  // Asistencia real al pasar lista: present | late | absent | injured | excused.
+  attendance: z.record(z.string(), z.string()).default({}).catch({}),
+});
+
 export const TeamSchema = z.object({
   teamname: z.string().nullish(),
   usercoach: z.string().nullish(), // uid del coach fundador — sigue siendo "el dueño" (borrar equipo, no puede salir sin borrarlo)
@@ -52,4 +64,5 @@ export const TeamSchema = z.object({
   // del fundador, que sí, ver buildTeam) — coach y jugador son cosas distintas.
   coaches: rtdbRecord(z.literal(true)).default({}),
   pendingCoaches: rtdbRecord(z.literal(true)).default({}),
+  eventData: z.record(z.string(), EventDataSchema).default({}).catch({}),
 });

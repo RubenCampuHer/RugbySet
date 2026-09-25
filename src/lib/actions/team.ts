@@ -4,6 +4,7 @@
 // denegada en varios casos. Referencia: TeamRepository.kt (multi-path).
 import { get, ref, set, update } from "firebase/database";
 import { httpsCallable } from "firebase/functions";
+import { eventDataKey, type AttendanceMark } from "@/lib/attendance";
 import { PATHS } from "@/lib/constants";
 import { db, functions } from "@/lib/firebase";
 import { parseOr } from "@/lib/schemas/common";
@@ -237,50 +238,38 @@ function toDateList(v: unknown): string[] {
 }
 
 /**
- * Pasar lista en bloque (2026-09-23): marca a varios jugadores de golpe en
- * una sola escritura multi-path del equipo, y luego la lista personal
- * assistedTrainingDays de cada uno (como setAttendance). Esa segunda parte
- * puede fallar por reglas si el equipo activo del jugador es otro: se
- * cuentan los fallos en vez de abortar, porque lo importante ya está escrito.
+ * Pasar lista con asistencia real (paso 2 Kanteo, 2026-09-25): escribe
+ * Teams/{t}/eventData/{yyyy-MM-dd}/attendance/{uid} sin tocar la respuesta del
+ * jugador (accepted/declined_players). null borra la marca (vuelve a contar su
+ * respuesta). Después, como setAttendanceBulk, la lista personal
+ * assistedTrainingDays que Android sigue leyendo: presente/tarde añaden la
+ * fecha y el resto la quita (Android no sabe excluir días justificados). Esa
+ * parte puede fallar por reglas si el equipo activo del jugador es otro: se
+ * cuenta en vez de abortar, porque la marca ya está guardada.
  */
-export async function setAttendanceBulk(opts: {
+export async function setAttendanceMarks(opts: {
   teamname: string;
   fecha: string;
-  playerUids: string[];
-  status: AttendanceStatus;
+  marks: Record<string, AttendanceMark | null>;
 }): Promise<{ marked: number; personalFailed: number }> {
-  const { teamname, fecha, playerUids, status } = opts;
-  if (playerUids.length === 0) return { marked: 0, personalFailed: 0 };
-  const daysSnap = await get(ref(db, `${PATHS.TEAMS}/${teamname}/trainingdays`));
-  let idx: string | null = null;
-  daysSnap.forEach((child) => {
-    if (child.child("fecha").val() === fecha) {
-      idx = child.key;
-      return true;
-    }
-    return false;
-  });
-  if (idx === null) throw new Error("Día de entreno no encontrado");
-
-  const updates: Record<string, unknown> = {};
-  for (const uid of playerUids) {
-    updates[`accepted_players/${uid}`] = status === "accepted" ? true : null;
-    updates[`declined_players/${uid}`] = status === "declined" ? true : null;
-  }
-  await update(ref(db, `${PATHS.TEAMS}/${teamname}/trainingdays/${idx}`), updates);
+  const { teamname, fecha, marks } = opts;
+  const key = eventDataKey(fecha);
+  if (!key) throw new Error("Fecha no válida");
+  const uids = Object.keys(marks);
+  if (uids.length === 0) return { marked: 0, personalFailed: 0 };
+  await update(ref(db, `${PATHS.TEAMS}/${teamname}/eventData/${key}/attendance`), marks);
 
   const results = await Promise.allSettled(
-    playerUids.map(async (uid) => {
-      const snap = await get(ref(db, `${PATHS.USERS}/${uid}/assistedTrainingDays`));
-      const days = toDateList(snap.val()).filter((d) => d !== fecha);
-      if (status === "accepted") days.push(fecha);
-      await update(ref(db, `${PATHS.USERS}/${uid}`), { assistedTrainingDays: days });
-    }),
+    uids
+      .filter((uid) => marks[uid] !== null)
+      .map(async (uid) => {
+        const snap = await get(ref(db, `${PATHS.USERS}/${uid}/assistedTrainingDays`));
+        const days = toDateList(snap.val()).filter((d) => d !== fecha);
+        if (marks[uid] === "present" || marks[uid] === "late") days.push(fecha);
+        await update(ref(db, `${PATHS.USERS}/${uid}`), { assistedTrainingDays: days });
+      }),
   );
-  return {
-    marked: playerUids.length,
-    personalFailed: results.filter((r) => r.status === "rejected").length,
-  };
+  return { marked: uids.length, personalFailed: results.filter((r) => r.status === "rejected").length };
 }
 
 /**

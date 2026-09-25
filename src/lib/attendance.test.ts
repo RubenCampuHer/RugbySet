@@ -3,7 +3,10 @@ import {
   attendanceDetailForPlayer,
   attendanceSummaryByPlayer,
   attendedDatesFromTeam,
+  calculateAttendanceRate,
   calculateStreak,
+  dayOutcome,
+  eventDataKey,
   presetRange,
   sessionsInRange,
 } from "./attendance";
@@ -26,6 +29,7 @@ function team(overrides: Partial<Team> = {}): Team {
     lineups: {},
     coaches: {},
     pendingCoaches: {},
+    eventData: {},
     ...overrides,
   };
 }
@@ -194,5 +198,53 @@ describe("presetRange", () => {
 
   it("'all' no acota por abajo", () => {
     expect(presetRange("all", new Date(2026, 2, 20))).toEqual({});
+  });
+});
+
+// Asistencia real (paso 2 Kanteo, 2026-09-25) — mismos casos que
+// functions/attendance.test.js del repo Android.
+describe("dayOutcome / asistencia real", () => {
+  const NOW = new Date(2026, 8, 25);
+  const d = (fecha: string, extra: Partial<Team["trainingdays"][number]> = {}) => ({
+    fecha,
+    accepted_players: {},
+    declined_players: {},
+    ...extra,
+  });
+
+  it("sin marca usa la respuesta; con marca manda la marca", () => {
+    const t = team({
+      trainingdays: [d("01/09/2026", { accepted_players: { ana: true } }), d("08/09/2026")],
+      eventData: {
+        "2026-09-01": { attendance: { ana: "absent" } },
+        "2026-09-08": { attendance: { ana: "late" } },
+      },
+    });
+    expect(dayOutcome(t, t.trainingdays[0], "ana")).toBe("missed");
+    expect(dayOutcome(t, t.trainingdays[1], "ana")).toBe("attended");
+    expect(dayOutcome(t, t.trainingdays[0], "marc")).toBe("missed");
+    expect(attendedDatesFromTeam(t, "ana")).toEqual(["08/09/2026"]);
+  });
+
+  it("lesionado/justificado no cuentan; valores desconocidos se ignoran", () => {
+    const t = team({
+      trainingdays: [d("01/09/2026"), d("08/09/2026"), d("22/09/2026", { accepted_players: { ana: true } })],
+      eventData: {
+        "2026-09-01": { attendance: { ana: "injured" } },
+        "2026-09-08": { attendance: { ana: "excused" } },
+        "2026-09-22": { attendance: { ana: "vino" } },
+      },
+    });
+    const dates = attendedDatesFromTeam(t, "ana");
+    expect(dates).toEqual(["22/09/2026"]);
+    expect(calculateAttendanceRate(t, dates, NOW, "ana")).toBe(100);
+    expect(calculateAttendanceRate(t, dates, NOW)).toBe(33);
+    const summary = attendanceSummaryByPlayer(t, {}, NOW).find((s) => s.uid === "ana")!;
+    expect(summary).toMatchObject({ attended: 1, total: 1, rate: 100 });
+  });
+
+  it("eventDataKey", () => {
+    expect(eventDataKey("02/09/2026")).toBe("2026-09-02");
+    expect(eventDataKey("2026-09-02")).toBeNull();
   });
 });

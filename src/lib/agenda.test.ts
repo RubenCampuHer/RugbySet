@@ -20,6 +20,7 @@ function team(trainingdays: TrainingDay[]): Team {
     lineups: {},
     coaches: {},
     pendingCoaches: {},
+    eventData: {},
   };
 }
 
@@ -77,11 +78,13 @@ describe("staffHome", () => {
   const t = team([
     day("24/09/2026", { accepted_players: { ana: true } }), // próximo, 1 sin responder
     day("26/09/2026", { eventType: "MATCH" }), // partido, 2 sin responder
-    day("20/09/2026", { declined_players: { marc: true } }), // pasado, 1 sin marcar
+    // pasado: ana con marca real; marc dijo que no pero nadie le pasó lista → 1 sin marcar
+    day("20/09/2026", { declined_players: { marc: true } }),
     day("21/09/2026", { cancelled: true }), // cancelado: nada
     day("01/08/2026"), // demasiado antiguo
     day("10/10/2026", { eventType: "MATCH" }), // lejano
   ]);
+  t.eventData = { "2026-09-20": { attendance: { ana: "present" } } };
 
   it("lista avisos pendientes primero y luego pasar lista", () => {
     const { tasks, nextMatch } = staffHome(t, now);

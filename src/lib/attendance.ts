@@ -21,8 +21,48 @@ export function countableDays(team: Team): TrainingDay[] {
   return team.trainingdays.filter((d) => d.cancelled !== true);
 }
 
-function teamTrainingDates(team: Team, now: Date): number[] {
-  return pastDateKeys(countableDays(team).map((d) => d.fecha), now);
+/** Asistencia real al pasar lista (paso 2 Kanteo, 2026-09-25): Teams/{t}/eventData/{yyyy-MM-dd}/attendance/{uid}. */
+export const ATTENDANCE_MARKS = ["present", "late", "absent", "injured", "excused"] as const;
+export type AttendanceMark = (typeof ATTENDANCE_MARKS)[number];
+
+export const ATTENDANCE_MARK_LABEL: Record<AttendanceMark, string> = {
+  present: "Presente",
+  late: "Tarde",
+  absent: "Faltó",
+  injured: "Lesionado",
+  excused: "Justificado",
+};
+
+/** "dd/MM/yyyy" → "yyyy-MM-dd", clave de eventData (las claves RTDB no admiten "/"). */
+export function eventDataKey(fecha: string): string | null {
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(fecha);
+  return m ? `${m[3]}-${m[2]}-${m[1]}` : null;
+}
+
+/** Marca real de un jugador en un día, si la hay (valores desconocidos se ignoran). */
+export function attendanceMark(team: Team, day: TrainingDay, uid: string): AttendanceMark | undefined {
+  const key = day.fecha ? eventDataKey(day.fecha) : null;
+  const value = key ? team.eventData[key]?.attendance[uid] : undefined;
+  return (ATTENDANCE_MARKS as readonly string[]).includes(value ?? "") ? (value as AttendanceMark) : undefined;
+}
+
+/**
+ * Cómo cuenta un día para un jugador — mismo criterio que
+ * functions/attendance.js del repo Android (mantener en sincronía): con marca
+ * real manda la marca ("late" = asistió; "injured"/"excused" = ese día no
+ * cuenta para él); sin marca, su respuesta (accepted_players), que es donde
+ * Android sigue pasando lista.
+ */
+export function dayOutcome(team: Team, day: TrainingDay, uid: string): "attended" | "missed" | "excluded" {
+  const mark = attendanceMark(team, day, uid);
+  if (mark === "injured" || mark === "excused") return "excluded";
+  if (mark) return mark === "present" || mark === "late" ? "attended" : "missed";
+  return day.accepted_players[uid] === true ? "attended" : "missed";
+}
+
+function teamTrainingDates(team: Team, now: Date, uid?: string): number[] {
+  const days = countableDays(team).filter((d) => !uid || dayOutcome(team, d, uid) !== "excluded");
+  return pastDateKeys(days.map((d) => d.fecha), now);
 }
 
 /**
@@ -38,7 +78,7 @@ function teamTrainingDates(team: Team, now: Date): number[] {
 export function attendedDatesFromTeam(team: Team | null | undefined, uid: string): string[] {
   if (!team || !uid) return [];
   return countableDays(team)
-    .filter((d) => d.fecha && d.accepted_players[uid] === true)
+    .filter((d) => d.fecha && dayOutcome(team, d, uid) === "attended")
     .map((d) => d.fecha!);
 }
 
@@ -51,8 +91,10 @@ export function calculateStreak(
   team: Team,
   assistedTrainingDays: string[],
   now = new Date(),
+  /** Con uid, los días en que ese jugador estaba lesionado/justificado no cuentan. */
+  uid?: string,
 ): number {
-  const teamDates = teamTrainingDates(team, now);
+  const teamDates = teamTrainingDates(team, now, uid);
   const userDates = pastDateKeys(assistedTrainingDays, now);
   let streak = 0;
   const min = Math.min(teamDates.length, userDates.length);
@@ -71,8 +113,10 @@ export function calculateMaxStreak(
   team: Team,
   assistedTrainingDays: string[],
   now = new Date(),
+  /** Con uid, los días en que ese jugador estaba lesionado/justificado no cuentan. */
+  uid?: string,
 ): number {
-  const teamDates = teamTrainingDates(team, now);
+  const teamDates = teamTrainingDates(team, now, uid);
   const userDates = new Set(pastDateKeys(assistedTrainingDays, now));
   if (teamDates.length === 0 || userDates.size === 0) return 0;
 
@@ -98,8 +142,10 @@ export function calculateAttendanceRate(
   team: Team,
   assistedTrainingDays: string[],
   now = new Date(),
+  /** Con uid, los días en que ese jugador estaba lesionado/justificado no cuentan. */
+  uid?: string,
 ): number {
-  const teamDates = teamTrainingDates(team, now);
+  const teamDates = teamTrainingDates(team, now, uid);
   if (teamDates.length === 0) return 0;
   const userDates = new Set(pastDateKeys(assistedTrainingDays, now));
   const attended = teamDates.filter((d) => userDates.has(d)).length;
@@ -143,19 +189,20 @@ export type PlayerAttendanceSummary = {
   streak: number;
 };
 
-/** Resumen de asistencia por jugador dentro de un rango — un total distinto de 0 significa que hay sesiones en el rango (igual para todos los jugadores). */
+/** Resumen de asistencia por jugador dentro de un rango — el total puede variar por jugador (sus días lesionado/justificado no cuentan). */
 export function attendanceSummaryByPlayer(
   team: Team,
   range: DateRange,
   now = new Date(),
 ): PlayerAttendanceSummary[] {
   const sessions = sessionsInRange(team, range, now);
-  const total = sessions.length;
   return Object.keys(team.userplayers).map((uid) => {
-    const attended = sessions.filter((s) => s.accepted_players[uid] === true).length;
+    const mine = sessions.filter((s) => dayOutcome(team, s, uid) !== "excluded");
+    const total = mine.length;
+    const attended = mine.filter((s) => dayOutcome(team, s, uid) === "attended").length;
     let streak = 0;
-    for (let i = sessions.length - 1; i >= 0; i--) {
-      if (sessions[i].accepted_players[uid] === true) streak++;
+    for (let i = mine.length - 1; i >= 0; i--) {
+      if (dayOutcome(team, mine[i], uid) === "attended") streak++;
       else break;
     }
     return {
@@ -172,7 +219,10 @@ export type PlayerAttendanceDetail = {
   fecha: string;
   nameTrainingDay: string | null | undefined;
   eventType: "TRAINING" | "MATCH" | null | undefined;
+  /** Respuesta del jugador (Sí/No). */
   status: "accepted" | "declined" | "none";
+  /** Asistencia real si se pasó lista con la web. */
+  mark?: AttendanceMark;
 };
 
 /** Desglose día a día de un jugador dentro de un rango (para el detalle desplegable del informe). */
@@ -191,6 +241,7 @@ export function attendanceDetailForPlayer(
       : s.declined_players[uid] === true
         ? "declined"
         : "none",
+    mark: attendanceMark(team, s, uid),
   }));
 }
 
@@ -274,7 +325,7 @@ export type MonthlyAttendance = {
   /** 0-11 */
   month: number;
   sessions: number;
-  /** % propio del mes, null si el uid no se pasa. */
+  /** % propio del mes; null si no se pasa uid o si ese mes no cuenta para él (lesionado/justificado). */
   mine: number | null;
   /** Media del equipo en el mes. */
   teamAverage: number;
@@ -296,16 +347,18 @@ export function attendanceByMonth(
     list.push(s);
     byMonth.set(key, list);
   }
-  const pct = (sessions: TrainingDay[], id: string) =>
-    Math.round((sessions.filter((s) => s.accepted_players[id] === true).length / sessions.length) * 100);
+  // null = ese mes no cuenta para él (todo lesionado/justificado).
+  const pct = (sessions: TrainingDay[], id: string): number | null => {
+    const mine = sessions.filter((s) => dayOutcome(team, s, id) !== "excluded");
+    if (mine.length === 0) return null;
+    return Math.round((mine.filter((s) => dayOutcome(team, s, id) === "attended").length / mine.length) * 100);
+  };
   return [...byMonth.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([key, sessions]) => {
       const [y, m] = key.split("-").map(Number);
-      const teamAverage =
-        players.length === 0
-          ? 0
-          : Math.round(players.reduce((sum, p) => sum + pct(sessions, p), 0) / players.length);
+      const rates = players.map((p) => pct(sessions, p)).filter((r): r is number => r !== null);
+      const teamAverage = rates.length === 0 ? 0 : Math.round(rates.reduce((sum, r) => sum + r, 0) / rates.length);
       return {
         key,
         year: y,

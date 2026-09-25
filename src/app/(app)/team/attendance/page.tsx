@@ -26,6 +26,7 @@ import { useProfilesByUid } from "@/hooks/useProfilesByUid";
 import { useTeam } from "@/hooks/useTeam";
 import {
   ATTENDANCE_PRESET_LABELS,
+  ATTENDANCE_MARK_LABEL,
   attendanceDetailForPlayer,
   attendanceSummaryByPlayer,
   presetRange,
@@ -34,6 +35,7 @@ import {
 } from "@/lib/attendance";
 import { downloadCsv, toCsv } from "@/lib/csv";
 import { isAdmin, isTeamCoach } from "@/lib/permissions";
+import { cn } from "@/lib/utils";
 
 /** "yyyy-MM-dd" (formato nativo de <input type="date">) → Date en medianoche local — mismo criterio que parseKey/toKey (lib/calendar.ts), sin pasar por UTC. */
 function parseDateInputLocal(value: string): Date | undefined {
@@ -138,7 +140,7 @@ function TeamAttendance() {
           d.fecha,
           d.eventType === "MATCH" ? "Partido" : "Entrenamiento",
           d.nameTrainingDay ?? "",
-          STATUS_LABEL[d.status],
+          d.mark ? ATTENDANCE_MARK_LABEL[d.mark] : STATUS_LABEL[d.status],
         ]);
       }
     }
@@ -265,14 +267,25 @@ function TeamAttendance() {
                             {d.fecha}
                             {d.nameTrainingDay ? ` · ${d.nameTrainingDay}` : ""}
                           </span>
-                          {d.status === "accepted" && (
-                            <Check className="size-3.5 shrink-0 text-accent" />
-                          )}
-                          {d.status === "declined" && (
-                            <X className="size-3.5 shrink-0 text-destructive" />
-                          )}
-                          {d.status === "none" && (
-                            <span className="shrink-0 text-muted-foreground">—</span>
+                          {/* Con lista pasada en la web manda la marca real; si no, la respuesta. */}
+                          {d.mark ? (
+                            <span
+                              className={cn(
+                                "shrink-0 font-medium",
+                                d.mark === "present" && "text-accent",
+                                d.mark === "late" && "text-warning",
+                                d.mark === "absent" && "text-destructive",
+                                (d.mark === "injured" || d.mark === "excused") && "text-muted-foreground",
+                              )}
+                            >
+                              {ATTENDANCE_MARK_LABEL[d.mark]}
+                            </span>
+                          ) : (
+                            <>
+                              {d.status === "accepted" && <Check className="size-3.5 shrink-0 text-accent" />}
+                              {d.status === "declined" && <X className="size-3.5 shrink-0 text-destructive" />}
+                              {d.status === "none" && <span className="shrink-0 text-muted-foreground">—</span>}
+                            </>
                           )}
                         </div>
                       ))}

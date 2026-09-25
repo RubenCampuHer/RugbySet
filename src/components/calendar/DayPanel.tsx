@@ -26,6 +26,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { assignLineupToMatch, createLineup } from "@/lib/actions/lineup";
 import { sendAttendanceNotification } from "@/lib/actions/notify";
 import { answerCounts } from "@/lib/agenda";
+import { ATTENDANCE_MARK_LABEL, attendanceMark } from "@/lib/attendance";
 import { parseKey } from "@/lib/calendar";
 import { cn } from "@/lib/utils";
 import type { Team, TrainingDay } from "@/lib/types";
@@ -201,6 +202,7 @@ export function DayPanel({
   const cancelled = day.cancelled === true;
   const accepted = day.accepted_players[myUid] === true;
   const declined = day.declined_players[myUid] === true;
+  const myMark = attendanceMark(team, day, myUid);
   // Días anteriores a hoy: el jugador ve su estado pero ya no lo cambia (la
   // respuesta es también la asistencia y editarla después altera los %).
   const eventDate = parseKey(fecha);
@@ -282,7 +284,13 @@ export function DayPanel({
 
         {!isCoach && !cancelled && isPast && (
           <p className="text-sm text-muted-foreground">
-            {accepted ? "Asististe." : declined ? "No asististe." : "No respondiste."}
+            {myMark
+              ? `Asistencia: ${ATTENDANCE_MARK_LABEL[myMark]}.`
+              : accepted
+                ? "Dijiste que sí."
+                : declined
+                  ? "Dijiste que no."
+                  : "No respondiste."}
           </p>
         )}
 

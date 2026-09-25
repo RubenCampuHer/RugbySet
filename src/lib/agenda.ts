@@ -1,6 +1,6 @@
 // Lógica pura de la agenda y del inicio (2026-09-23): fechas relativas,
 // agrupación por semanas y tareas pendientes por rol. Sin Firebase ni React.
-import { startOfWeekMonday } from "./attendance";
+import { attendanceMark, startOfWeekMonday } from "./attendance";
 import { MONTHS, parseKey } from "./calendar";
 import type { Team, TrainingDay } from "./types";
 
@@ -107,6 +107,11 @@ export function noAnswerUids(team: Team, day: TrainingDay): string[] {
   );
 }
 
+/** Jugadores sin marca de asistencia real en un evento (paso 2 Kanteo, 2026-09-25). */
+export function unmarkedUids(team: Team, day: TrainingDay): string[] {
+  return Object.keys(team.userplayers).filter((uid) => !attendanceMark(team, day, uid));
+}
+
 export type StaffTask = {
   kind: "unanswered" | "rollcall";
   fecha: string;
@@ -128,11 +133,12 @@ export function staffHome(team: Team, now = new Date(), aheadDays = 7, behindDay
     const date = day.fecha ? parseKey(day.fecha) : null;
     if (!date || day.cancelled === true) continue;
     const diff = dayDiff(now, date);
-    const count = noAnswerUids(team, day).length;
-    if (diff >= 0 && diff <= aheadDays && count > 0) {
-      tasks.push({ kind: "unanswered", fecha: day.fecha!, day, count });
-    } else if (diff < 0 && diff >= -behindDays && count > 0) {
-      tasks.push({ kind: "rollcall", fecha: day.fecha!, day, count });
+    const unanswered = noAnswerUids(team, day).length;
+    const unmarked = unmarkedUids(team, day).length;
+    if (diff >= 0 && diff <= aheadDays && unanswered > 0) {
+      tasks.push({ kind: "unanswered", fecha: day.fecha!, day, count: unanswered });
+    } else if (diff < 0 && diff >= -behindDays && unmarked > 0) {
+      tasks.push({ kind: "rollcall", fecha: day.fecha!, day, count: unmarked });
     }
     if (day.eventType === "MATCH" && diff >= 0 && (!nextMatch || date < nextMatch.date)) {
       nextMatch = { day, date };

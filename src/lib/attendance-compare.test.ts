@@ -31,6 +31,7 @@ function team(trainingdays: TrainingDay[], players = ["ana", "marc", "leo"]): Te
     lineups: {},
     coaches: {},
     pendingCoaches: {},
+    eventData: {},
   };
 }
 

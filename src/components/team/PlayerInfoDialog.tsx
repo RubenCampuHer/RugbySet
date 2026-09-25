@@ -94,30 +94,10 @@ export function PlayerInfoDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {positions.length > 0 && (
-          <div className="flex flex-wrap gap-1.5" aria-label="Puestos elegidos, en orden">
-            {positions.map((p, i) => (
-              <button
-                key={p}
-                type="button"
-                onClick={() => setPositions(makeMain(positions, p))}
-                className={cn(
-                  "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
-                  i === 0 ? "border-brand bg-brand/15 text-brand" : "text-muted-foreground hover:text-foreground",
-                )}
-                title={i === 0 ? "Puesto principal" : "Hacer principal"}
-              >
-                {i === 0 && <Star className="size-3 fill-current" />}
-                {p} · {POSITION_SHORT[p]}
-              </button>
-            ))}
-          </div>
-        )}
-
         {POSITION_GROUPS.map((group) => (
           <div key={group.label} className="space-y-1.5">
             <p className="text-xs font-medium text-muted-foreground">{group.label}</p>
-            <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+            <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
               {group.positions.map((p) => {
                 const selected = positions.includes(p);
                 const full = !selected && positions.length >= MAX_POSITIONS;
@@ -143,6 +123,25 @@ export function PlayerInfoDialog({
             </div>
           </div>
         ))}
+
+        <div className="flex min-h-7 flex-wrap items-center gap-1.5" aria-label="Puestos elegidos, en orden">
+          {positions.length === 0 && <span className="text-xs text-muted-foreground">Sin puestos elegidos.</span>}
+          {positions.map((p, i) => (
+            <button
+              key={p}
+              type="button"
+              onClick={() => setPositions(makeMain(positions, p))}
+              className={cn(
+                "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
+                i === 0 ? "border-brand bg-brand/15 text-brand" : "text-muted-foreground hover:text-foreground",
+              )}
+              title={i === 0 ? "Puesto principal" : "Hacer principal"}
+            >
+              {i === 0 && <Star className="size-3 fill-current" />}
+              {p} · {POSITION_SHORT[p]}
+            </button>
+          ))}
+        </div>
 
         <div className="grid grid-cols-2 items-end gap-3">
           <div className="space-y-1">

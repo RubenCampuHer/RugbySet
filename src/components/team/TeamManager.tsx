@@ -903,16 +903,9 @@ export function TeamManager({ teamname }: { teamname: string | null }) {
                   {
                     key: "player",
                     label: "Jugador",
-                    url: teamInviteUrl(team.teamcode, "player"),
-                    hint: "Entrará como jugador cuando le aceptes.",
+                    url: teamInviteUrl(team.teamcode),
+                    hint: "Entrará como jugador cuando le aceptes. Para hacerle co-entrenador, asciéndele desde la lista de jugadores.",
                     shareText: `Únete a ${team.teamname} en RugbySet:`,
-                  },
-                  {
-                    key: "coach",
-                    label: "Co-entrenador",
-                    url: teamInviteUrl(team.teamcode, "coach"),
-                    hint: "Pedirá entrar como co-entrenador; lo aceptas tú.",
-                    shareText: `Únete como entrenador de ${team.teamname} en RugbySet:`,
                   },
                 ]}
               />

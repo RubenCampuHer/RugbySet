@@ -5,8 +5,7 @@ const BASE = "https://rugbyset.web.app";
 
 describe("invite-links", () => {
   it("enlaces de equipo y club codifican el código", () => {
-    expect(teamInviteUrl("SP@", "player", BASE)).toBe(`${BASE}/join?code=SP%40`);
-    expect(teamInviteUrl("ABC", "coach", BASE)).toBe(`${BASE}/join?code=ABC&as=coach`);
+    expect(teamInviteUrl("SP@", BASE)).toBe(`${BASE}/join?code=SP%40`);
     expect(clubInviteUrl("CLUB 1", BASE)).toBe(`${BASE}/join-club?code=CLUB+1`);
   });
 
@@ -19,7 +18,7 @@ describe("invite-links", () => {
   });
 
   it("teamCodeFromNext", () => {
-    expect(teamCodeFromNext("/join?code=SP%40&as=coach")).toBe("SP@");
+    expect(teamCodeFromNext("/join?code=SP%40")).toBe("SP@");
     expect(teamCodeFromNext("/join-club?code=X")).toBeNull();
     expect(teamCodeFromNext(null)).toBeNull();
   });

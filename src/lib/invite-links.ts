@@ -2,19 +2,15 @@
 // siempre: no da acceso directo, ahorra escribirlo. Ingreso con aprobación,
 // igual que por código (Cloud Function joinTeamByCode / pendingTeams del club).
 
-export type InviteRole = "player" | "coach";
-
 const FALLBACK_ORIGIN = "https://rugbyset.web.app";
 
 function origin(): string {
   return typeof window !== "undefined" ? window.location.origin : FALLBACK_ORIGIN;
 }
 
-/** Enlace para unirse a un equipo; `coach` pide entrar como co-entrenador. */
-export function teamInviteUrl(teamcode: string, role: InviteRole = "player", base = origin()): string {
-  const params = new URLSearchParams({ code: teamcode });
-  if (role === "coach") params.set("as", "coach");
-  return `${base}/join?${params.toString()}`;
+/** Enlace para unirse a un equipo (siempre como jugador). */
+export function teamInviteUrl(teamcode: string, base = origin()): string {
+  return `${base}/join?${new URLSearchParams({ code: teamcode }).toString()}`;
 }
 
 /** Enlace para que el entrenador de un equipo pida entrar en el club. */

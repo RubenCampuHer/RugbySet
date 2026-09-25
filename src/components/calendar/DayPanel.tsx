@@ -281,7 +281,7 @@ export function DayPanel({
                 <Trophy className="size-3" /> Partido
               </Badge>
             )}
-            {day.nameTrainingDay || day.training?.name || "Entreno"}
+            {day.nameTrainingDay || day.training?.name || (isMatch ? "Partido" : "Entreno")}
           </span>
           <span className="text-sm font-normal text-muted-foreground">
             {day.horaInicio}–{day.horaFin}
@@ -352,7 +352,7 @@ export function DayPanel({
 
         {isCoach && (
           <Tabs defaultValue={initialTab ?? "summary"}>
-            <TabsList>
+            <TabsList className="w-full [&>*]:min-w-0 [&>*]:px-1 [&>*]:text-xs sm:[&>*]:text-sm">
               <TabsTrigger value="summary">Asistencia</TabsTrigger>
               <TabsTrigger value="rollcall">Pasar lista</TabsTrigger>
               {isMatch && <TabsTrigger value="lineup">Alineación</TabsTrigger>}

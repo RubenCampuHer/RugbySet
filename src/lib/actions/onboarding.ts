@@ -131,12 +131,20 @@ export async function createStandaloneTeam(opts: {
   await update(ref(db), {
     [`${PATHS.TEAMS}/${opts.teamName}`]: team,
     [`${PATHS.USERS}/${opts.uid}/teamname`]: opts.teamName,
-    // Varios equipos (fase 1, 2026-09-04): la pertenencia va en el mismo
-    // update — la regla de UserTeams evalúa `root` ya combinado, así que
-    // tanto "soy usercoach del equipo" como "coincide con mi teamname" son
-    // ciertos en esta misma escritura.
-    [`${PATHS.USER_TEAMS}/${opts.uid}/${opts.teamName}`]: true,
   });
+  await linkFounder(opts.uid, opts.teamName);
+}
+
+/**
+ * UserTeams/{uid}/{team} del fundador, SIEMPRE en una escritura aparte y
+ * después de crear Teams/{team}: su regla consulta
+ * Teams/{team}/usercoach y, en producción, una regla no ve lo que otra ruta
+ * de la MISMA escritura multi-path está creando (el emulador sí lo acepta).
+ * En una sola escritura daba PERMISSION_DENIED al crear equipo (QA
+ * 2026-09-25). Mismo orden que Android (TeamRepository.createTeam).
+ */
+async function linkFounder(uid: string, teamName: string): Promise<void> {
+  await update(ref(db), { [`${PATHS.USER_TEAMS}/${uid}/${teamName}`]: true });
 }
 
 /**
@@ -177,10 +185,10 @@ export async function createAdditionalTeam(opts: {
   });
   const updates: Record<string, unknown> = {
     [`${PATHS.TEAMS}/${opts.teamName}`]: team,
-    [`${PATHS.USER_TEAMS}/${opts.uid}/${opts.teamName}`]: true,
   };
   if (opts.setActive) updates[`${PATHS.USERS}/${opts.uid}/teamname`] = opts.teamName;
   await update(ref(db), updates);
+  await linkFounder(opts.uid, opts.teamName);
 
   if (opts.club?.clubId) {
     const teams = opts.club.teams.includes(opts.teamName)
@@ -248,8 +256,8 @@ export async function createClubAndTeam(opts: {
   await update(ref(db), {
     [`${PATHS.TEAMS}/${opts.teamName}`]: team,
     [`${PATHS.USERS}/${opts.uid}/teamname`]: opts.teamName,
-    [`${PATHS.USER_TEAMS}/${opts.uid}/${opts.teamName}`]: true, // ver createStandaloneTeam
   });
+  await linkFounder(opts.uid, opts.teamName);
   // Puntero de descubrimiento del club que dirijo (rediseño multi-director
   // 2026-09-03) — mismo criterio que createClub en actions/club.ts.
   await update(ref(db, `${PATHS.USERS}/${opts.uid}`), { directorOfClubId: clubId });

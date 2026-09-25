@@ -4,7 +4,7 @@ import type { z } from "zod";
 import type { ClubSchema } from "../schemas/club";
 import type { ExerciseSchema } from "../schemas/exercise";
 import type { LineupDocSchema } from "../schemas/lineup";
-import type { TeamSchema, TrainingDaySchema } from "../schemas/team";
+import type { PlayerInfoSchema, TeamSchema, TrainingDaySchema } from "../schemas/team";
 import type { ExerciseTrainingSchema, SectionSchema, TrainingSchema } from "../schemas/training";
 import type {
   AttendanceStatsSchema,
@@ -25,6 +25,7 @@ export type Section = z.infer<typeof SectionSchema>;
 export type ExerciseTraining = z.infer<typeof ExerciseTrainingSchema>;
 export type Team = z.infer<typeof TeamSchema>;
 export type TrainingDay = z.infer<typeof TrainingDaySchema>;
+export type PlayerInfo = z.infer<typeof PlayerInfoSchema>;
 export type LineupDoc = z.infer<typeof LineupDocSchema>;
 export type Club = z.infer<typeof ClubSchema>;
 

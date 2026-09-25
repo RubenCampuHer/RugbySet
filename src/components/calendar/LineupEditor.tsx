@@ -1,145 +1,158 @@
 "use client";
 
-import { Plus, Trash2, Undo2, X } from "lucide-react";
-import { useState } from "react";
+import { Plus, Star, Trash2, UserPlus, X } from "lucide-react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
+import { AvatarInitials } from "@/components/AvatarInitials";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { LineupPitch, type PitchSlot } from "@/components/lineup/LineupPitch";
+import { SearchInput } from "@/components/SearchInput";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useProfilesByUid } from "@/hooks/useProfilesByUid";
 import { deleteLineup, updateLineup } from "@/lib/actions/lineup";
 import {
-  findDuplicateName,
+  findDuplicateSlot,
+  lineupSlots,
   nextBenchNumber,
   RUGBY_POSITIONS,
-  STARTER_POSITIONS,
-  takenNames,
+  slotsToStored,
+  type LineupSlot,
+  type LineupSlots,
 } from "@/lib/lineup";
+import { POSITION_SHORT, playerInfoOf, positionFit, rankCandidates, type Candidate } from "@/lib/player-info";
 import type { LineupDoc, Team } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 const NO_TEMPLATE = "__none__";
-const NONE = "__none__";
-const MANUAL = "__manual__";
+
+type SlotKey = { kind: "starters" | "bench"; key: string };
 
 /**
- * Fila de una posición/dorsal: Select con el roster del equipo (menos los
- * ya asignados a otra fila) + una opción "Otro" que cambia la fila a texto
- * libre — para convocar a alguien sin cuenta en la app (un juvenil que
- * sube, un fichaje nuevo…). El valor guardado es el mismo texto tanto si
- * viene del roster como si se escribió a mano.
+ * Selector de jugador para un puesto: primero quien tiene ese puesto en su
+ * ficha (★ principal), luego el resto, lesionados al final. Elegir a alguien
+ * que ya está en otro puesto lo MUEVE aquí. Admite un nombre escrito a mano
+ * (alguien sin cuenta: un juvenil que sube, un fichaje nuevo…).
  */
-function LineupRow({
-  rowKey,
-  label,
-  value,
-  players,
-  takenElsewhere,
-  onChange,
-  onRemove,
+function SlotPicker({
+  target,
+  candidates,
+  where,
+  current,
+  onPick,
+  onClose,
 }: {
-  rowKey: string;
-  label: string;
-  value: string;
-  players: string[];
-  takenElsewhere: Set<string>;
-  onChange: (name: string) => void;
-  onRemove?: () => void;
+  target: SlotKey;
+  candidates: Candidate[];
+  /** Dónde está ya cada uid ("12", "S16"…). */
+  where: Map<string, string>;
+  current: LineupSlot | undefined;
+  onPick: (slot: LineupSlot | null) => void;
+  onClose: () => void;
 }) {
-  const inRoster = value === "" || players.includes(value);
-  const [manual, setManual] = useState(!inRoster);
-  const options = players.filter((p) => !takenElsewhere.has(p));
+  const [search, setSearch] = useState("");
+  const [manual, setManual] = useState(current && !current.uid ? current.name : "");
+  const pos = target.kind === "starters" ? Number(target.key) : null;
+  const title = pos ? `${pos} · ${RUGBY_POSITIONS[pos]}` : `Suplente ${target.key}`;
+
+  const ranked = pos ? rankCandidates(candidates, pos) : [...candidates].sort((a, b) => a.name.localeCompare(b.name, "es"));
+  const visible = ranked.filter((c) => c.name.toLowerCase().includes(search.toLowerCase()));
+  const fits = pos ? visible.filter((c) => !c.info.injured && positionFit(c.info, pos)) : [];
+  const rest = visible.filter((c) => !c.info.injured && !(pos && positionFit(c.info, pos)));
+  const injured = visible.filter((c) => c.info.injured);
+
+  const row = (c: Candidate) => {
+    const fit = pos ? positionFit(c.info, pos) : null;
+    const at = where.get(c.uid);
+    const isCurrent = current?.uid === c.uid;
+    return (
+      <button
+        key={c.uid}
+        type="button"
+        onClick={() => onPick({ name: c.name, uid: c.uid })}
+        className={cn(
+          "flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-muted",
+          isCurrent && "bg-brand/10",
+        )}
+      >
+        <AvatarInitials name={c.name} size="sm" />
+        <span className="min-w-0 flex-1">
+          <span className="flex items-center gap-1.5 truncate text-sm font-medium">
+            {fit === "main" && <Star className="size-3 shrink-0 fill-brand text-brand" />}
+            {c.name}
+            {c.info.number ? <span className="text-xs font-normal text-muted-foreground">#{c.info.number}</span> : null}
+          </span>
+          <span className="block truncate text-xs text-muted-foreground">
+            {c.info.positions.length > 0 ? c.info.positions.map((p) => POSITION_SHORT[p]).join(" · ") : "Sin puestos en su ficha"}
+          </span>
+        </span>
+        {c.info.injured && <span className="shrink-0 text-xs text-destructive">Lesionado</span>}
+        {at && !isCurrent && <span className="shrink-0 text-xs text-muted-foreground">en el {at}</span>}
+      </button>
+    );
+  };
+
+  const section = (label: string, list: Candidate[]) =>
+    list.length > 0 && (
+      <div className="space-y-0.5">
+        <p className="px-2 pt-2 text-xs font-medium text-muted-foreground">{label}</p>
+        {list.map(row)}
+      </div>
+    );
 
   return (
-    <div className="flex items-center gap-2">
-      <span className="w-8 shrink-0 text-xs text-muted-foreground">{rowKey}</span>
-      <span className="w-28 shrink-0 truncate text-xs text-muted-foreground">{label}</span>
-      {manual ? (
-        <>
-          <Input
-            value={value}
-            placeholder="Nombre y apellidos"
-            aria-label={`${label} (nombre manual)`}
-            onChange={(e) => onChange(e.target.value)}
-            className="flex-1"
-          />
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            aria-label="Volver a elegir del equipo"
-            onClick={() => {
-              setManual(false);
-              onChange("");
-            }}
-          >
-            <Undo2 className="size-4" />
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+        </DialogHeader>
+        {candidates.length > 6 && <SearchInput value={search} onChange={setSearch} placeholder="Buscar jugador…" />}
+        <div>
+          {pos && section("Su puesto", fits)}
+          {section(pos ? "Resto del equipo" : "Equipo", rest)}
+          {section("Lesionados", injured)}
+          {visible.length === 0 && (
+            <p className="py-4 text-center text-sm text-muted-foreground">
+              {candidates.length === 0 ? "El equipo aún no tiene jugadores." : "Nadie con ese nombre."}
+            </p>
+          )}
+        </div>
+        <div className="space-y-1.5 border-t pt-3">
+          <Label htmlFor="slot-manual" className="text-xs text-muted-foreground">
+            Alguien sin cuenta en la app
+          </Label>
+          <div className="flex gap-2">
+            <Input
+              id="slot-manual"
+              value={manual}
+              placeholder="Nombre y apellidos"
+              onChange={(e) => setManual(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && manual.trim() && onPick({ name: manual.trim(), uid: null })}
+            />
+            <Button variant="outline" disabled={!manual.trim()} onClick={() => onPick({ name: manual.trim(), uid: null })}>
+              <UserPlus className="size-4" /> Poner
+            </Button>
+          </div>
+        </div>
+        {current?.name && (
+          <Button variant="ghost" className="text-destructive hover:text-destructive" onClick={() => onPick(null)}>
+            <X className="size-4" /> Quitar de este puesto
           </Button>
-        </>
-      ) : (
-        <Select
-          value={value === "" ? NONE : value}
-          onValueChange={(v) => {
-            if (v === MANUAL) {
-              setManual(true);
-              onChange("");
-            } else if (v === NONE) {
-              onChange("");
-            } else {
-              onChange(v ?? "");
-            }
-          }}
-        >
-          <SelectTrigger className="min-w-0 flex-1" aria-label={label}>
-            {/* min-w-0 en dos niveles: el trigger ya se encoge (flex-1),
-                pero SelectValue es a su vez un flex item interno
-                (flex flex-1, sin min-w-0 propio) — sin este segundo
-                min-w-0 el nombre largo desborda el trigger en vez de
-                truncar (verificado con un harness a 360px). */}
-            <SelectValue className="min-w-0">
-              <span className="truncate">{value || "Sin asignar"}</span>
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={NONE}>Sin asignar</SelectItem>
-            {options.map((n) => (
-              <SelectItem key={n} value={n}>
-                {n}
-              </SelectItem>
-            ))}
-            <SelectItem value={MANUAL}>Otro (escribir nombre)…</SelectItem>
-          </SelectContent>
-        </Select>
-      )}
-      {onRemove && (
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          aria-label="Quitar suplente"
-          onClick={onRemove}
-        >
-          <X className="size-4" />
-        </Button>
-      )}
-    </div>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
 
 /**
  * Editor de una alineación — entidad propia (Teams/{team}/lineups/{id}),
- * desacoplada del partido desde el rediseño 2026-09-03: solo nombre +
- * titulares + banquillo. No sabe ni le importa a qué partido está
- * asignada — esa asignación (elegir esta alineación para un partido, o
- * quitarla) es una acción exclusiva del Calendario (ver DayPanel), no de
- * este editor.
+ * desacoplada del partido (la asignación vive en el Calendario, DayPanel).
+ * Rediseño 2026-09-25: titulares sobre un campo de rugby, selector por
+ * puesto que sugiere según la ficha del jugador (puestos, lesionado) y
+ * guarda quién es cada puesto (players, uid) además del nombre (Android).
  */
 export function LineupEditor({
   team,
@@ -152,67 +165,79 @@ export function LineupEditor({
   onDeleted?: () => void;
 }) {
   const [name, setName] = useState(lineup.name ?? "");
-  const [starters, setStarters] = useState<Record<string, string>>(lineup.starters);
-  const [bench, setBench] = useState<Record<string, string>>(lineup.bench);
+  const [slots, setSlots] = useState<LineupSlots>(() => lineupSlots(lineup));
   const [benchOrder, setBenchOrder] = useState<number[]>(() =>
     Object.keys(lineup.bench)
       .map(Number)
       .sort((a, b) => a - b),
   );
+  const [picking, setPicking] = useState<SlotKey | null>(null);
   const [saving, setSaving] = useState(false);
-  // Rosters por uid (2026-09-04): starters/bench siguen siendo texto libre
-  // (admiten a alguien SIN cuenta, ver comentario de LineupRow) — el
-  // desplegable del roster necesita los NOMBRES, resueltos aquí en vivo vía
-  // publicProfiles, no team.userplayers directamente (ya es {uid: true}).
-  const playerProfiles = useProfilesByUid(Object.keys(team.userplayers));
-  const playerNames = Object.values(playerProfiles)
-    .map((p) => p?.nameSurname)
-    .filter((n): n is string => Boolean(n));
-  // Ver LineupEditor (versión embebida anterior): cada fila decide
-  // "roster o texto libre" una sola vez al montar; forzar remount al
-  // copiar una plantilla para que cada una lo vuelva a decidir con el
-  // dato recién copiado.
-  const [templateVersion, setTemplateVersion] = useState(0);
 
-  // Solo informativo para el aviso al borrar — no hay ningún control de
-  // asignación aquí, vive solo en el Calendario.
+  const playerUids = useMemo(() => Object.keys(team.userplayers), [team.userplayers]);
+  const profiles = useProfilesByUid(playerUids);
+  const candidates: Candidate[] = playerUids.map((uid) => ({
+    uid,
+    name: profiles[uid]?.nameSurname || "Jugador",
+    info: playerInfoOf(team, uid),
+  }));
+
+  // Nombre a mostrar: el actual del perfil si el puesto tiene uid (renombres).
+  const displayName = (slot: LineupSlot | undefined) =>
+    slot ? (slot.uid && profiles[slot.uid]?.nameSurname) || slot.name : "";
+
+  const where = new Map<string, string>();
+  for (const [key, slot] of Object.entries(slots.starters)) if (slot.uid) where.set(slot.uid, key);
+  for (const [key, slot] of Object.entries(slots.bench)) if (slot.uid) where.set(slot.uid, `S${key}`);
+
+  const pitchSlots: Record<number, PitchSlot> = {};
+  for (const [key, slot] of Object.entries(slots.starters)) {
+    const info = slot.uid ? playerInfoOf(team, slot.uid) : null;
+    pitchSlots[Number(key)] = {
+      name: displayName(slot),
+      warning: info?.injured
+        ? "injured"
+        : info && info.positions.length > 0 && !positionFit(info, Number(key))
+          ? "offPosition"
+          : null,
+    };
+  }
+
   const assignedFechas = team.trainingdays
     .filter((d) => d.lineupId === lineup.lineupId)
     .map((d) => d.fecha)
     .filter((f): f is string => Boolean(f));
 
-  const setStarter = (pos: number, value: string) => {
-    setStarters((prev) => {
-      const next = { ...prev };
-      if (value) next[String(pos)] = value;
-      else delete next[String(pos)];
+  const pick = (target: SlotKey, slot: LineupSlot | null) => {
+    setSlots((prev) => {
+      const next: LineupSlots = { starters: { ...prev.starters }, bench: { ...prev.bench } };
+      // Si ya estaba en otro puesto, se mueve (no se duplica).
+      if (slot?.uid) {
+        for (const kind of ["starters", "bench"] as const) {
+          for (const [k, s] of Object.entries(next[kind])) if (s.uid === slot.uid) delete next[kind][k];
+        }
+      }
+      if (slot) next[target.kind][target.key] = slot;
+      else delete next[target.kind][target.key];
       return next;
     });
+    setPicking(null);
   };
-  const setBenchSlot = (num: number, value: string) => {
-    setBench((prev) => {
-      const next = { ...prev };
-      if (value) next[String(num)] = value;
-      else delete next[String(num)];
-      return next;
-    });
-  };
+
   const removeBenchSlot = (num: number) => {
     setBenchOrder((prev) => prev.filter((n) => n !== num));
-    setBench((prev) => {
-      const next = { ...prev };
-      delete next[String(num)];
-      return next;
+    setSlots((prev) => {
+      const bench = { ...prev.bench };
+      delete bench[String(num)];
+      return { ...prev, bench };
     });
   };
   const addBenchSlot = () => {
-    setBenchOrder((prev) => [...prev, nextBenchNumber(prev)]);
+    const num = nextBenchNumber(benchOrder);
+    setBenchOrder((prev) => [...prev, num]);
+    setPicking({ kind: "bench", key: String(num) });
   };
 
-  // Copiar de otra alineación del equipo (cualquiera — con o sin partido,
-  // publicada o no) como punto de partida para ESTA. Solo se copian
-  // titulares/banquillo — nombre y fecha de la alineación que se está
-  // editando no cambian.
   const otherLineups = Object.values(team.lineups)
     .filter((l) => l.lineupId !== lineup.lineupId)
     .sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
@@ -220,37 +245,26 @@ export function LineupEditor({
   const applyTemplate = (sourceId: string) => {
     const source = otherLineups.find((l) => l.lineupId === sourceId);
     if (!source) return;
-    setStarters(source.starters);
-    setBench(source.bench);
+    setSlots(lineupSlots(source));
     setBenchOrder(Object.keys(source.bench).map(Number).sort((a, b) => a - b));
-    setTemplateVersion((v) => v + 1);
     toast.success(`Alineación "${source.name || "sin nombre"}" copiada — revisa y guarda.`);
   };
 
-  const cleanAssignments = () => ({
-    starters: Object.fromEntries(Object.entries(starters).filter(([, v]) => v)),
-    bench: Object.fromEntries(Object.entries(bench).filter(([, v]) => v)),
-  });
-
-  const persist = async () => {
-    const clean = cleanAssignments();
-    const duplicate = findDuplicateName(clean);
-    if (duplicate) {
-      toast.error(`"${duplicate}" está asignado en más de una posición`);
-      return false;
-    }
-    await updateLineup(team.teamname!, lineup.lineupId!, {
-      name,
-      ...clean,
-    });
-    return true;
-  };
-
   const save = async () => {
+    // Nombre actual de cada jugador con cuenta (si se renombró, se guarda el nuevo).
+    const withNames: LineupSlots = {
+      starters: Object.fromEntries(Object.entries(slots.starters).map(([k, s]) => [k, { ...s, name: displayName(s) }])),
+      bench: Object.fromEntries(Object.entries(slots.bench).map(([k, s]) => [k, { ...s, name: displayName(s) }])),
+    };
+    const duplicate = findDuplicateSlot(withNames);
+    if (duplicate) {
+      toast.error(`"${duplicate}" está en más de un puesto`);
+      return;
+    }
     setSaving(true);
     try {
-      const ok = await persist();
-      if (ok) toast.success("Alineación guardada");
+      await updateLineup(team.teamname!, lineup.lineupId!, { name, ...slotsToStored(withNames) });
+      toast.success("Alineación guardada");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "No se pudo guardar la alineación");
     } finally {
@@ -267,6 +281,8 @@ export function LineupEditor({
       toast.error(e instanceof Error ? e.message : "No se pudo eliminar la alineación");
     }
   };
+
+  const filled = Object.keys(slots.starters).length;
 
   return (
     <div className="space-y-4">
@@ -302,40 +318,62 @@ export function LineupEditor({
       )}
 
       <div className="space-y-1.5">
-        {STARTER_POSITIONS.map((pos) => (
-          <LineupRow
-            key={`${pos}-${templateVersion}`}
-            rowKey={String(pos)}
-            label={RUGBY_POSITIONS[pos]}
-            value={starters[String(pos)] ?? ""}
-            players={playerNames}
-            takenElsewhere={takenNames({ starters, bench }, String(pos))}
-            onChange={(v) => setStarter(pos, v)}
-          />
-        ))}
+        <div className="flex items-baseline justify-between">
+          <p className="text-sm font-medium">Titulares</p>
+          <p className="text-xs text-muted-foreground">{filled} de 15 · toca un puesto</p>
+        </div>
+        <LineupPitch
+          slots={pitchSlots}
+          selected={picking?.kind === "starters" ? Number(picking.key) : null}
+          onSelect={(pos) => setPicking({ kind: "starters", key: String(pos) })}
+        />
+        <p className="flex flex-wrap gap-x-3 text-[11px] text-muted-foreground">
+          <span className="inline-flex items-center gap-1">
+            <span className="size-2 rounded-full bg-destructive" /> Lesionado
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <span className="size-2 rounded-full bg-warning" /> Fuera de sus puestos
+          </span>
+        </p>
       </div>
 
       <div className="space-y-1.5">
-        <p className="text-xs font-medium text-muted-foreground">Suplentes</p>
-        {benchOrder.map((num) => (
-          <LineupRow
-            key={`${num}-${templateVersion}`}
-            rowKey={String(num)}
-            label="Suplente"
-            value={bench[String(num)] ?? ""}
-            players={playerNames}
-            takenElsewhere={takenNames({ starters, bench }, String(num))}
-            onChange={(v) => setBenchSlot(num, v)}
-            onRemove={() => removeBenchSlot(num)}
-          />
-        ))}
-        <Button type="button" variant="outline" size="sm" onClick={addBenchSlot}>
-          <Plus className="size-3.5" /> Añadir suplente
-        </Button>
+        <p className="text-sm font-medium">Suplentes</p>
+        <div className="flex flex-wrap gap-2">
+          {benchOrder.map((num) => {
+            const slot = slots.bench[String(num)];
+            return (
+              <span key={num} className="inline-flex items-center rounded-lg border">
+                <button
+                  type="button"
+                  onClick={() => setPicking({ kind: "bench", key: String(num) })}
+                  className="flex items-center gap-2 py-1.5 pr-1 pl-2.5 text-sm hover:text-foreground"
+                >
+                  <span className="text-xs font-semibold text-muted-foreground">{num}</span>
+                  <span className={cn("max-w-36 truncate", !slot && "text-muted-foreground")}>
+                    {displayName(slot) || "Elegir…"}
+                  </span>
+                </button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={`Quitar suplente ${num}`}
+                  onClick={() => removeBenchSlot(num)}
+                >
+                  <X className="size-3.5" />
+                </Button>
+              </span>
+            );
+          })}
+          <Button type="button" variant="outline" size="sm" onClick={addBenchSlot}>
+            <Plus className="size-3.5" /> Añadir suplente
+          </Button>
+        </div>
       </div>
 
       <Button size="xl" className="w-full" disabled={saving} onClick={() => void save()}>
-        Guardar
+        {saving ? "Guardando…" : "Guardar"}
       </Button>
 
       <ConfirmDialog
@@ -354,6 +392,18 @@ export function LineupEditor({
         destructive
         onConfirm={remove}
       />
+
+      {picking && (
+        <SlotPicker
+          key={`${picking.kind}-${picking.key}`}
+          target={picking}
+          candidates={candidates}
+          where={where}
+          current={slots[picking.kind][picking.key]}
+          onPick={(slot) => pick(picking, slot)}
+          onClose={() => setPicking(null)}
+        />
+      )}
     </div>
   );
 }

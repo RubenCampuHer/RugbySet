@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
-  findDuplicateName,
+  findDuplicateSlot,
+  lineupSlots,
   nextBenchNumber,
   RUGBY_POSITIONS,
+  slotsToStored,
   STARTER_POSITIONS,
-  takenNames,
-  type RosterAssignments,
 } from "./lineup";
 
 describe("RUGBY_POSITIONS / STARTER_POSITIONS", () => {
@@ -18,72 +18,6 @@ describe("RUGBY_POSITIONS / STARTER_POSITIONS", () => {
   });
 });
 
-describe("takenNames", () => {
-  it("sin alineación (undefined/null) no hay nadie asignado", () => {
-    expect(takenNames(undefined)).toEqual(new Set());
-    expect(takenNames(null)).toEqual(new Set());
-  });
-
-  it("junta titulares + banquillo", () => {
-    const assignments: RosterAssignments = {
-      starters: { "1": "Juan Pérez", "9": "Ana García" },
-      bench: { "16": "Marc López" },
-    };
-    expect(takenNames(assignments)).toEqual(new Set(["Juan Pérez", "Ana García", "Marc López"]));
-  });
-
-  it("excludeKey deja fuera solo esa fila (su propio valor sigue disponible en su Select)", () => {
-    const assignments: RosterAssignments = {
-      starters: { "1": "Juan Pérez" },
-      bench: {},
-    };
-    expect(takenNames(assignments, "1")).toEqual(new Set());
-    expect(takenNames(assignments, "9")).toEqual(new Set(["Juan Pérez"]));
-  });
-
-  it("un nombre manual repetido en dos filas cuenta igual que uno del roster", () => {
-    const assignments: RosterAssignments = {
-      starters: { "1": "Invitado Sin Cuenta" },
-      bench: {},
-    };
-    expect(takenNames(assignments, "9").has("Invitado Sin Cuenta")).toBe(true);
-  });
-});
-
-describe("findDuplicateName", () => {
-  it("sin duplicados devuelve null", () => {
-    const assignments: RosterAssignments = {
-      starters: { "1": "Juan Pérez", "9": "Ana García" },
-      bench: { "16": "Marc López" },
-    };
-    expect(findDuplicateName(assignments)).toBeNull();
-  });
-
-  it("detecta el mismo nombre manual repetido en dos filas (titular y banquillo)", () => {
-    const assignments: RosterAssignments = {
-      starters: { "1": "Invitado Sin Cuenta" },
-      bench: { "16": "Invitado Sin Cuenta" },
-    };
-    expect(findDuplicateName(assignments)).toBe("Invitado Sin Cuenta");
-  });
-
-  it("ignora mayúsculas y espacios extra al comparar", () => {
-    const assignments: RosterAssignments = {
-      starters: { "1": "Juan Pérez", "2": "  juan pérez  " },
-      bench: {},
-    };
-    expect(findDuplicateName(assignments)).not.toBeNull();
-  });
-
-  it("no confunde huecos vacíos entre sí (nunca hay strings vacíos en starters/bench en la práctica, pero por si acaso)", () => {
-    const assignments: RosterAssignments = {
-      starters: { "1": "", "2": "" },
-      bench: {},
-    };
-    expect(findDuplicateName(assignments)).toBeNull();
-  });
-});
-
 describe("nextBenchNumber", () => {
   it("empieza en 16 sin ningún número usado", () => {
     expect(nextBenchNumber([])).toBe(16);
@@ -91,5 +25,43 @@ describe("nextBenchNumber", () => {
 
   it("continúa tras el número más alto ya usado, sin importar el orden", () => {
     expect(nextBenchNumber([16, 18, 17])).toBe(19);
+  });
+});
+
+describe("puestos con uid", () => {
+  it("lineupSlots solo se fía del uid si el nombre coincide", () => {
+    const slots = lineupSlots({
+      starters: { "1": "Ana", "2": "Nombre nuevo de Android", "3": "Sin cuenta" },
+      bench: { "16": "Luis" },
+      players: { "1": { uid: "u1", name: "Ana" }, "2": { uid: "u2", name: "Marc" }, "16": { uid: "u3", name: "Luis" } },
+    });
+    expect(slots.starters["1"]).toEqual({ name: "Ana", uid: "u1" });
+    expect(slots.starters["2"]).toEqual({ name: "Nombre nuevo de Android", uid: null });
+    expect(slots.starters["3"]).toEqual({ name: "Sin cuenta", uid: null });
+    expect(slots.bench["16"]).toEqual({ name: "Luis", uid: "u3" });
+  });
+
+  it("slotsToStored guarda nombres y players solo para quien tiene cuenta", () => {
+    expect(
+      slotsToStored({
+        starters: { "1": { name: " Ana ", uid: "u1" }, "2": { name: "Invitado", uid: null }, "3": { name: "", uid: null } },
+        bench: {},
+      }),
+    ).toEqual({ starters: { "1": "Ana", "2": "Invitado" }, bench: {}, players: { "1": { uid: "u1", name: "Ana" } } });
+  });
+
+  it("findDuplicateSlot: homónimos con cuentas distintas no cuentan como repetidos", () => {
+    expect(
+      findDuplicateSlot({
+        starters: { "1": { name: "Juan Pérez", uid: "a" }, "2": { name: "Juan Pérez", uid: "b" } },
+        bench: {},
+      }),
+    ).toBeNull();
+    expect(
+      findDuplicateSlot({ starters: { "1": { name: "Ana", uid: "a" } }, bench: { "16": { name: "Ana", uid: "a" } } }),
+    ).toBe("Ana");
+    expect(
+      findDuplicateSlot({ starters: { "1": { name: "Invitado", uid: null }, "2": { name: " invitado", uid: null } }, bench: {} }),
+    ).toBe(" invitado");
   });
 });

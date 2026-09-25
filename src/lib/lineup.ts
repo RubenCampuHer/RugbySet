@@ -20,38 +20,6 @@ export const RUGBY_POSITIONS: Record<number, string> = {
 export const STARTER_POSITIONS = Object.keys(RUGBY_POSITIONS).map(Number);
 
 /**
- * Forma mínima que necesitan estas utilidades — no el LineupDoc completo
- * (que además lleva lineupId/name/matchFecha) — para poder llamarlas
- * también sobre el estado local en edición de LineupEditor, sin tener que
- * reconstruir un doc completo en cada tecla.
- */
-export type RosterAssignments = {
-  starters: Record<string, string>;
-  bench: Record<string, string>;
-};
-
-const EMPTY: RosterAssignments = { starters: {}, bench: {} };
-
-/**
- * Nombres ya asignados en la alineación (titulares + banquillo), para
- * excluirlos de los desplegables de las demás filas. `excludeKey` es la
- * propia clave de la fila que se está editando ("1".."15" o el dorsal de
- * banquillo) — así su valor actual sigue apareciendo como opción en su
- * propio Select en vez de desaparecer.
- */
-export function takenNames(assignments: RosterAssignments | null | undefined, excludeKey?: string): Set<string> {
-  const a = assignments ?? EMPTY;
-  const names = new Set<string>();
-  for (const [key, name] of Object.entries(a.starters)) {
-    if (key !== excludeKey && name) names.add(name);
-  }
-  for (const [key, name] of Object.entries(a.bench)) {
-    if (key !== excludeKey && name) names.add(name);
-  }
-  return names;
-}
-
-/**
  * Siguiente dorsal de banquillo libre (16, 17…) al pulsar "Añadir suplente".
  * Recibe los números YA VISIBLES en el editor (no las claves de
  * lineup.bench): una fila de banquillo añadida pero sin nombre asignado
@@ -63,20 +31,51 @@ export function nextBenchNumber(usedNumbers: number[]): number {
   return usedNumbers.length === 0 ? 16 : Math.max(...usedNumbers) + 1;
 }
 
-/**
- * Primer nombre duplicado en la alineación (dos filas distintas con la
- * misma persona), o null si no hay ninguno. takenNames ya evita elegir dos
- * veces del roster en el Select, pero un nombre escrito a mano en dos
- * filas distintas no pasa por ningún roster que lo impida — se valida
- * aquí, al guardar. Comparación sin mayúsculas ni espacios extra (mismo
- * "Juan Pérez" escrito con distinto formato en dos filas también cuenta).
- */
-export function findDuplicateName(assignments: RosterAssignments): string | null {
+// ── Puestos con uid (2026-09-25) ──
+// starters/bench guardan el NOMBRE (Android los lee); players[clave] = {uid,
+// name} dice quién es. Solo se usa el uid si ese nombre sigue coincidiendo
+// con el de starters/bench: si no, Android editó el puesto y manda el texto.
+
+export type LineupSlot = { name: string; uid: string | null };
+export type LineupSlots = { starters: Record<string, LineupSlot>; bench: Record<string, LineupSlot> };
+
+type StoredLineup = {
+  starters: Record<string, string>;
+  bench: Record<string, string>;
+  players: Record<string, { uid: string; name: string } | null>;
+};
+
+export function lineupSlots(lineup: StoredLineup): LineupSlots {
+  const toSlots = (names: Record<string, string>) =>
+    Object.fromEntries(
+      Object.entries(names)
+        .filter(([, name]) => name)
+        .map(([key, name]) => {
+          const p = lineup.players[key];
+          return [key, { name, uid: p && p.name === name ? p.uid : null }];
+        }),
+    );
+  return { starters: toSlots(lineup.starters), bench: toSlots(lineup.bench) };
+}
+
+/** Lo que se guarda: nombres (para Android) + quién es cada puesto con cuenta. */
+export function slotsToStored(slots: LineupSlots): StoredLineup {
+  const names = (s: Record<string, LineupSlot>) =>
+    Object.fromEntries(Object.entries(s).filter(([, v]) => v.name.trim()).map(([k, v]) => [k, v.name.trim()]));
+  const players: StoredLineup["players"] = {};
+  for (const [key, slot] of [...Object.entries(slots.starters), ...Object.entries(slots.bench)]) {
+    if (slot.uid && slot.name.trim()) players[key] = { uid: slot.uid, name: slot.name.trim() };
+  }
+  return { starters: names(slots.starters), bench: names(slots.bench), players };
+}
+
+/** Primer puesto repetido (misma persona en dos puestos): por uid si tiene cuenta, si no por nombre. */
+export function findDuplicateSlot(slots: LineupSlots): string | null {
   const seen = new Set<string>();
-  for (const name of [...Object.values(assignments.starters), ...Object.values(assignments.bench)]) {
-    const key = name.trim().toLowerCase();
-    if (!key) continue;
-    if (seen.has(key)) return name;
+  for (const slot of [...Object.values(slots.starters), ...Object.values(slots.bench)]) {
+    const key = slot.uid ? `uid:${slot.uid}` : `name:${slot.name.trim().toLowerCase()}`;
+    if (key === "name:") continue;
+    if (seen.has(key)) return slot.name;
     seen.add(key);
   }
   return null;

@@ -30,6 +30,7 @@ function team(overrides: Partial<Team> = {}): Team {
     coaches: {},
     pendingCoaches: {},
     eventData: {},
+    playerInfo: {},
     ...overrides,
   };
 }

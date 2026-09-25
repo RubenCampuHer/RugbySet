@@ -29,6 +29,7 @@ export async function createLineup(teamname: string, data: { name: string }): Pr
     name: data.name.trim() || null,
     starters: {},
     bench: {},
+    players: {},
     createdAt: Date.now(),
   };
   await update(ref(db, `${PATHS.TEAMS}/${teamname}/lineups/${lineupId}`), doc);
@@ -43,12 +44,15 @@ export async function updateLineup(
     name?: string;
     starters?: Record<string, string>;
     bench?: Record<string, string>;
+    /** Quién es cada puesto (uid + nombre), solo web — ver schemas/lineup.ts. */
+    players?: Record<string, { uid: string; name: string } | null>;
   },
 ): Promise<void> {
   const updates: Record<string, unknown> = {};
   if (patch.name !== undefined) updates.name = patch.name.trim() || null;
   if (patch.starters !== undefined) updates.starters = patch.starters;
   if (patch.bench !== undefined) updates.bench = patch.bench;
+  if (patch.players !== undefined) updates.players = patch.players;
   await update(ref(db, `${PATHS.TEAMS}/${teamname}/lineups/${lineupId}`), updates);
 }
 

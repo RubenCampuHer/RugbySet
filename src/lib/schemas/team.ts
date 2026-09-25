@@ -51,6 +51,20 @@ export const EventDataSchema = z.object({
     .catch({}),
 });
 
+/**
+ * Ficha del jugador EN ESTE EQUIPO (2026-09-25, solo web; la edita el cuerpo
+ * técnico con el .write del equipo, sin reglas nuevas): puestos 1-15 (máx. 5,
+ * el primero es el principal), dorsal habitual, capitán y lesionado.
+ */
+export const PlayerInfoSchema = z
+  .object({
+    positions: rtdbList(z.number().int().min(1).max(15)).default([]).catch([]),
+    number: z.number().int().nullish().catch(null),
+    captain: z.boolean().nullish().catch(null),
+    injured: z.boolean().nullish().catch(null),
+  })
+  .catch({ positions: [] });
+
 export const TeamSchema = z.object({
   teamname: z.string().nullish(),
   usercoach: z.string().nullish(), // uid del coach fundador — sigue siendo "el dueño" (borrar equipo, no puede salir sin borrarlo)
@@ -70,4 +84,5 @@ export const TeamSchema = z.object({
   coaches: rtdbRecord(z.literal(true)).default({}),
   pendingCoaches: rtdbRecord(z.literal(true)).default({}),
   eventData: z.record(z.string(), EventDataSchema).default({}).catch({}),
+  playerInfo: z.record(z.string(), PlayerInfoSchema).default({}).catch({}),
 });

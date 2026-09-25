@@ -273,6 +273,25 @@ export async function setAttendanceMarks(opts: {
 }
 
 /**
+ * Ficha del jugador en el equipo (Teams/{t}/playerInfo/{uid}, 2026-09-25): la
+ * escribe el cuerpo técnico con el .write del equipo. Ficha vacía = se borra.
+ */
+export async function setPlayerInfo(
+  teamname: string,
+  uid: string,
+  info: { positions: number[]; number: number | null; captain: boolean; injured: boolean },
+): Promise<void> {
+  const clean = {
+    positions: info.positions.length > 0 ? info.positions.slice(0, 5) : null,
+    number: info.number ?? null,
+    captain: info.captain || null,
+    injured: info.injured || null,
+  };
+  const empty = Object.values(clean).every((v) => v === null);
+  await set(ref(db, `${PATHS.TEAMS}/${teamname}/playerInfo/${uid}`), empty ? null : clean);
+}
+
+/**
  * Motivo del propio jugador al decir que no (eventData/{día}/rsvpNotes/{uid},
  * regla: solo él y solo si es jugador del equipo). null lo borra — p. ej. al
  * cambiar a "sí". Solo web: Android no lo muestra.

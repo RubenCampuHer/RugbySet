@@ -109,6 +109,7 @@ function buildTeam(opts: {
     coaches: {},
     pendingCoaches: {},
     eventData: {},
+    playerInfo: {},
   };
 }
 

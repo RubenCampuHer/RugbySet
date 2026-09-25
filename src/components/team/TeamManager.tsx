@@ -53,6 +53,8 @@ import {
 } from "@/lib/actions/team";
 import { sendGeneralMessage } from "@/lib/actions/notify";
 import { InviteLinkDialog } from "@/components/InviteLinkDialog";
+import { PlayerInfoDialog } from "@/components/team/PlayerInfoDialog";
+import { playerInfoOf, playerInfoSummary } from "@/lib/player-info";
 import { teamInviteUrl } from "@/lib/invite-links";
 import { isAdmin, isCoach, isTeamCoach, isTeamFounder } from "@/lib/permissions";
 import { resizeAndUpload } from "@/lib/storage";
@@ -236,10 +238,13 @@ function PlayerRow({
   src,
   stats,
   action,
+  subtitle,
 }: {
   /** Ficha de persona: si se pasa, foto+nombre son clicables (ver PersonLink). */
   uid?: string;
   name: string;
+  /** Línea secundaria bajo el nombre (dorsal, puestos… — ficha del jugador). */
+  subtitle?: string;
   /** usericon de publicProfiles — sin él no se veía la foto de nadie (bug real 2026-09-04). */
   src?: string | null;
   stats?: AttendanceStats | null;
@@ -249,7 +254,10 @@ function PlayerRow({
     <div className="flex items-center gap-3 rounded-lg py-2 pr-1 pl-2 hover:bg-muted/50">
       <PersonLink uid={uid}>
         <AvatarInitials name={name} src={src} size="sm" />
-        <span className="flex-1 truncate text-sm">{name}</span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm">{name}</span>
+          {subtitle && <span className="block truncate text-xs text-muted-foreground">{subtitle}</span>}
+        </span>
       </PersonLink>
       {stats && (typeof stats.streak === "number" || typeof stats.attendanceRate === "number") && (
         <span className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
@@ -1001,9 +1009,16 @@ export function TeamManager({ teamname }: { teamname: string | null }) {
                     name={name}
                     src={playerProfiles[uid]?.usericon}
                     stats={statsForTeam(playerProfiles[uid], team.teamname!)}
+                    subtitle={playerInfoSummary(playerInfoOf(team, uid))}
                     action={
                       canManage ? (
                         <span className="flex gap-1">
+                          <PlayerInfoDialog
+                            teamname={team.teamname!}
+                            uid={uid}
+                            name={name}
+                            info={playerInfoOf(team, uid)}
+                          />
                           <RenamePersonDialog uid={uid} currentName={name} triggerSize="icon-xl" />
                           <Button
                             size="icon-xl"

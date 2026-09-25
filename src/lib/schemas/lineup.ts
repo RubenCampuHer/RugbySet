@@ -30,4 +30,10 @@ export const LineupDocSchema = z.object({
   starters: rtdbRecord(z.string()).default({}),
   bench: rtdbRecord(z.string()).default({}),
   createdAt: z.number().nullish(),
+  // Quién es cada puesto (2026-09-25, solo web): {clave: {uid, name}}. starters/
+  // bench siguen llevando el nombre (Android los lee y los reescribe con
+  // updateChildren, sin tocar este campo). La web solo se fía del uid si el
+  // nombre guardado aquí coincide con el de starters/bench — si no, Android
+  // cambió ese puesto y manda el texto.
+  players: rtdbRecord(z.object({ uid: z.string(), name: z.string() }).nullable().catch(null)).default({}).catch({}),
 });

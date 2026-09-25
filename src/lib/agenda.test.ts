@@ -21,6 +21,7 @@ function team(trainingdays: TrainingDay[]): Team {
     coaches: {},
     pendingCoaches: {},
     eventData: {},
+    playerInfo: {},
   };
 }
 

@@ -159,7 +159,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             {/* Selector de equipo activo — solo con más de un equipo (fase 2). */}
             <TeamSwitcher className="min-w-0" />
 
-            <span aria-hidden className="mx-1.5 hidden h-6 w-px bg-border md:block" />
 
             <Link
               href="/notifications"

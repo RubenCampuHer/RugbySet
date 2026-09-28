@@ -163,3 +163,45 @@ export function playerPending(team: Team, uid: string, now = new Date(), aheadDa
       );
     });
 }
+
+// ── Agenda del club (2026-09-28) ──
+
+export type ClubAgendaEntry = AgendaEntry & { team: Team };
+export type ClubAgendaGroup = { key: string; label: string; entries: ClubAgendaEntry[] };
+
+/**
+ * Como agendaGroups pero con los eventos de varios equipos a la vez (la
+ * dirección del club); a igualdad de día, por hora y equipo.
+ */
+export function clubAgendaGroups(
+  teams: Team[],
+  mode: "upcoming" | "past",
+  now = new Date(),
+): ClubAgendaGroup[] {
+  const today = startOfDay(now).getTime();
+  const sign = mode === "upcoming" ? 1 : -1;
+  const entries = teams
+    .flatMap((team) =>
+      team.trainingdays.map((day) => ({ team, day, date: day.fecha ? parseKey(day.fecha) : null })),
+    )
+    .filter((e): e is ClubAgendaEntry => e.date !== null)
+    .filter((e) => (mode === "upcoming" ? e.date.getTime() >= today : e.date.getTime() < today))
+    .sort(
+      (a, b) =>
+        sign * (a.date.getTime() - b.date.getTime()) ||
+        (a.day.horaInicio ?? "").localeCompare(b.day.horaInicio ?? "") ||
+        (a.team.teamname ?? "").localeCompare(b.team.teamname ?? "", "es"),
+    );
+  const groups: ClubAgendaGroup[] = [];
+  for (const entry of entries) {
+    const ws = startOfWeekMonday(entry.date);
+    const key = String(ws.getTime());
+    let group = groups.find((g) => g.key === key);
+    if (!group) {
+      group = { key, label: weekLabel(ws, now), entries: [] };
+      groups.push(group);
+    }
+    group.entries.push(entry);
+  }
+  return groups;
+}

@@ -32,6 +32,9 @@ export const TrainingDaySchema = z.object({
   // respuestas pero no cuenta para asistencia. Android lo conserva al editar
   // (fusiona el día) aunque todavía no lo pinta.
   cancelled: z.boolean().nullish().catch(null),
+  // Evento del club (2026-09-28): mismo id en el día de cada equipo al que la
+  // dirección lo añadió, para verlo como tal y borrarlo de todos a la vez.
+  clubEventId: z.string().nullish().catch(null),
 });
 
 /**

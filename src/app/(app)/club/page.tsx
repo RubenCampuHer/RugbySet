@@ -1,6 +1,6 @@
 "use client";
 
-import { Megaphone, Shield, TriangleAlert } from "lucide-react";
+import { CalendarDays, Megaphone, Shield, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { ClubManager } from "@/components/club/ClubManager";
@@ -54,6 +54,15 @@ export default function ClubPage() {
       <PageHeader title="Club" />
 
       <ClubLessonsCard />
+
+      {club && (
+        <ClubToolLink
+          href="/club/calendar"
+          icon={CalendarDays}
+          title="Calendario del club"
+          hint="Los eventos de todos los equipos y eventos del club."
+        />
+      )}
 
       {club && (
         <ClubToolLink

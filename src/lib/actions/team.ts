@@ -461,16 +461,31 @@ export async function setEventCancelled(teamname: string, fecha: string, cancell
  * misma fecha heredaría todo.
  */
 export async function deleteTrainingDay(teamname: string, fecha: string) {
+  // Pasar lista (setAttendanceMarks) también añade el día a assistedTrainingDays:
+  // hay que leer las marcas antes de que clearEventData las borre.
+  const key = eventDataKey(fecha);
+  const marks = key
+    ? (await get(ref(db, `${PATHS.TEAMS}/${teamname}/eventData/${key}/attendance`)).catch(() => null))?.val()
+    : null;
   const before = await mutateTrainingDays(teamname, (days) => removeRawDay(days, fecha));
   await clearEventData(teamname, fecha).catch(() => {}); // el día ya no existe: lo que quede no se ve
   const removed = findRawDay(before, fecha);
   const accepted = removed?.accepted_players;
   // Rosters por uid: accepted_players ya son claves de uid directamente.
-  for (const uid of Object.keys(accepted && typeof accepted === "object" ? accepted : {})) {
-    const snap = await get(ref(db, `${PATHS.USERS}/${uid}/assistedTrainingDays`));
-    const days = toDateList(snap.val()).filter((d) => d !== fecha);
-    await update(ref(db, `${PATHS.USERS}/${uid}`), { assistedTrainingDays: days });
-  }
+  const uids = new Set([
+    ...Object.keys(accepted && typeof accepted === "object" ? accepted : {}),
+    ...Object.keys(marks && typeof marks === "object" ? marks : {}),
+  ]);
+  // Como en setAttendanceMarks: la lista personal puede fallar por reglas si el
+  // equipo activo del jugador es otro; el día ya está borrado, no se aborta.
+  await Promise.allSettled(
+    [...uids].map(async (uid) => {
+      const snap = await get(ref(db, `${PATHS.USERS}/${uid}/assistedTrainingDays`));
+      const days = toDateList(snap.val());
+      if (!days.includes(fecha)) return;
+      await update(ref(db, `${PATHS.USERS}/${uid}`), { assistedTrainingDays: days.filter((d) => d !== fecha) });
+    }),
+  );
 }
 
 export type JoinByCodeResult = {

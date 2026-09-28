@@ -3,7 +3,10 @@
 import { ref, update } from "firebase/database";
 import { httpsCallable } from "firebase/functions";
 import { PATHS } from "@/lib/constants";
+import { hasActiveTeam } from "@/lib/actions/team";
+import type { MemberRole } from "@/lib/admin-members";
 import { db, functions } from "@/lib/firebase";
+import type { Team } from "@/lib/types";
 
 export async function updateApprovalStatus(
   kind: "exercise" | "training",
@@ -30,4 +33,26 @@ export async function updateUserRole(
  */
 export async function deleteUser(targetUid: string): Promise<void> {
   await httpsCallable(functions, "adminDeleteUser")({ uid: targetUid });
+}
+
+/**
+ * ADMIN añade a cualquier persona a un equipo (2026-09-28) como jugador,
+ * co-entrenador o delegado, sin que lo pida: una escritura multi-path como
+ * aceptar una solicitud (sale de pendientes, entra en el roster y en
+ * UserTeams) y, si no tenía equipo activo, pasa a ser este. Las reglas ya lo
+ * permiten al ADMIN (Teams, UserTeams y Users/{uid}/teamname). El rol global
+ * no cambia (igual que ascender a co-entrenador).
+ */
+export async function adminAddMember(team: Team, uid: string, role: MemberRole): Promise<void> {
+  const t = `${PATHS.TEAMS}/${team.teamname}`;
+  const updates: Record<string, unknown> = {
+    [`${t}/pendingplayers/${uid}`]: null,
+    [`${t}/pendingCoaches/${uid}`]: null,
+    [`${t}/userplayers/${uid}`]: role === "player" ? true : null,
+    [`${t}/coaches/${uid}`]: role === "coach" ? true : null,
+    [`${t}/delegates/${uid}`]: role === "delegate" ? true : null,
+    [`${PATHS.USER_TEAMS}/${uid}/${team.teamname}`]: true,
+  };
+  if (!(await hasActiveTeam(uid))) updates[`${PATHS.USERS}/${uid}/teamname`] = team.teamname;
+  await update(ref(db), updates);
 }

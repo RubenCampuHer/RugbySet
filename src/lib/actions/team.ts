@@ -82,7 +82,7 @@ async function isActiveTeamOf(uid: string, teamname: string): Promise<boolean> {
 }
 
 /** ¿Tiene ese usuario algún equipo activo? (misma fuente que isActiveTeamOf). */
-async function hasActiveTeam(uid: string): Promise<boolean> {
+export async function hasActiveTeam(uid: string): Promise<boolean> {
   const snap = await get(ref(db, `${PATHS.PUBLIC_PROFILES}/${uid}/teamname`));
   return typeof snap.val() === "string" && snap.val().length > 0;
 }

@@ -58,6 +58,7 @@ import { InviteLinkDialog } from "@/components/InviteLinkDialog";
 import { PlayerInfoDialog } from "@/components/team/PlayerInfoDialog";
 import { playerInfoOf, playerInfoSummary } from "@/lib/player-info";
 import { teamInviteUrl } from "@/lib/invite-links";
+import { AddMemberDialog } from "@/components/team/AddMemberDialog";
 import { isAdmin, isCoach, isTeamCoach, isTeamDelegate, isTeamFounder } from "@/lib/permissions";
 import { resizeAndUpload } from "@/lib/storage";
 import { validateTeamCode } from "@/lib/team-validation";
@@ -1076,6 +1077,9 @@ export function TeamManager({ teamname }: { teamname: string | null }) {
           <Trophy className="size-4" /> Ver alineaciones
         </Link>
       )}
+
+      {/* ADMIN (2026-09-28): añadir a cualquier persona sin que lo pida. */}
+      {isAdmin(profile) && <AddMemberDialog team={team} />}
 
       <PendingSection team={team} canManage={canManage} />
 

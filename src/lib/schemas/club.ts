@@ -22,3 +22,23 @@ export const ClubSchema = z.object({
   // no autoservicio con aprobación.
   directors: rtdbRecord(z.literal(true)).default({}),
 });
+
+// "El club en números" (2026-09-28): ClubStats/{clubId}/teams/{teamname}, lo
+// escriben las Cloud Functions (functions/attendance.js → teamStats).
+export const ClubTeamStatsSchema = z.object({
+  players: z.number().catch(0),
+  sessions: z.number().catch(0),
+  matches: z.number().catch(0),
+  /** % medio de los jugadores (0-100); null sin datos. */
+  rate: z.number().nullish().catch(null),
+  monthly: z
+    .record(
+      z.string(),
+      z.object({ sessions: z.number().catch(0), matches: z.number().catch(0), rate: z.number().nullish().catch(null) }),
+    )
+    .default({})
+    .catch({}),
+  lastSessionAt: z.number().nullish().catch(null),
+  updatedAt: z.number().nullish().catch(null),
+});
+export type ClubTeamStats = z.infer<typeof ClubTeamStatsSchema>;

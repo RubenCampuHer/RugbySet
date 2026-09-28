@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { ClubManager } from "@/components/club/ClubManager";
 import { ClubMembershipCard } from "@/components/club/ClubMembershipCard";
-import { ClubToolLink } from "@/components/club/ClubToolLink";
+import { ClubStatsLink, ClubToolLink } from "@/components/club/ClubToolLink";
 import { ClubLessonsCard } from "@/components/lessons/ClubLessonsCard";
 import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/PageHeader";
@@ -54,6 +54,8 @@ export default function ClubPage() {
       <PageHeader title="Club" />
 
       <ClubLessonsCard />
+
+      <ClubStatsLink />
 
       {club && (
         <ClubToolLink

@@ -1,6 +1,9 @@
-import { ChevronRight, type LucideIcon } from "lucide-react";
+"use client";
+
+import { ChartNoAxesColumn, ChevronRight, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
+import { useLessonsClub } from "@/hooks/useClubLessons";
 
 /** Acceso a una herramienta del club desde /club (avisos, calendario, números…). */
 export function ClubToolLink({ href, icon: Icon, title, hint }: { href: string; icon: LucideIcon; title: string; hint: string }) {
@@ -19,5 +22,19 @@ export function ClubToolLink({ href, icon: Icon, title, hint }: { href: string; 
         </Link>
       </CardContent>
     </Card>
+  );
+}
+
+/** "El club en números": para la dirección y los entrenadores del club (mismo criterio que la regla de ClubStats). */
+export function ClubStatsLink() {
+  const { clubId, isDirector, canWrite, loading } = useLessonsClub();
+  if (loading || !clubId || (!isDirector && !canWrite)) return null;
+  return (
+    <ClubToolLink
+      href="/club/stats"
+      icon={ChartNoAxesColumn}
+      title="El club en números"
+      hint="Asistencia y sesiones de cada equipo del club."
+    />
   );
 }

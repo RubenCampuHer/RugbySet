@@ -376,3 +376,59 @@ export function attendanceByMonth(
       };
     });
 }
+
+// ── Semana del jugador (2026-09-28) ──
+// Sesiones de esta semana (lunes a domingo) una a una: las anteriores a hoy con
+// su resultado (mismo criterio que dayOutcome) y las de hoy en adelante con su
+// respuesta, salvo que ya se haya pasado lista.
+
+export type WeekSessionState = "attended" | "missed" | "excluded" | "cancelled" | "upcoming";
+
+export type WeekSession = {
+  fecha: string;
+  date: Date;
+  day: TrainingDay;
+  state: WeekSessionState;
+  /** Respuesta del jugador (Sí/No), útil para las que están por venir. */
+  rsvp: "accepted" | "declined" | "none";
+  mark?: AttendanceMark;
+};
+
+export type PlayerWeek = {
+  sessions: WeekSession[];
+  /** Sesiones ya jugadas que cuentan para él (sin canceladas ni lesionado/justificado). */
+  counted: number;
+  attended: number;
+  upcoming: number;
+};
+
+export function playerWeek(team: Team, uid: string, now = new Date()): PlayerWeek {
+  const from = startOfWeekMonday(now).getTime();
+  const to = from + 7 * 86_400_000;
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const sessions = team.trainingdays
+    .map((day) => ({ day, date: day.fecha ? parseKey(day.fecha) : null }))
+    .filter((x): x is { day: TrainingDay; date: Date } => x.date !== null)
+    .filter(({ date }) => date.getTime() >= from && date.getTime() < to)
+    .sort((a, b) => a.date.getTime() - b.date.getTime() || (a.day.horaInicio ?? "").localeCompare(b.day.horaInicio ?? ""))
+    .map(({ day, date }): WeekSession => {
+      const mark = attendanceMark(team, day, uid);
+      const rsvp = day.accepted_players[uid] === true
+        ? "accepted"
+        : day.declined_players[uid] === true
+          ? "declined"
+          : "none";
+      let state: WeekSessionState;
+      if (day.cancelled === true) state = "cancelled";
+      else if (date.getTime() >= today && !mark) state = "upcoming";
+      else state = dayOutcome(team, day, uid);
+      return { fecha: day.fecha!, date, day, state, rsvp, mark };
+    });
+  const played = sessions.filter((s) => s.state === "attended" || s.state === "missed");
+  return {
+    sessions,
+    counted: played.length,
+    attended: played.filter((s) => s.state === "attended").length,
+    upcoming: sessions.filter((s) => s.state === "upcoming").length,
+  };
+}

@@ -2,6 +2,7 @@
 
 import { TrendingUp } from "lucide-react";
 import { useMemo, useState } from "react";
+import { PlayerWeekList } from "@/components/stats/PlayerWeekList";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -67,6 +68,7 @@ export function AttendanceComparisonCard({ team, uid }: { team: Team; uid: strin
         </Tabs>
       </CardHeader>
       <CardContent className="space-y-4 text-sm">
+        <PlayerWeekList team={team} uid={uid} />
         {cmp.sessions === 0 ? (
           <p className="text-muted-foreground">Todavía no hay entrenos pasados en este periodo.</p>
         ) : (

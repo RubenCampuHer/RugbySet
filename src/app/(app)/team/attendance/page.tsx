@@ -9,6 +9,7 @@ import { AvatarInitials } from "@/components/AvatarInitials";
 import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/PageHeader";
 import { ListRowsSkeleton } from "@/components/skeletons";
+import { TeamMonthlyChart } from "@/components/stats/TeamMonthlyChart";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -172,6 +173,9 @@ function TeamAttendance() {
           </Button>
         }
       />
+
+      {/* Toda la temporada, independiente del periodo de la lista de abajo. */}
+      <TeamMonthlyChart team={team} />
 
       <Card>
         <CardContent className="space-y-3 pt-6">

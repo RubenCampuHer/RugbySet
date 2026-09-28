@@ -414,6 +414,7 @@ function LessonEditor() {
         open={pickExercises}
         onOpenChange={setPickExercises}
         selection={exerciseSelection}
+        confirmLabel="Añadir a la lección"
         onToggle={(name) =>
           setExerciseSelection((prev) => {
             const next = new Set(prev);

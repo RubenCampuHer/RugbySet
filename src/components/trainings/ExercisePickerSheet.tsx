@@ -36,12 +36,15 @@ export function ExercisePickerSheet({
   selection,
   onToggle,
   onConfirm,
+  confirmLabel = "Añadir a la sección",
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   selection: Set<string>;
   onToggle: (name: string) => void;
   onConfirm: () => void;
+  /** Texto del botón (en lecciones: "Añadir a la lección"). */
+  confirmLabel?: string;
 }) {
   const { exercises, loading } = useExercises();
   const { profile } = useAuth();
@@ -190,7 +193,7 @@ export function ExercisePickerSheet({
         </ScrollArea>
         <SheetFooter>
           <Button size="xl" onClick={onConfirm}>
-            Añadir a la sección
+            {confirmLabel}
           </Button>
         </SheetFooter>
       </SheetContent>

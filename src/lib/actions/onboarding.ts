@@ -158,9 +158,12 @@ async function linkFounder(uid: string, teamName: string): Promise<void> {
  * solo cambia si el usuario no tenía ninguno (decisión de producto: entrar
  * en otro equipo nunca te cambia la pantalla; el cliente ofrece "Cambiar").
  *
- * Con club: Teams/{t}/clubId pasa la .validate porque quien escribe dirige
- * ese club Y es usercoach del equipo en la misma escritura (root ya
- * combinado); Clubs/{id}/teams se actualiza aparte, como addTeamToClub.
+ * Con club (2026-09-28): el equipo se crea SIN clubId y se vincula al club
+ * en una escritura aparte. La .validate de Teams/{t}/clubId exige ser
+ * usercoach del equipo y en producción `root` es el estado ANTERIOR (el
+ * equipo aún no existe): en una sola escritura daba PERMISSION_DENIED
+ * (encontrado en QA; mismo motivo que linkFounder). Clubs/{id}/teams se
+ * actualiza al final, como addTeamToClub.
  */
 export async function createAdditionalTeam(opts: {
   teamName: string;
@@ -182,8 +185,6 @@ export async function createAdditionalTeam(opts: {
     iconUrl: opts.iconUrl,
     coachName: opts.coachName,
     uid: opts.uid,
-    clubId: opts.club?.clubId ?? undefined,
-    category: opts.club ? opts.category : undefined,
     alsoPlayer: opts.alsoPlayer,
   });
   const updates: Record<string, unknown> = {
@@ -194,6 +195,11 @@ export async function createAdditionalTeam(opts: {
   await linkFounder(opts.uid, opts.teamName);
 
   if (opts.club?.clubId) {
+    // Ya existe el equipo con usercoach = yo: ahora sí pasa la .validate de clubId.
+    await update(ref(db, `${PATHS.TEAMS}/${opts.teamName}`), {
+      clubId: opts.club.clubId,
+      ...(opts.category ? { category: opts.category } : {}),
+    });
     const teams = opts.club.teams.includes(opts.teamName)
       ? opts.club.teams
       : [...opts.club.teams, opts.teamName];

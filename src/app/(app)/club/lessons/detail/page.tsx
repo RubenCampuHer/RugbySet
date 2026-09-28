@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { toast } from "sonner";
+import { AudienceBadge } from "@/components/audience/AudiencePicker";
 import { BackLink } from "@/components/BackLink";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
@@ -16,6 +17,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useClubLessons, useLessonsClub, usePendingLessons } from "@/hooks/useClubLessons";
 import { useProfilesByUid } from "@/hooks/useProfilesByUid";
 import { approveLesson, rejectLesson } from "@/lib/actions/lessons";
+import { audienceBadge } from "@/lib/audience";
 import { breadcrumb } from "@/lib/lessons";
 import { canEditClubItem } from "@/lib/permissions";
 
@@ -90,6 +92,10 @@ function LessonDetail() {
           <p className="mt-1 text-xs text-muted-foreground">
             {authorName ? `${authorName} · ` : ""}
             {shown.updatedAt ? `actualizada el ${dateFmt.format(new Date(shown.updatedAt))}` : ""}
+          </p>
+          <p className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            La ven: <AudienceBadge audience={shown.audience} />
+            {!audienceBadge(shown.audience) && <span>todo el club</span>}
           </p>
         </div>
         {editable && (

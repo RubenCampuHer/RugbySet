@@ -18,6 +18,7 @@ import { Separator } from "@/components/ui/separator";
 import { DetailSkeleton } from "@/components/skeletons";
 import { AssignToDaySheet } from "@/components/library/AssignToDaySheet";
 import { CopyToMineDialog } from "@/components/library/CopyToMineDialog";
+import { useAudienceViewer } from "@/hooks/useAudienceViewer";
 import { useClub } from "@/hooks/useClub";
 import { useMyClubId } from "@/hooks/useMyClubId";
 import { useTeam } from "@/hooks/useTeam";
@@ -44,6 +45,7 @@ function TrainingDetail() {
   const { team } = useTeam();
   const { clubId: myClubId, loading: loadingMyClub } = useMyClubId();
   const { club: adminClub, loading: loadingAdminClub } = useClub();
+  const audienceViewer = useAudienceViewer();
   const [result, setResult] = useState<
     { name: string; training: Training | null } | undefined
   >(undefined);
@@ -73,7 +75,7 @@ function TrainingDetail() {
   }
   if (
     training === null ||
-    !canViewTraining(profile, training, { myClubId, myAdminClubId: adminClub?.clubId })
+    !canViewTraining(profile, training, { myClubId, myAdminClubId: adminClub?.clubId, audienceViewer })
   ) {
     return (
       <div className="space-y-4 py-12 text-center">

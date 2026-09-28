@@ -44,3 +44,13 @@ export function rankForSquad<T extends { uid: string; name: string; injured: boo
       a.name.localeCompare(b.name, "es"),
   );
 }
+
+/**
+ * ¿Los jugadores ven la alineación de este partido? (2026-09-28). Sin marca =
+ * sí (alineaciones de antes y las que asigna Android); false = oculta hasta
+ * que el cuerpo técnico la publique.
+ */
+export function lineupVisibleToPlayers(team: Team, day: TrainingDay): boolean {
+  const key = day.fecha ? eventDataKey(day.fecha) : null;
+  return (key ? team.eventData[key]?.lineupVisible : null) !== false;
+}

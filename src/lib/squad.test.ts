@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { rankForSquad, squadOf, visibleSquad } from "./squad";
+import { lineupVisibleToPlayers, rankForSquad, squadOf, visibleSquad } from "./squad";
 import type { Team, TrainingDay } from "./types";
 
 const day = {
@@ -30,5 +30,20 @@ describe("squad", () => {
     const p = (uid: string, injured = false) => ({ uid, name: uid, injured });
     const ranked = rankForSquad(day, [p("luis"), p("bea"), p("zoe", true), p("ana")]);
     expect(ranked.map((x) => x.uid)).toEqual(["ana", "zoe", "bea", "luis"]);
+  });
+});
+
+describe("alineación visible para los jugadores", () => {
+  const withFlag = (lineupVisible: unknown) =>
+    ({ eventData: { "2026-09-24": { attendance: {}, rsvpNotes: {}, lineupVisible } } }) as unknown as Team;
+
+  it("sin marca = visible (lo de antes y lo que asigna Android)", () => {
+    expect(lineupVisibleToPlayers({ eventData: {} } as unknown as Team, day)).toBe(true);
+    expect(lineupVisibleToPlayers(withFlag(null), day)).toBe(true);
+  });
+
+  it("false = oculta; true = publicada", () => {
+    expect(lineupVisibleToPlayers(withFlag(false), day)).toBe(false);
+    expect(lineupVisibleToPlayers(withFlag(true), day)).toBe(true);
   });
 });

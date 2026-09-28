@@ -1,5 +1,6 @@
 // Lógica pura de las lecciones del club (2026-09-28): árbol de carpetas,
 // migas, bloques y ficheros. Sin Firebase ni React.
+import { type Audience, CLUB_AUDIENCE } from "./audience";
 import type { Lesson, LessonBlock, LessonFolder } from "./schemas/lesson";
 
 export type Folders = Record<string, LessonFolder>;
@@ -138,4 +139,51 @@ export function validateLessonFile(kind: "pdf" | "video", file: { type: string; 
   if (!file.type.startsWith("video/")) return "Tiene que ser un vídeo.";
   if (file.size >= LESSON_VIDEO_MAX_BYTES) return "El vídeo no puede pasar de 200 MB.";
   return null;
+}
+
+// ── Público heredado (2026-09-28) ──
+
+/** Público que hereda algo que cuelga de `parentId` (null = raíz = todo el club). */
+export function parentAudience(folders: Folders, parentId: string | null | undefined): Audience {
+  const parent = parentId ? folders[parentId] : null;
+  return parent?.audience ?? CLUB_AUDIENCE;
+}
+
+/** Público a guardar: el propio si lo tiene, si no el de su carpeta. */
+export function resolveAudience(
+  folders: Folders,
+  parentId: string | null | undefined,
+  own: Audience | null,
+): { audience: Audience; audienceInherited: boolean } {
+  return own ? { audience: own, audienceInherited: false } : { audience: parentAudience(folders, parentId), audienceInherited: true };
+}
+
+/**
+ * Rutas (relativas a ClubLessons/{clubId}) que hay que reescribir cuando la
+ * carpeta `folderId` pasa a tener `audience`: todo lo que cuelga de ella y
+ * hereda, recorriendo subcarpetas que también heredan (una con público propio
+ * corta la cadena). `pending` son las versiones pendientes que ve quien edita.
+ */
+export function inheritedAudienceUpdates(
+  folders: Folders,
+  lessons: Lessons,
+  pending: Lessons,
+  folderId: string,
+  audience: Audience,
+): Record<string, Audience> {
+  const updates: Record<string, Audience> = {};
+  const visit = (parent: string) => {
+    for (const { id, folder } of childFolders(folders, parent)) {
+      if (folder.audienceInherited === false) continue;
+      updates[`folders/${id}/audience`] = audience;
+      visit(id);
+    }
+    for (const [branch, map] of [["lessons", lessons], ["pending", pending]] as const) {
+      for (const [id, l] of Object.entries(map)) {
+        if (l.folderId === parent && l.audienceInherited !== false) updates[`${branch}/${id}/audience`] = audience;
+      }
+    }
+  };
+  visit(folderId);
+  return updates;
 }

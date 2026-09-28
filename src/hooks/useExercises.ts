@@ -3,6 +3,7 @@
 import { onValue, ref } from "firebase/database";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { useAudienceViewer } from "@/hooks/useAudienceViewer";
 import { useClub } from "@/hooks/useClub";
 import { useMyClubId } from "@/hooks/useMyClubId";
 import { PATHS } from "@/lib/constants";
@@ -23,6 +24,7 @@ export function useExercises() {
   const { profile } = useAuth();
   const { clubId: myClubId, loading: loadingMyClub } = useMyClubId();
   const { club: adminClub, loading: loadingAdminClub } = useClub();
+  const audienceViewer = useAudienceViewer();
   const [all, setAll] = useState<Exercise[] | null>(null);
 
   useEffect(() => {
@@ -40,7 +42,7 @@ export function useExercises() {
   const loading = all === null || profile === null || loadingMyClub || loadingAdminClub;
   const exercises = loading
     ? []
-    : all.filter((e) => canViewExercise(profile, e, { myClubId, myAdminClubId: adminClub?.clubId }));
+    : all.filter((e) => canViewExercise(profile, e, { myClubId, myAdminClubId: adminClub?.clubId, audienceViewer }));
 
   return { exercises, loading };
 }

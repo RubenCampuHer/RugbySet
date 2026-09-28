@@ -4,6 +4,7 @@
 // canDeleteExercise ANTES de escribir, cerrando ese hueco en el único punto
 // donde podemos hacerlo sin tocar las reglas.
 import { get, ref, remove, set, update } from "firebase/database";
+import type { Audience } from "@/lib/audience";
 import { PATHS } from "@/lib/constants";
 import { auth, db } from "@/lib/firebase";
 import { canCreateContent, canDeleteExercise, canEditExercise } from "@/lib/permissions";
@@ -28,6 +29,8 @@ export type ExerciseInput = {
    * mismo criterio que ya se documentaba para teamname).
    */
   clubId?: string | null;
+  /** Con privacy "Club": quién del club lo ve (null = todo el club). */
+  clubAudience?: Audience | null;
   /** Solo al copiar de otro autor: de dónde viene. Al editar se omite y se conserva el existente. */
   copiedFrom?: { name: string; author: string };
 };
@@ -57,6 +60,7 @@ function buildExercise(input: ExerciseInput, author: string): Exercise {
     approvalStatus: input.privacy === "Publico" || input.privacy === "Club" ? "PENDING" : null,
     teamname: null, // sin uso real — ver comentario en schemas/exercise.ts
     clubId: input.privacy === "Club" ? (input.clubId ?? null) : null,
+    clubAudience: input.privacy === "Club" ? (input.clubAudience ?? null) : null,
     boardData: input.boardData,
     ...(input.copiedFrom ? { copiedFrom: input.copiedFrom } : {}),
   };
@@ -157,6 +161,7 @@ export async function duplicateExercise(
       etiquetas: exercise.etiquetas,
       boardData: exercise.boardData ?? null,
       clubId: privacy === "Club" ? exercise.clubId : null,
+      clubAudience: privacy === "Club" ? (exercise.clubAudience ?? null) : null,
     },
     currentUser.username!,
   );

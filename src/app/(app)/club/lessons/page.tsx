@@ -8,7 +8,8 @@ import { toast } from "sonner";
 import { BackLink } from "@/components/BackLink";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
-import { FolderNameDialog, FolderPickerDialog } from "@/components/lessons/LessonDialogs";
+import { AudienceBadge } from "@/components/audience/AudiencePicker";
+import { FolderDialog, FolderPickerDialog } from "@/components/lessons/LessonDialogs";
 import { ListRowsSkeleton } from "@/components/skeletons";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -21,7 +22,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useClubLessons, useLessonsClub, usePendingLessons } from "@/hooks/useClubLessons";
-import { createFolder, deleteFolder, deleteLesson, moveFolder, moveLesson, renameFolder } from "@/lib/actions/lessons";
+import { createFolder, deleteFolder, deleteLesson, type LessonsCtx, moveFolder, moveLesson, updateFolder } from "@/lib/actions/lessons";
 import {
   breadcrumb,
   canMoveFolder,
@@ -29,6 +30,7 @@ import {
   descendantIds,
   isFolderEmpty,
   lessonsIn,
+  parentAudience,
   type Lessons,
 } from "@/lib/lessons";
 import { canEditClubItem } from "@/lib/permissions";
@@ -36,7 +38,7 @@ import type { Lesson } from "@/lib/schemas/lesson";
 
 type Dialog =
   | { kind: "newFolder" }
-  | { kind: "rename"; id: string; name: string }
+  | { kind: "edit"; id: string }
   | { kind: "moveFolder"; id: string; parentId: string | null }
   | { kind: "moveLesson"; id: string; folderId: string | null }
   | { kind: "deleteFolder"; id: string; name: string }
@@ -109,6 +111,10 @@ function ClubLessons() {
       throw e;
     }
   };
+
+  const ctx: LessonsCtx = { folders, lessons, pending, uid: uid!, isDirector };
+  const clubTeams = club?.teams ?? [];
+  const editing = dialog?.kind === "edit" ? folders[dialog.id] : null;
 
   const lessonOf = (id: string): { approved: Lesson | null; pending: Lesson | null } => ({
     approved: lessons[id] ?? null,
@@ -198,12 +204,13 @@ function ClubLessons() {
                   <Link href={folderHref(id)} className="flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-md px-1 hover:bg-muted/50">
                     <Folder className="size-5 shrink-0 fill-muted text-muted-foreground" />
                     <span className="min-w-0 flex-1 truncate text-sm font-medium">{folder.name}</span>
+                    <AudienceBadge audience={folder.audience} />
                     <span className="shrink-0 text-xs text-muted-foreground">{count}</span>
                   </Link>
                   {editable && (
                     <RowMenu label={`Opciones de la carpeta ${folder.name}`}>
-                      <DropdownMenuItem onClick={() => setDialog({ kind: "rename", id, name: folder.name })}>
-                        <Pencil /> Renombrar
+                      <DropdownMenuItem onClick={() => setDialog({ kind: "edit", id })}>
+                        <Pencil /> Editar
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => setDialog({ kind: "moveFolder", id, parentId: folder.parentId ?? null })}>
                         <FolderInput /> Mover
@@ -229,6 +236,7 @@ function ClubLessons() {
                   <Link href={lessonHref(id)} className="flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-md px-1 hover:bg-muted/50">
                     <BookOpen className="size-5 shrink-0 text-muted-foreground" />
                     <span className="min-w-0 flex-1 truncate text-sm">{lesson.title}</span>
+                    <AudienceBadge audience={lesson.audience} />
                     {both.pending && (
                       <Badge variant="secondary" className="shrink-0">
                         {both.approved ? "Cambios pendientes" : "Pendiente"}
@@ -258,20 +266,27 @@ function ClubLessons() {
         </Card>
       )}
 
-      <FolderNameDialog
+      <FolderDialog
         open={dialog?.kind === "newFolder"}
         onOpenChange={close}
         title={folderId ? `Nueva carpeta en ${current?.name}` : "Nueva carpeta"}
+        inherited={parentAudience(folders, folderId)}
+        teams={clubTeams}
         submitLabel="Crear"
-        onSubmit={(name) => guard(async () => void (await createFolder(clubId, uid!, name, folderId)), "Carpeta creada")}
+        onSubmit={(name, own) => guard(async () => void (await createFolder(clubId, ctx, name, folderId, own)), "Carpeta creada")}
       />
-      <FolderNameDialog
-        open={dialog?.kind === "rename"}
+      <FolderDialog
+        open={dialog?.kind === "edit"}
         onOpenChange={close}
-        title="Renombrar carpeta"
-        initialName={dialog?.kind === "rename" ? dialog.name : ""}
+        title="Editar carpeta"
+        initialName={editing?.name ?? ""}
+        initialAudience={editing && editing.audienceInherited === false ? (editing.audience ?? null) : null}
+        inherited={parentAudience(folders, editing?.parentId)}
+        teams={clubTeams}
         submitLabel="Guardar"
-        onSubmit={(name) => guard(() => renameFolder(clubId, (dialog as { id: string }).id, name), "Carpeta renombrada")}
+        onSubmit={(name, own) =>
+          guard(() => updateFolder(clubId, ctx, (dialog as { id: string }).id, { name, ownAudience: own }), "Carpeta guardada")
+        }
       />
       <FolderPickerDialog
         open={dialog?.kind === "moveFolder"}
@@ -283,7 +298,7 @@ function ClubLessons() {
           dialog?.kind === "moveFolder" &&
           (target === dialog.id || descendantIds(folders, dialog.id).has(target) || !canMoveFolder(folders, dialog.id, target))
         }
-        onPick={(target) => guard(() => moveFolder(clubId, (dialog as { id: string }).id, target), "Carpeta movida")}
+        onPick={(target) => guard(() => moveFolder(clubId, ctx, (dialog as { id: string }).id, target), "Carpeta movida")}
       />
       <FolderPickerDialog
         open={dialog?.kind === "moveLesson"}
@@ -291,7 +306,7 @@ function ClubLessons() {
         title="Mover lección a…"
         folders={folders}
         current={dialog?.kind === "moveLesson" ? dialog.folderId : null}
-        onPick={(target) => guard(() => moveLesson(clubId, (dialog as { id: string }).id, target), "Lección movida")}
+        onPick={(target) => guard(() => moveLesson(clubId, ctx, (dialog as { id: string }).id, target), "Lección movida")}
       />
       <ConfirmDialog
         open={dialog?.kind === "deleteFolder"}

@@ -2,6 +2,7 @@
 // editar y borrar entrenamientos. Misma validación server-side de permisos
 // que exercises.ts (las reglas RTDB de Trainings solo comprueban rol).
 import { get, ref, remove, set, update } from "firebase/database";
+import type { Audience } from "@/lib/audience";
 import { PATHS } from "@/lib/constants";
 import { auth, db } from "@/lib/firebase";
 import { canCreateContent, canDeleteTraining, canEditTraining } from "@/lib/permissions";
@@ -17,6 +18,8 @@ export type TrainingInput = {
   etiquetas: string[];
   /** Ver comentario equivalente en lib/actions/exercises.ts (ExerciseInput.clubId). */
   clubId?: string | null;
+  /** Con privacy "Club": quién del club lo ve (null = todo el club). */
+  clubAudience?: Audience | null;
   /** Solo al copiar de otro autor: de dónde viene. Al editar se omite y se conserva el existente. */
   copiedFrom?: { name: string; author: string };
 };
@@ -57,6 +60,7 @@ function buildTraining(input: TrainingInput, author: string): Training {
     approvalStatus: input.privacy === "Publico" || input.privacy === "Club" ? "PENDING" : null,
     teamname: null, // sin uso real — ver comentario en schemas/training.ts
     clubId: input.privacy === "Club" ? (input.clubId ?? null) : null,
+    clubAudience: input.privacy === "Club" ? (input.clubAudience ?? null) : null,
     ...(input.copiedFrom ? { copiedFrom: input.copiedFrom } : {}),
   };
 }
@@ -149,6 +153,7 @@ export async function duplicateTraining(
       privacy,
       etiquetas: training.etiquetas,
       clubId: privacy === "Club" ? training.clubId : null,
+      clubAudience: privacy === "Club" ? (training.clubAudience ?? null) : null,
     },
     currentUser.username!,
   );

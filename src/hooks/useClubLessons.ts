@@ -2,6 +2,7 @@
 
 import { onValue, ref } from "firebase/database";
 import { useEffect, useMemo, useState } from "react";
+import type { z } from "zod";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useClub } from "@/hooks/useClub";
 import { useMyClubId } from "@/hooks/useMyClubId";
@@ -39,41 +40,64 @@ export function useLessonsClub() {
   };
 }
 
-/** Carpetas y lecciones publicadas del club, en tiempo real. */
-export function useClubLessons(clubId: string | null) {
-  const [folders, setFolders] = useState<{ clubId: string; data: Folders } | null>(null);
-  const [lessons, setLessons] = useState<{ clubId: string; data: Lessons } | null>(null);
+/**
+ * Elementos del índice (index/{kind}) que el usuario puede leer, en tiempo
+ * real (2026-09-28, públicos): el índice solo da ids y cada carpeta/lección se
+ * lee aparte; las que las reglas no dejan ver (público de otro equipo, solo
+ * entrenadores…) se descartan sin error.
+ */
+function useIndexed<T>(clubId: string | null, kind: "folders" | "lessons", schema: z.ZodType<T>) {
+  const [index, setIndex] = useState<{ clubId: string; ids: string[] } | null>(null);
+  const [items, setItems] = useState<Record<string, T | null>>({});
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!clubId) return;
-    const base = `${PATHS.CLUB_LESSONS}/${clubId}`;
-    const fail = (e: Error) => {
-      console.error("useClubLessons:", e);
-      setError(e.message);
-    };
-    const offFolders = onValue(
-      ref(db, `${base}/folders`),
-      (snap) => setFolders({ clubId, data: parseMap(LessonFolderSchema, snap.val()) }),
-      fail,
+    return onValue(
+      ref(db, `${PATHS.CLUB_LESSONS}/${clubId}/index/${kind}`),
+      (snap) => setIndex({ clubId, ids: Object.keys((snap.val() as Record<string, string> | null) ?? {}) }),
+      (e) => {
+        console.error(`useClubLessons(index/${kind}):`, e);
+        setError(e.message);
+      },
     );
-    const offLessons = onValue(
-      ref(db, `${base}/lessons`),
-      (snap) => setLessons({ clubId, data: parseMap(LessonSchema, snap.val()) }),
-      fail,
-    );
-    return () => {
-      offFolders();
-      offLessons();
-    };
-  }, [clubId]);
+  }, [clubId, kind]);
 
-  const ready = Boolean(clubId && folders?.clubId === clubId && lessons?.clubId === clubId);
+  const ids = index && index.clubId === clubId ? index.ids : null;
+  const idsKey = ids?.join(",") ?? "";
+  useEffect(() => {
+    if (!clubId || !idsKey) return;
+    const offs = idsKey.split(",").map((id) =>
+      onValue(
+        ref(db, `${PATHS.CLUB_LESSONS}/${clubId}/${kind}/${id}`),
+        (snap) => {
+          const parsed = snap.exists() ? schema.safeParse(snap.val()) : null;
+          setItems((prev) => ({ ...prev, [id]: parsed?.success ? parsed.data : null }));
+        },
+        // Sin permiso (público que no me incluye): simplemente no lo veo.
+        () => setItems((prev) => ({ ...prev, [id]: null })),
+      ),
+    );
+    return () => offs.forEach((off) => off());
+  }, [clubId, kind, idsKey, schema]);
+
+  return useMemo(() => {
+    const data: Record<string, T> = {};
+    for (const id of ids ?? []) if (items[id]) data[id] = items[id]!;
+    const loading = Boolean(clubId) && !error && (!ids || ids.some((id) => !(id in items)));
+    return { data, loading, error };
+  }, [clubId, ids, items, error]);
+}
+
+/** Carpetas y lecciones publicadas del club que el usuario puede ver, en tiempo real. */
+export function useClubLessons(clubId: string | null) {
+  const folders = useIndexed(clubId, "folders", LessonFolderSchema);
+  const lessons = useIndexed(clubId, "lessons", LessonSchema);
   return {
-    folders: ready ? folders!.data : {},
-    lessons: ready ? lessons!.data : {},
-    loading: Boolean(clubId) && !ready && !error,
-    error,
+    folders: folders.data as Folders,
+    lessons: lessons.data as Lessons,
+    loading: folders.loading || lessons.loading,
+    error: folders.error ?? lessons.error,
   };
 }
 

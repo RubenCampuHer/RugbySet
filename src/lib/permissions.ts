@@ -1,6 +1,7 @@
 // Port literal de PermissionsManager.kt (repo Android) — mantener en
 // sincronía caso por caso. Es la única lógica de negocio real del MVP:
 // decide qué contenido ve cada usuario según privacy × approvalStatus.
+import { type Audience, type AudienceViewer, canSeeAudience } from "./audience";
 import type { Club, Exercise, Team, Training, User } from "./types";
 
 export const APPROVAL_PENDING = "PENDING";
@@ -44,7 +45,24 @@ export function isTeamFounder(team: Team, uid: string | null | undefined): boole
 }
 
 /** Club del que el usuario es miembro (`myClubId`, vía su propio equipo) y/o administra (`myAdminClubId`, vía `Clubs.adminUserId`) — resueltos por quien llama, ver useMyClubId()/useClub(). */
-export type ClubContext = { myClubId?: string | null; myAdminClubId?: string | null };
+export type ClubContext = {
+  myClubId?: string | null;
+  myAdminClubId?: string | null;
+  /**
+   * Quién mira, para el público dentro del club (clubAudience, 2026-09-28).
+   * Sin él (cargando) lo restringido solo lo ven autor y dirección.
+   */
+  audienceViewer?: AudienceViewer;
+};
+
+/** Contenido "Club" APROBADO: ¿lo ve este miembro según su público? */
+function passesClubAudience(item: { clubAudience?: Audience | null; clubId?: string | null }, club: ClubContext): boolean {
+  const audience = item.clubAudience;
+  if (!audience || audience.kind === "club") return true;
+  const isDirector = club.myAdminClubId != null && club.myAdminClubId === item.clubId;
+  if (!club.audienceViewer) return isDirector;
+  return canSeeAudience(audience, { ...club.audienceViewer, isDirector: club.audienceViewer.isDirector || isDirector });
+}
 
 /**
  * Espejo de PermissionsManager.canViewExercise:
@@ -67,7 +85,7 @@ export function canViewExercise(user: User | null, exercise: Exercise, club: Clu
       if (exercise.clubId == null || exercise.clubId !== club.myClubId) return false;
       switch (exercise.approvalStatus) {
         case APPROVAL_APPROVED:
-          return true;
+          return passesClubAudience(exercise, club);
         case APPROVAL_PENDING:
           return club.myAdminClubId === exercise.clubId;
         default:
@@ -105,7 +123,7 @@ export function canViewTraining(user: User | null, training: Training, club: Clu
       if (training.clubId == null || training.clubId !== club.myClubId) return false;
       switch (training.approvalStatus) {
         case APPROVAL_APPROVED:
-          return true;
+          return passesClubAudience(training, club);
         case APPROVAL_PENDING:
           return club.myAdminClubId === training.clubId;
         default:

@@ -25,13 +25,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { assignLineupToMatch, createLineup } from "@/lib/actions/lineup";
+import { assignLineupToMatch, createLineup, setLineupVisible } from "@/lib/actions/lineup";
 import { sendAttendanceNotification } from "@/lib/actions/notify";
 import { answerCounts } from "@/lib/agenda";
 import { ATTENDANCE_MARK_LABEL, attendanceMark, declineReason } from "@/lib/attendance";
 import { useProfilesByUid } from "@/hooks/useProfilesByUid";
 import { parseKey } from "@/lib/calendar";
-import { squadOf } from "@/lib/squad";
+import { lineupVisibleToPlayers, squadOf } from "@/lib/squad";
 import { cn } from "@/lib/utils";
 import type { Team, TrainingDay } from "@/lib/types";
 
@@ -143,7 +143,43 @@ function MatchLineupSection({ team, fecha, day }: { team: Team; fecha: string; d
         </div>
       )}
 
+      {current && <LineupVisibilityToggle team={team} fecha={fecha} day={day} />}
+
       {current && <LineupEditor team={team} lineup={current} squad={squadOf(team, day)?.players ?? null} />}
+    </div>
+  );
+}
+
+/** Publicar u ocultar la alineación a los jugadores (2026-09-28), como la convocatoria. */
+function LineupVisibilityToggle({ team, fecha, day }: { team: Team; fecha: string; day: TrainingDay }) {
+  const [saving, setSaving] = useState(false);
+  const visible = lineupVisibleToPlayers(team, day);
+  const toggle = async (next: boolean) => {
+    setSaving(true);
+    try {
+      await setLineupVisible(team.teamname!, fecha, next);
+      toast.success(next ? "Alineación visible para los jugadores" : "Alineación oculta a los jugadores");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo cambiar la visibilidad");
+    } finally {
+      setSaving(false);
+    }
+  };
+  return (
+    <div className="space-y-1">
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={visible}
+          disabled={saving}
+          onChange={(e) => void toggle(e.target.checked)}
+          className="size-4 accent-primary"
+        />
+        Visible para los jugadores
+      </label>
+      <p className="pl-6 text-xs text-muted-foreground">
+        {visible ? "Los jugadores ven la alineación en este partido." : "Mientras no sea visible, solo la ve el cuerpo técnico."}
+      </p>
     </div>
   );
 }
@@ -354,7 +390,7 @@ export function DayPanel({
 
         {isMatch && <MatchResultCard team={team} day={day} />}
 
-        {!isCoach && isMatch && day.lineupId && team.lineups[day.lineupId] && (
+        {!isCoach && isMatch && day.lineupId && team.lineups[day.lineupId] && lineupVisibleToPlayers(team, day) && (
           <LineupSummary lineup={team.lineups[day.lineupId]} />
         )}
 

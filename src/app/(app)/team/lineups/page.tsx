@@ -29,6 +29,7 @@ import { useMyTeams } from "@/hooks/useMyTeams";
 import { useTeam } from "@/hooks/useTeam";
 import { createLineup } from "@/lib/actions/lineup";
 import { isAdmin, isTeamCoach } from "@/lib/permissions";
+import { lineupVisibleToPlayers } from "@/lib/squad";
 import type { LineupDoc } from "@/lib/types";
 
 /** Diálogo mínimo "+ Nueva alineación": solo nombre, crea y abre el editor. */
@@ -169,9 +170,16 @@ function TeamLineups() {
     assignedFechasByLineup.set(d.lineupId, list);
   }
 
-  const lineups = Object.values(team.lineups).sort(
-    (a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0),
+  // Jugadores (2026-09-28): solo las alineaciones asignadas a un partido y
+  // publicadas para ellos; los borradores y planes B son del cuerpo técnico.
+  const publishedIds = new Set(
+    team.trainingdays
+      .filter((d) => d.lineupId && lineupVisibleToPlayers(team, d))
+      .map((d) => d.lineupId!),
   );
+  const lineups = Object.values(team.lineups)
+    .filter((l) => isManage || publishedIds.has(l.lineupId!))
+    .sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
 
   return (
     <div className="mx-auto max-w-2xl space-y-4">
@@ -199,7 +207,7 @@ function TeamLineups() {
             hint={
               isManage
                 ? "Crea la primera con el botón de arriba."
-                : "Aquí aparecerán en cuanto el entrenador cree alguna."
+                : "Aquí aparecerán las alineaciones que el cuerpo técnico publique para cada partido."
             }
           />
         ) : (

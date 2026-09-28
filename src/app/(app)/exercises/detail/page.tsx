@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DetailSkeleton } from "@/components/skeletons";
 import { CopyToMineDialog } from "@/components/library/CopyToMineDialog";
+import { useAudienceViewer } from "@/hooks/useAudienceViewer";
 import { useClub } from "@/hooks/useClub";
 import { useMyClubId } from "@/hooks/useMyClubId";
 import { copyExerciseToMine, deleteExercise, duplicateExercise } from "@/lib/actions/exercises";
@@ -39,6 +40,7 @@ function ExerciseDetail() {
   const { profile } = useAuth();
   const { clubId: myClubId, loading: loadingMyClub } = useMyClubId();
   const { club: adminClub, loading: loadingAdminClub } = useClub();
+  const audienceViewer = useAudienceViewer();
   const [result, setResult] = useState<
     { name: string; exercise: Exercise | null } | undefined
   >(undefined);
@@ -70,7 +72,7 @@ function ExerciseDetail() {
   }
   if (
     exercise === null ||
-    !canViewExercise(profile, exercise, { myClubId, myAdminClubId: adminClub?.clubId })
+    !canViewExercise(profile, exercise, { myClubId, myAdminClubId: adminClub?.clubId, audienceViewer })
   ) {
     return (
       <div className="space-y-4 py-12 text-center">

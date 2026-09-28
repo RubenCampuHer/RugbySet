@@ -319,3 +319,41 @@ describe("delegado (2026-09-25)", () => {
     expect(canManageEvents(team, null)).toBe(false);
   });
 });
+
+describe("público dentro del club (clubAudience, 2026-09-28)", () => {
+  const clubEx = (clubAudience: unknown) =>
+    exercise({ author: "otro", privacy: "Club", clubId: "c1", approvalStatus: "APPROVED", clubAudience } as never);
+  const viewer = (activeTeam: string, isCoachOfActive: boolean) => ({ isDirector: false, activeTeam, isCoachOfActive });
+  const member = (v: ReturnType<typeof viewer>): ClubContext => ({ myClubId: "c1", audienceViewer: v });
+  const me = user({ username: "yo" });
+
+  it("sin público o 'todo el club': lo ve cualquier miembro", () => {
+    expect(canViewExercise(me, clubEx(undefined), member(viewer("Sub16", false)))).toBe(true);
+    expect(canViewExercise(me, clubEx({ kind: "club" }), member(viewer("Sub16", false)))).toBe(true);
+  });
+
+  it("solo cuerpo técnico: el jugador no, el entrenador sí", () => {
+    const ex = clubEx({ kind: "staff" });
+    expect(canViewExercise(me, ex, member(viewer("Sub16", false)))).toBe(false);
+    expect(canViewExercise(me, ex, member(viewer("Sub16", true)))).toBe(true);
+  });
+
+  it("equipos concretos", () => {
+    const ex = clubEx({ kind: "teams", teams: { Sub16: true } });
+    expect(canViewExercise(me, ex, member(viewer("Sub16", false)))).toBe(true);
+    expect(canViewExercise(me, ex, member(viewer("Sub18", true)))).toBe(false);
+  });
+
+  it("la dirección del club y el autor lo ven siempre; sin viewer (cargando) solo ellos", () => {
+    const ex = clubEx({ kind: "teamsStaff", teams: { Sub16: true } });
+    expect(canViewExercise(me, ex, { myClubId: "c1", myAdminClubId: "c1", audienceViewer: viewer("Sub18", false) })).toBe(true);
+    expect(canViewExercise(user({ username: "otro" }), ex, member(viewer("Sub18", false)))).toBe(true);
+    expect(canViewExercise(me, ex, { myClubId: "c1" })).toBe(false);
+  });
+
+  it("entrenos igual", () => {
+    const tr = training({ author: "otro", privacy: "Club", clubId: "c1", approvalStatus: "APPROVED", clubAudience: { kind: "staff" } } as never);
+    expect(canViewTraining(me, tr, member(viewer("Sub16", false)))).toBe(false);
+    expect(canViewTraining(me, tr, member(viewer("Sub16", true)))).toBe(true);
+  });
+});

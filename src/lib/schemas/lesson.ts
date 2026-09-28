@@ -2,6 +2,7 @@
 // database.rules.json del repo Android (bloque ClubLessons): las reglas
 // validan la misma forma, así que un campo nuevo aquí va también allí.
 import { z } from "zod";
+import { AudienceSchema } from "../audience";
 import { rtdbRecord } from "./common";
 
 export const LESSON_BLOCK_TYPES = ["text", "pdf", "video", "board"] as const;
@@ -42,6 +43,11 @@ export const LessonSchema = z.object({
   createdBy: z.string(),
   createdAt: z.number().catch(0),
   updatedAt: z.number().catch(0),
+  // Público efectivo (2026-09-28): siempre guardado (desnormalizado) para que
+  // las reglas lo comprueben sin recorrer carpetas; audienceInherited = sigue
+  // al de su carpeta y se reescribe cuando esta cambia. Ausente = todo el club.
+  audience: AudienceSchema.nullish().catch(null),
+  audienceInherited: z.boolean().nullish().catch(null),
   // Un bloque que no encaja (tipo desconocido, datos rotos) se descarta en vez de tirar la lección.
   blocks: rtdbRecord(LessonBlockSchema.nullable().catch(null)).default({}),
 });
@@ -53,6 +59,11 @@ export const LessonFolderSchema = z.object({
   parentId: z.string().nullish(),
   createdBy: z.string(),
   createdAt: z.number().catch(0),
+  // Público efectivo (2026-09-28): siempre guardado (desnormalizado) para que
+  // las reglas lo comprueben sin recorrer carpetas; audienceInherited = sigue
+  // al de su carpeta y se reescribe cuando esta cambia. Ausente = todo el club.
+  audience: AudienceSchema.nullish().catch(null),
+  audienceInherited: z.boolean().nullish().catch(null),
 });
 export type LessonFolder = z.infer<typeof LessonFolderSchema>;
 

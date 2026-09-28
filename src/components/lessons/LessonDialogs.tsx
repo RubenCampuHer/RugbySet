@@ -6,15 +6,20 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AudiencePicker } from "@/components/audience/AudiencePicker";
+import { type Audience, normalizeAudience } from "@/lib/audience";
 import { folderOptions, type Folders } from "@/lib/lessons";
 import { cn } from "@/lib/utils";
 
-/** Nombre de carpeta (crear o renombrar). Controlado por el padre. */
-export function FolderNameDialog({
+/** Crear o editar carpeta: nombre y público (propio o el de la carpeta de arriba). Controlado por el padre. */
+export function FolderDialog({
   open,
   onOpenChange,
   title,
   initialName = "",
+  initialAudience = null,
+  inherited,
+  teams,
   submitLabel,
   onSubmit,
 }: {
@@ -22,24 +27,35 @@ export function FolderNameDialog({
   onOpenChange: (open: boolean) => void;
   title: string;
   initialName?: string;
+  /** Público propio actual (null = hereda). */
+  initialAudience?: Audience | null;
+  /** Público de la carpeta de arriba (o todo el club en la raíz). */
+  inherited: Audience;
+  teams: string[];
   submitLabel: string;
-  onSubmit: (name: string) => Promise<void>;
+  onSubmit: (name: string, ownAudience: Audience | null) => Promise<void>;
 }) {
   const [name, setName] = useState(initialName);
+  const [audience, setAudience] = useState<Audience | null>(initialAudience);
   const [busy, setBusy] = useState(false);
   const [lastOpen, setLastOpen] = useState(open);
-  // Al abrir, vuelve al nombre inicial (sin efecto: ajuste durante el render).
+  // Al abrir, vuelve a los valores iniciales (sin efecto: ajuste durante el render).
   if (open !== lastOpen) {
     setLastOpen(open);
-    if (open) setName(initialName);
+    if (open) {
+      setName(initialName);
+      setAudience(initialAudience);
+    }
   }
 
   const trimmed = name.trim();
+  const own = audience ? normalizeAudience(audience) : null;
+  const invalidAudience = Boolean(audience && !own);
   const submit = async () => {
-    if (!trimmed) return;
+    if (!trimmed || invalidAudience) return;
     setBusy(true);
     try {
-      await onSubmit(trimmed);
+      await onSubmit(trimmed, own);
       onOpenChange(false);
     } catch {
       // El aviso lo da quien llama; el diálogo sigue abierto para reintentar.
@@ -50,29 +66,32 @@ export function FolderNameDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
         <form
-          className="space-y-1"
+          className="space-y-4"
           onSubmit={(e) => {
             e.preventDefault();
             void submit();
           }}
         >
-          <Label htmlFor="folder-name">Nombre</Label>
-          <Input
-            id="folder-name"
-            value={name}
-            maxLength={120}
-            autoFocus
-            disabled={busy}
-            onChange={(e) => setName(e.target.value)}
-          />
+          <div className="space-y-1">
+            <Label htmlFor="folder-name">Nombre</Label>
+            <Input
+              id="folder-name"
+              value={name}
+              maxLength={120}
+              autoFocus
+              disabled={busy}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </div>
+          <AudiencePicker value={audience} onChange={setAudience} teams={teams} inherited={inherited} disabled={busy} />
         </form>
         <DialogFooter>
-          <Button disabled={busy || !trimmed} onClick={() => void submit()}>
+          <Button disabled={busy || !trimmed || invalidAudience} onClick={() => void submit()}>
             {busy ? "Guardando…" : submitLabel}
           </Button>
         </DialogFooter>

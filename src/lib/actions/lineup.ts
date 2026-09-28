@@ -12,12 +12,13 @@
 // una acción exclusiva del Calendario — la alineación no sabe ni le
 // importa a qué partido está asignada, esa referencia vive solo en
 // TrainingDay.lineupId.
-import { push, ref, remove, update } from "firebase/database";
+import { push, ref, remove, set, update } from "firebase/database";
 import { mutateTrainingDays } from "@/lib/actions/team";
 import { PATHS } from "@/lib/constants";
 import { db } from "@/lib/firebase";
 import { mergeNode } from "@/lib/rtdb";
-import { patchRawDay } from "@/lib/trainingdays";
+import { eventDataKey } from "@/lib/attendance";
+import { findRawDay, patchRawDay } from "@/lib/trainingdays";
 import type { LineupDoc } from "@/lib/types";
 
 /** Crea una alineación nueva — solo nombre, sin ningún partido asociado todavía. */
@@ -66,7 +67,22 @@ export async function assignLineupToMatch(
   fecha: string,
   lineupId: string | null,
 ): Promise<void> {
-  await mutateTrainingDays(teamname, (days) => patchRawDay(days, fecha, { lineupId }));
+  const before = await mutateTrainingDays(teamname, (days) => patchRawDay(days, fecha, { lineupId }));
+  const key = eventDataKey(fecha);
+  if (!key) return;
+  const visibleRef = ref(db, `${PATHS.TEAMS}/${teamname}/eventData/${key}/lineupVisible`);
+  const hadLineup = Boolean(findRawDay(before, fecha)?.lineupId);
+  // Primera alineación del partido: oculta a los jugadores hasta publicarla.
+  // Cambiar de una a otra mantiene lo que hubiera; quitarla borra la marca.
+  if (!lineupId) await set(visibleRef, null);
+  else if (!hadLineup) await set(visibleRef, false);
+}
+
+/** Publica u oculta la alineación del partido para los jugadores (2026-09-28). */
+export async function setLineupVisible(teamname: string, fecha: string, visible: boolean): Promise<void> {
+  const key = eventDataKey(fecha);
+  if (!key) throw new Error("Fecha no válida");
+  await set(ref(db, `${PATHS.TEAMS}/${teamname}/eventData/${key}/lineupVisible`), visible);
 }
 
 /**

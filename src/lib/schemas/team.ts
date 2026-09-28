@@ -90,6 +90,10 @@ export const EventDataSchema = z.object({
     })
     .nullish()
     .catch(null),
+  // Alineación del partido visible para los jugadores (2026-09-28). Ausente =
+  // visible (lo de antes y lo que asigna Android); la web la guarda en false
+  // al asignar una alineación nueva hasta que el cuerpo técnico la publica.
+  lineupVisible: z.boolean().nullish().catch(null),
 });
 
 /**

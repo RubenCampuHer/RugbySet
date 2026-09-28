@@ -1,6 +1,7 @@
 // Fuente: _Exercise.kt del repo Android — mantener en sincronía.
 // Nota: la clave del nodo Exercises/{name} ES el nombre (no hay push ids).
 import { z } from "zod";
+import { AudienceSchema } from "../audience";
 import { ApprovalStatusSchema, PrivacySchema, rtdbList, timestampMs } from "./common";
 
 // Origen de una copia hecha con "Copiar a mis ejercicios/entrenos" (solo web;
@@ -33,4 +34,8 @@ export const ExerciseSchema = z.object({
   // pero debe preservarlo al editar — ver _Exercise.kt).
   boardData: z.string().nullish(),
   copiedFrom: CopiedFromSchema.nullish().catch(null),
+  // Público dentro del club (2026-09-28, solo web): con privacy "Club", quién
+  // del club lo ve (lib/audience.ts). Ausente = todo el club. Android lo
+  // ignora (lo ve todo el club) pero lo conserva al editar (fusiona el nodo).
+  clubAudience: AudienceSchema.nullish().catch(null),
 });

@@ -1,6 +1,9 @@
 "use client";
 
 import { get, ref } from "firebase/database";
+import { AudiencePicker } from "@/components/audience/AudiencePicker";
+import { useClub } from "@/hooks/useClub";
+import { type Audience, normalizeAudience } from "@/lib/audience";
 import { ChevronDown, ChevronUp, Plus, Trash2 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
@@ -56,6 +59,10 @@ function TrainingForm({
   const isEdit = originalName !== null;
   const { exercises: visibleExercises } = useExercises();
   const { clubId: myClubId, loading: loadingMyClub } = useMyClubId();
+  // Equipos del club para el público "Club" (2026-09-28).
+  const { club: myClub } = useClub(myClubId ?? null);
+  const [clubAudience, setClubAudience] = useState<Audience | null>(original?.clubAudience ?? null);
+  const normalizedAudience = clubAudience ? normalizeAudience(clubAudience) : null;
 
   const [name, setName] = useState(original?.name ?? "");
   const [descCorta, setDescCorta] = useState(original?.descCorta ?? "");
@@ -79,7 +86,7 @@ function TrainingForm({
     isDescCortaValid &&
     hasExercises &&
     !saving &&
-    (privacy !== "Club" || myClubId != null);
+    (privacy !== "Club" || myClubId != null) && !(privacy === "Club" && Boolean(clubAudience) && !normalizedAudience);
   const tiempoTotal = sections.reduce((sum, s) => sum + s.tiempoSeccion, 0);
 
   const updateSection = (uid: string, fn: (s: Section) => Section) =>
@@ -165,6 +172,7 @@ function TrainingForm({
         privacy,
         etiquetas,
         clubId: privacy === "Club" ? myClubId : null,
+        clubAudience: privacy === "Club" ? normalizedAudience : null,
       };
       if (isEdit) {
         await updateTraining(originalName, input, profile);
@@ -255,6 +263,11 @@ function TrainingForm({
           <p className="text-xs text-muted-foreground">
             El admin de tu club debe aprobarlo antes de que el resto del club lo vea.
           </p>
+        )}
+        {privacy === "Club" && myClubId && (
+          <div className="rounded-lg border p-3">
+            <AudiencePicker value={clubAudience} onChange={setClubAudience} teams={myClub?.teams ?? []} />
+          </div>
         )}
       </div>
 

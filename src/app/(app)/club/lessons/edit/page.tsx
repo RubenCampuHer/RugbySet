@@ -17,6 +17,7 @@ import { Suspense, useRef, useState } from "react";
 import { toast } from "sonner";
 import { BackLink } from "@/components/BackLink";
 import { EmptyState } from "@/components/EmptyState";
+import { AudiencePicker } from "@/components/audience/AudiencePicker";
 import { FolderPickerDialog } from "@/components/lessons/LessonDialogs";
 import { LessonBlockView } from "@/components/lessons/LessonBlocksView";
 import { VideoLinkCard } from "@/components/media/VideoLinkCard";
@@ -31,7 +32,17 @@ import { parseBoardData } from "@/components/whiteboard/types";
 import { WhiteboardDialog } from "@/components/whiteboard/WhiteboardDialog";
 import { useClubLessons, useLessonsClub, usePendingLessons } from "@/hooks/useClubLessons";
 import { discardUploads, newLessonId, saveLesson, uploadLessonFile } from "@/lib/actions/lessons";
-import { breadcrumb, lessonFiles, moveBlock, sortedBlocks, toBlocksRecord, validateLessonFile, type BlockEntry } from "@/lib/lessons";
+import { type Audience, normalizeAudience } from "@/lib/audience";
+import {
+  breadcrumb,
+  lessonFiles,
+  moveBlock,
+  parentAudience,
+  sortedBlocks,
+  toBlocksRecord,
+  validateLessonFile,
+  type BlockEntry,
+} from "@/lib/lessons";
 import { normalizeVideoUrl } from "@/lib/match";
 import { canEditClubItem } from "@/lib/permissions";
 import type { LessonBlock } from "@/lib/schemas/lesson";
@@ -49,7 +60,7 @@ function LessonEditor() {
   const router = useRouter();
   const editingId = params.get("id");
   const initialFolder = params.get("folder");
-  const { uid, clubId, isDirector, canWrite, loading } = useLessonsClub();
+  const { uid, clubId, club, isDirector, canWrite, loading } = useLessonsClub();
   const { folders, lessons, loading: loadingLessons } = useClubLessons(clubId);
   const { pending: pendingMap, loading: loadingPending } = usePendingLessons(clubId, uid, isDirector);
 
@@ -58,6 +69,8 @@ function LessonEditor() {
   const [title, setTitle] = useState("");
   const [folderId, setFolderId] = useState<string | null>(initialFolder);
   const [blocks, setBlocks] = useState<BlockEntry[]>([]);
+  /** Público propio (null = el de la carpeta). */
+  const [ownAudience, setOwnAudience] = useState<Audience | null>(null);
   /** Ficheros subidos en esta sesión del editor (para borrarlos si no se guardan). */
   const [uploaded, setUploaded] = useState<string[]>([]);
   const [uploading, setUploading] = useState<UploadState | null>(null);
@@ -79,6 +92,7 @@ function LessonEditor() {
       setTitle(source.title);
       setFolderId(source.folderId ?? null);
       setBlocks(sortedBlocks(source));
+      setOwnAudience(source.audienceInherited === false ? (source.audience ?? null) : null);
     }
   }
   if (ready && clubId && !lessonId) setLessonId(newLessonId(clubId));
@@ -150,10 +164,16 @@ function LessonEditor() {
         if (b.text.trim()) cleaned.push(entry);
       } else cleaned.push(entry);
     }
+    const own = ownAudience ? normalizeAudience(ownAudience) : null;
+    if (ownAudience && !own) {
+      toast.error("Elige al menos un equipo para el público de la lección");
+      return;
+    }
     setSaving(true);
     try {
-      const draft = { title, folderId, blocks: toBlocksRecord(cleaned) };
-      const result = await saveLesson({ clubId, lessonId, uid, isDirector, draft, approved, pending });
+      const draft = { title, folderId, blocks: toBlocksRecord(cleaned), ownAudience: own };
+      const ctx = { folders, lessons, pending: pendingMap, uid, isDirector };
+      const result = await saveLesson({ clubId, lessonId, ctx, draft, approved, pending });
       // Lo subido aquí que al final no quedó en la lección.
       const used = new Set(lessonFiles(draft));
       await discardUploads(uploaded.filter((p) => !used.has(p)));
@@ -192,6 +212,17 @@ function LessonEditor() {
           <Folder /> <span className="truncate">{path.length ? path.map((c) => c.name).join(" / ") : "Lecciones (inicio)"}</span>
         </Button>
       </div>
+
+      <Card>
+        <CardContent className="py-3">
+          <AudiencePicker
+            value={ownAudience}
+            onChange={setOwnAudience}
+            teams={club?.teams ?? []}
+            inherited={parentAudience(folders, folderId)}
+          />
+        </CardContent>
+      </Card>
 
       {blocks.map((entry, i) => {
         const b = entry.block;

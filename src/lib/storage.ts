@@ -1,7 +1,7 @@
 // Redimensiona (máx. 1600px lado mayor) y comprime a JPEG ~0.85 en el
 // navegador antes de subir a Firebase Storage — sin recortador ni
 // dependencias nuevas (decisión del plan de paridad F1).
-import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
+import { deleteObject, getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { storage } from "@/lib/firebase";
 
 const MAX_DIMENSION = 1600;
@@ -40,4 +40,10 @@ export async function resizeAndUpload(folder: string, file: Blob): Promise<strin
   const storageRef = ref(storage, `${folder}/${Date.now()}.jpg`);
   await uploadBytes(storageRef, resized, { contentType: "image/jpeg" });
   return getDownloadURL(storageRef);
+}
+
+/** Borra un fichero de Storage sin fallar si ya no existe (o no se deja). */
+export async function deleteFileQuietly(path: string | null | undefined): Promise<void> {
+  if (!path) return;
+  await deleteObject(ref(storage, path)).catch(() => {});
 }

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { ClubManager } from "@/components/club/ClubManager";
 import { ClubMembershipCard } from "@/components/club/ClubMembershipCard";
+import { ClubLessonsCard } from "@/components/lessons/ClubLessonsCard";
 import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/PageHeader";
 import { TeamSkeleton } from "@/components/skeletons";
@@ -50,6 +51,8 @@ export default function ClubPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-4">
       <PageHeader title="Club" />
+
+      <ClubLessonsCard />
 
       {club && <ClubManager club={club} />}
 

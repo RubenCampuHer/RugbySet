@@ -1,9 +1,10 @@
 "use client";
 
-import { FileText, Link2, Play, Trash2, Upload } from "lucide-react";
+import { FileText, Trash2, Upload } from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { VideoLinkCard } from "@/components/media/VideoLinkCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,8 +29,6 @@ import {
   matchOutcome,
   parseScore,
   scoreline,
-  videoSiteLabel,
-  youtubeId,
 } from "@/lib/match";
 import type { Match, Team, TrainingDay } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -148,51 +147,11 @@ function VideoList({
   if (videos.length === 0) return null;
   return (
     <ul className="grid gap-2 sm:grid-cols-2">
-      {videos.map(([id, v]) => {
-        const yt = youtubeId(v.url);
-        return (
-          <li key={id} className="flex min-w-0 items-center gap-2 rounded-lg border p-1.5">
-            <a
-              href={v.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex min-w-0 flex-1 items-center gap-2 hover:underline"
-            >
-              {yt ? (
-                <span className="relative shrink-0 overflow-hidden rounded-md">
-                  {/* eslint-disable-next-line @next/next/no-img-element -- miniatura externa de YouTube */}
-                  <img
-                    src={`https://i.ytimg.com/vi/${yt}/mqdefault.jpg`}
-                    alt=""
-                    className="h-12 w-20 object-cover"
-                    loading="lazy"
-                  />
-                  <Play className="absolute inset-0 m-auto size-5 fill-white text-white drop-shadow" />
-                </span>
-              ) : (
-                <span className="flex h-12 w-20 shrink-0 items-center justify-center rounded-md bg-muted">
-                  <Link2 className="size-5 text-muted-foreground" />
-                </span>
-              )}
-              <span className="min-w-0">
-                <span className="block truncate text-sm font-medium">{v.title || videoSiteLabel(v.url)}</span>
-                {v.title && <span className="block truncate text-xs text-muted-foreground">{videoSiteLabel(v.url)}</span>}
-              </span>
-            </a>
-            {onRemove && (
-              <Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                aria-label="Quitar vídeo"
-                onClick={() => onRemove(id)}
-              >
-                <Trash2 className="size-4" />
-              </Button>
-            )}
-          </li>
-        );
-      })}
+      {videos.map(([id, v]) => (
+        <li key={id}>
+          <VideoLinkCard url={v.url} title={v.title} onRemove={onRemove ? () => onRemove(id) : undefined} />
+        </li>
+      ))}
     </ul>
   );
 }

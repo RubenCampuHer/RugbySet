@@ -1,7 +1,7 @@
 // Port literal de PermissionsManager.kt (repo Android) — mantener en
 // sincronía caso por caso. Es la única lógica de negocio real del MVP:
 // decide qué contenido ve cada usuario según privacy × approvalStatus.
-import type { Exercise, Team, Training, User } from "./types";
+import type { Club, Exercise, Team, Training, User } from "./types";
 
 export const APPROVAL_PENDING = "PENDING";
 export const APPROVAL_APPROVED = "APPROVED";
@@ -164,4 +164,31 @@ export function getRoleDisplayName(role: string | null | undefined): string {
     default:
       return "Desconocido";
   }
+}
+
+// ── Lecciones del club (2026-09-28, solo web) ──
+// Mismo criterio que el bloque ClubLessons de database.rules.json (repo Android).
+
+/** Dirección del club: fundador, codirector o ADMIN. Aprueba y edita todas las lecciones. */
+export function isClubDirector(club: Club | null | undefined, uid: string | null | undefined, profile: User | null): boolean {
+  if (isAdmin(profile)) return true;
+  if (!club || !uid) return false;
+  return club.adminUserId === uid || club.directors[uid] === true;
+}
+
+/** ¿Puede crear carpetas y lecciones? La dirección, o un entrenador de su equipo activo si ese equipo es del club. */
+export function canWriteClubLessons(opts: {
+  isDirector: boolean;
+  activeTeam: Team | null | undefined;
+  clubId: string | null | undefined;
+  uid: string | null | undefined;
+}): boolean {
+  if (opts.isDirector) return true;
+  const { activeTeam, clubId, uid } = opts;
+  return Boolean(activeTeam && clubId && activeTeam.clubId === clubId && isTeamCoach(activeTeam, uid));
+}
+
+/** Editar/borrar una carpeta o lección: la dirección, todo; un entrenador, solo lo suyo. */
+export function canEditClubItem(item: { createdBy: string }, uid: string | null | undefined, isDirector: boolean, canWrite: boolean): boolean {
+  return isDirector || (canWrite && Boolean(uid) && item.createdBy === uid);
 }

@@ -11,6 +11,9 @@ export const PATHS = {
   USER_TEAMS: "UserTeams",
   TEAMS: "Teams",
   CLUBS: "Clubs",
+  // Lecciones del club (2026-09-28, solo web): ClubLessons/{clubId}/{folders,lessons,pending,pendingBy}.
+  // Nodo raíz aparte porque Clubs se puede leer sin ser del club.
+  CLUB_LESSONS: "ClubLessons",
   EXERCISES: "Exercises",
   TRAININGS: "Trainings",
   NOTIFICATIONS: "notifications", // hijo de Users/{uid}

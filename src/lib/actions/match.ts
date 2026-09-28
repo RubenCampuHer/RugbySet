@@ -3,22 +3,17 @@
 // el .write del equipo — sin reglas RTDB nuevas. El acta (PDF) va a Storage en
 // match_reports/{equipo}/ (ver storage.rules del repo Android).
 import { get, push, ref, set, update } from "firebase/database";
-import { deleteObject, getDownloadURL, ref as storageRef, uploadBytes } from "firebase/storage";
+import { getDownloadURL, ref as storageRef, uploadBytes } from "firebase/storage";
 import { eventDataKey } from "@/lib/attendance";
 import { PATHS } from "@/lib/constants";
 import { db, storage } from "@/lib/firebase";
+import { deleteFileQuietly } from "@/lib/storage";
 import { MATCH_REPORT_MAX_BYTES, type MatchStatus, normalizeVideoUrl } from "@/lib/match";
 
 function matchPath(teamname: string, fecha: string): string {
   const key = eventDataKey(fecha);
   if (!key) throw new Error("Fecha no válida");
   return `${PATHS.TEAMS}/${teamname}/eventData/${key}/match`;
-}
-
-/** Borra un fichero de Storage sin fallar si ya no existe (o no se deja). */
-async function deleteFileQuietly(path: string | null | undefined): Promise<void> {
-  if (!path) return;
-  await deleteObject(storageRef(storage, path)).catch(() => {});
 }
 
 export type MatchResultInput = {

@@ -67,7 +67,7 @@ export function PlayerWeekList({ team, uid }: { team: Team; uid: string }) {
   return (
     <div className="space-y-2 border-b border-border pb-4">
       <div className="flex items-baseline justify-between gap-2">
-        <p className="text-xs font-medium text-muted-foreground">Esta semana</p>
+        <p className="text-xs font-medium text-muted-foreground">Tu semana</p>
         <p className="text-xs text-muted-foreground">{summary(week.attended, week.counted, week.upcoming)}</p>
       </div>
       {week.sessions.length === 0 ? (

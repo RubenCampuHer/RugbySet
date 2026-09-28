@@ -4,11 +4,21 @@
 import { parseKey } from "./calendar";
 import type { Team, TrainingDay } from "./types";
 
+/**
+ * Medianoche de hoy: una sesión cuenta para el % y las rachas a partir del día
+ * siguiente (2026-09-28). Antes contaba desde las 00:00 del mismo día, y un
+ * entreno de las 19:00 todavía sin jugar ya sumaba por la respuesta "voy".
+ * Mismo corte en functions/attendance.js (repo Android).
+ */
+function startOfToday(now: Date): number {
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+}
+
 function pastDateKeys(fechas: (string | null | undefined)[], now: Date): number[] {
-  const nowMs = now.getTime();
+  const cutoff = startOfToday(now);
   return fechas
     .map((f) => (f ? parseKey(f)?.getTime() : undefined))
-    .filter((t): t is number => t != null && t <= nowMs)
+    .filter((t): t is number => t != null && t < cutoff)
     .sort((a, b) => a - b);
 }
 
@@ -169,18 +179,19 @@ export function calculateAttendanceRate(
 export type DateRange = { from?: Date; to?: Date };
 
 /**
- * Sesiones del equipo dentro de un rango, ordenadas cronológicamente. Un
- * `to` ausente se resuelve a `now` (igual criterio que calculateAttendanceRate:
- * las sesiones futuras programadas no cuentan todavía) — un `from` ausente
- * no acota por abajo ("toda la temporada").
+ * Sesiones del equipo dentro de un rango, ordenadas cronológicamente. Nunca
+ * entran las de hoy ni las futuras (igual criterio que calculateAttendanceRate:
+ * cuentan a partir del día siguiente), aunque `to` sea posterior — un `from`
+ * ausente no acota por abajo ("toda la temporada").
  */
 export function sessionsInRange(team: Team, range: DateRange, now = new Date()): TrainingDay[] {
-  const toMs = (range.to ?? now).getTime();
+  const cutoff = startOfToday(now);
+  const toMs = range.to?.getTime();
   const fromMs = range.from?.getTime();
   return countableDays(team)
     .map((d) => ({ d, ms: d.fecha ? parseKey(d.fecha)?.getTime() : undefined }))
     .filter((x): x is { d: TrainingDay; ms: number } => x.ms != null)
-    .filter(({ ms }) => ms <= toMs && (fromMs == null || ms >= fromMs))
+    .filter(({ ms }) => ms < cutoff && (toMs == null || ms <= toMs) && (fromMs == null || ms >= fromMs))
     .sort((a, b) => a.ms - b.ms)
     .map(({ d }) => d);
 }

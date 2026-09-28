@@ -833,6 +833,7 @@ export function TeamManager({ teamname }: { teamname: string | null }) {
   const isDelegateHere = isTeamDelegate(team, uid);
   const isMemberHere = isPlayerHere || isMyCoach || isDelegateHere;
   const canManage = isMyCoach || isAdmin(profile) || isDirectorOfTeamClub;
+  const isStaff = (id: string) => id === team.usercoach || team.coaches[id] === true;
   // Borrar es más grave que gestionar: nunca un co-entrenador cualquiera.
   const canDeleteTeam = isFounder || isAdmin(profile) || isDirectorOfTeamClub;
   const canLeave = isMemberHere && !isFounder;
@@ -1125,33 +1126,39 @@ export function TeamManager({ teamname }: { teamname: string | null }) {
                             info={playerInfoOf(team, uid)}
                           />
                           <RenamePersonDialog uid={uid} currentName={name} triggerSize="icon-xl" />
-                          <Button
-                            size="icon-xl"
-                            variant="ghost"
-                            className="rounded-full"
-                            aria-label={`Ascender a ${name} a co-entrenador`}
-                            title="Ascender a co-entrenador"
-                            onClick={() => void promote(uid, name)}
-                          >
-                            <ArrowUpCircle className="size-4" />
-                          </Button>
-                          <ConfirmDialog
-                            trigger={
+                          {/* El fundador (o un co-entrenador) que también juega ya es cuerpo técnico:
+                              ni ascenderlo ni nombrarlo delegado. */}
+                          {!isStaff(uid) && (
+                            <>
                               <Button
                                 size="icon-xl"
                                 variant="ghost"
                                 className="rounded-full"
-                                aria-label={`Nombrar a ${name} delegado`}
-                                title="Nombrar delegado"
+                                aria-label={`Ascender a ${name} a co-entrenador`}
+                                title="Ascender a co-entrenador"
+                                onClick={() => void promote(uid, name)}
                               >
-                                <ClipboardCheck className="size-4" />
+                                <ArrowUpCircle className="size-4" />
                               </Button>
-                            }
-                            title={`¿Nombrar a ${name} delegado?`}
-                            description="Llevará el calendario, pasar lista, la convocatoria, el resultado y los avisos. Deja de ser jugador: no cuenta para la asistencia ni sale en las alineaciones."
-                            confirmLabel="Nombrar delegado"
-                            onConfirm={() => delegate(uid, name)}
-                          />
+                              <ConfirmDialog
+                                trigger={
+                                  <Button
+                                    size="icon-xl"
+                                    variant="ghost"
+                                    className="rounded-full"
+                                    aria-label={`Nombrar a ${name} delegado`}
+                                    title="Nombrar delegado"
+                                  >
+                                    <ClipboardCheck className="size-4" />
+                                  </Button>
+                                }
+                                title={`¿Nombrar a ${name} delegado?`}
+                                description="Llevará el calendario, pasar lista, la convocatoria, el resultado y los avisos. Deja de ser jugador: no cuenta para la asistencia ni sale en las alineaciones."
+                                confirmLabel="Nombrar delegado"
+                                onConfirm={() => delegate(uid, name)}
+                              />
+                            </>
+                          )}
                           <ConfirmDialog
                             trigger={
                               <Button

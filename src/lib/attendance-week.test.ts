@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { attendanceByMonth, playerWeek } from "./attendance";
+import { attendanceByMonth, calculateAttendanceRate, calculateStreak, playerWeek, sessionsInRange } from "./attendance";
 import type { Team, TrainingDay } from "./types";
 
 function day(fecha: string, accepted: string[] = [], extra: Partial<TrainingDay> = {}): TrainingDay {
@@ -101,5 +101,19 @@ describe("attendanceByMonth sin jugador (media del equipo)", () => {
       ["2026-08", 100, 1, null],
       ["2026-09", 25, 2, null],
     ]);
+  });
+});
+
+describe("las sesiones de hoy cuentan a partir de mañana", () => {
+  it("fuera del %, de la media mensual y de la racha hasta el día siguiente", () => {
+    const t = team([day("29/09/2026", ["ana"]), day("30/09/2026", ["ana"])]);
+    const tonight = new Date(2026, 8, 30, 18); // antes del entreno de las 19:00
+    expect(sessionsInRange(t, {}, tonight).map((d) => d.fecha)).toEqual(["29/09/2026"]);
+    expect(sessionsInRange(t, { to: new Date(2026, 9, 31) }, tonight).map((d) => d.fecha)).toEqual(["29/09/2026"]);
+    expect(calculateStreak(t, ["29/09/2026", "30/09/2026"], tonight, "ana")).toBe(1);
+    expect(calculateAttendanceRate(t, ["29/09/2026"], tonight, "ana")).toBe(100);
+    expect(attendanceByMonth(t, "ana", {}, tonight)[0]).toMatchObject({ sessions: 1, mine: 100 });
+    const tomorrow = new Date(2026, 9, 1, 9);
+    expect(sessionsInRange(t, {}, tomorrow).map((d) => d.fecha)).toEqual(["29/09/2026", "30/09/2026"]);
   });
 });

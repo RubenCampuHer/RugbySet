@@ -3,6 +3,8 @@
 import {
   ArrowDown,
   ArrowUp,
+  ClipboardList,
+  Dumbbell,
   FileText,
   Folder,
   Link2,
@@ -18,7 +20,10 @@ import { toast } from "sonner";
 import { BackLink } from "@/components/BackLink";
 import { EmptyState } from "@/components/EmptyState";
 import { AudiencePicker } from "@/components/audience/AudiencePicker";
+import { TrainingPickerSheet } from "@/components/calendar/TrainingPickerSheet";
 import { FolderPickerDialog } from "@/components/lessons/LessonDialogs";
+import { LibraryRefCard } from "@/components/lessons/LibraryRefCard";
+import { ExercisePickerSheet } from "@/components/trainings/ExercisePickerSheet";
 import { LessonBlockView } from "@/components/lessons/LessonBlocksView";
 import { VideoLinkCard } from "@/components/media/VideoLinkCard";
 import { DetailSkeleton } from "@/components/skeletons";
@@ -51,7 +56,14 @@ let localSeq = 0;
 /** Id local de bloque (clave RTDB válida, sin push para no depender de la red). */
 const blockId = () => `b${Date.now().toString(36)}${(localSeq++).toString(36)}`;
 
-const BLOCK_LABEL: Record<LessonBlock["type"], string> = { text: "Texto", pdf: "PDF", video: "Vídeo", board: "Jugada" };
+const BLOCK_LABEL: Record<LessonBlock["type"], string> = {
+  text: "Texto",
+  pdf: "PDF",
+  video: "Vídeo",
+  board: "Jugada",
+  exercise: "Ejercicio",
+  training: "Entreno",
+};
 
 type UploadState = { kind: "pdf" | "video"; name: string; progress: number };
 
@@ -76,6 +88,10 @@ function LessonEditor() {
   const [uploading, setUploading] = useState<UploadState | null>(null);
   const [board, setBoard] = useState<{ id: string | null; data: string | null } | null>(null);
   const [pickFolder, setPickFolder] = useState(false);
+  // Selectores de la biblioteca (2026-09-28): varios ejercicios o un entreno.
+  const [pickExercises, setPickExercises] = useState(false);
+  const [exerciseSelection, setExerciseSelection] = useState<Set<string>>(new Set());
+  const [pickTraining, setPickTraining] = useState(false);
   const [saving, setSaving] = useState(false);
   const pdfInput = useRef<HTMLInputElement>(null);
   const videoInput = useRef<HTMLInputElement>(null);
@@ -288,6 +304,9 @@ function LessonEditor() {
                   />
                 </div>
               )}
+              {(b.type === "exercise" || b.type === "training") && (
+                <LibraryRefCard kind={b.type} refName={b.ref} showPrivacyHint />
+              )}
               {b.type === "board" && (
                 <div className="space-y-2">
                   <button
@@ -343,6 +362,19 @@ function LessonEditor() {
           <Button variant="outline" size="xl" onClick={() => setBoard({ id: null, data: null })}>
             <PenTool /> Jugada
           </Button>
+          <Button
+            variant="outline"
+            size="xl"
+            onClick={() => {
+              setExerciseSelection(new Set());
+              setPickExercises(true);
+            }}
+          >
+            <Dumbbell /> Ejercicio
+          </Button>
+          <Button variant="outline" size="xl" onClick={() => setPickTraining(true)}>
+            <ClipboardList /> Entreno
+          </Button>
         </div>
         <p className="text-xs text-muted-foreground">PDF hasta 20 MB · vídeo hasta 200 MB.</p>
         <input
@@ -378,6 +410,32 @@ function LessonEditor() {
         </div>
       </div>
 
+      <ExercisePickerSheet
+        open={pickExercises}
+        onOpenChange={setPickExercises}
+        selection={exerciseSelection}
+        onToggle={(name) =>
+          setExerciseSelection((prev) => {
+            const next = new Set(prev);
+            if (next.has(name)) next.delete(name);
+            else next.add(name);
+            return next;
+          })
+        }
+        onConfirm={() => {
+          for (const ref of exerciseSelection) add({ type: "exercise", order: 0, ref });
+          setPickExercises(false);
+        }}
+      />
+      <TrainingPickerSheet
+        open={pickTraining}
+        onOpenChange={setPickTraining}
+        value=""
+        onConfirm={(ref) => {
+          if (ref) add({ type: "training", order: 0, ref });
+          setPickTraining(false);
+        }}
+      />
       <FolderPickerDialog
         open={pickFolder}
         onOpenChange={setPickFolder}

@@ -1,6 +1,7 @@
 "use client";
 
 import { FileText } from "lucide-react";
+import { LibraryRefCard } from "@/components/lessons/LibraryRefCard";
 import { VideoLinkCard } from "@/components/media/VideoLinkCard";
 import { BoardSvg } from "@/components/whiteboard/BoardSvg";
 import { parseBoardData } from "@/components/whiteboard/types";
@@ -48,6 +49,9 @@ export function LessonBlockView({ block }: { block: LessonBlock }) {
         );
       }
       return <VideoLinkCard url={block.url} title={block.title} />;
+    case "exercise":
+    case "training":
+      return <LibraryRefCard kind={block.type} refName={block.ref} />;
     case "board":
       return (
         <figure className="space-y-1">

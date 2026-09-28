@@ -135,3 +135,27 @@ describe("esquema", () => {
     expect(sortedBlocks(parsed.ok).map((b) => b.id)).toEqual(["a"]);
   });
 });
+
+describe("bloques de la biblioteca (ejercicio/entreno)", () => {
+  it("se parsean con su ref y no aportan ficheros", () => {
+    const parsed = parseMap(LessonSchema, {
+      l: {
+        title: "T",
+        createdBy: "u",
+        createdAt: 1,
+        updatedAt: 1,
+        blocks: {
+          a: { type: "exercise", order: 0, ref: "Placaje 1v1" },
+          b: { type: "training", order: 1, ref: "Sesión martes" },
+          c: { type: "exercise", order: 2, ref: "" },
+        },
+      },
+    });
+    const blocks = sortedBlocks(parsed.l);
+    expect(blocks.map((b) => `${b.block.type}:${"ref" in b.block ? b.block.ref : ""}`)).toEqual([
+      "exercise:Placaje 1v1",
+      "training:Sesión martes",
+    ]);
+    expect(lessonFiles(parsed.l)).toEqual([]);
+  });
+});

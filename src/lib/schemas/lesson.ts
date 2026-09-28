@@ -5,7 +5,7 @@ import { z } from "zod";
 import { AudienceSchema } from "../audience";
 import { rtdbRecord } from "./common";
 
-export const LESSON_BLOCK_TYPES = ["text", "pdf", "video", "board"] as const;
+export const LESSON_BLOCK_TYPES = ["text", "pdf", "video", "board", "exercise", "training"] as const;
 export type LessonBlockType = (typeof LESSON_BLOCK_TYPES)[number];
 
 const TextBlock = z.object({ type: z.literal("text"), order: z.number(), text: z.string().catch("") });
@@ -34,7 +34,20 @@ const BoardBlock = z.object({
   title: z.string().nullish(),
 });
 
-export const LessonBlockSchema = z.discriminatedUnion("type", [TextBlock, PdfBlock, VideoBlock, BoardBlock]);
+// Ejercicio o entreno de la biblioteca (2026-09-28): referencia por nombre
+// (la clave de Exercises/{n} y Trainings/{n}); se lee al mostrarlo y cada uno
+// lo ve solo si su privacidad se lo permite.
+const ExerciseRefBlock = z.object({ type: z.literal("exercise"), order: z.number(), ref: z.string().min(1) });
+const TrainingRefBlock = z.object({ type: z.literal("training"), order: z.number(), ref: z.string().min(1) });
+
+export const LessonBlockSchema = z.discriminatedUnion("type", [
+  TextBlock,
+  PdfBlock,
+  VideoBlock,
+  BoardBlock,
+  ExerciseRefBlock,
+  TrainingRefBlock,
+]);
 export type LessonBlock = z.infer<typeof LessonBlockSchema>;
 
 export const LessonSchema = z.object({

@@ -19,6 +19,7 @@ const TYPE_LABEL: Record<string, string> = {
   reminder: "Recordatorio",
   general: "Mensaje",
   training_update: "Calendario",
+  club: "Club",
 };
 
 // Estos tipos siempre llevan trainingDate → llevan al día en el calendario.

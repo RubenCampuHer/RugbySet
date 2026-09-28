@@ -1,10 +1,11 @@
 "use client";
 
-import { Shield, TriangleAlert } from "lucide-react";
+import { Megaphone, Shield, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { ClubManager } from "@/components/club/ClubManager";
 import { ClubMembershipCard } from "@/components/club/ClubMembershipCard";
+import { ClubToolLink } from "@/components/club/ClubToolLink";
 import { ClubLessonsCard } from "@/components/lessons/ClubLessonsCard";
 import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/PageHeader";
@@ -53,6 +54,15 @@ export default function ClubPage() {
       <PageHeader title="Club" />
 
       <ClubLessonsCard />
+
+      {club && (
+        <ClubToolLink
+          href="/club/notify"
+          icon={Megaphone}
+          title="Avisos del club"
+          hint="Escribe a todo el club o a equipos concretos."
+        />
+      )}
 
       {club && <ClubManager club={club} />}
 

@@ -22,16 +22,19 @@ async function notifyUsers(
     teamName: string;
     trainingDate?: string;
     trainingTime?: string;
+    /** Avisos del club: las reglas y la función lo usan para permitir a la dirección. */
+    clubId?: string;
     recipientUserIds: string[];
   },
 ): Promise<{ sent: number }> {
-  const { recipientUserIds, type, title, message, teamName, trainingDate, trainingTime } = opts;
+  const { recipientUserIds, type, title, message, teamName, trainingDate, trainingTime, clubId } = opts;
   if (recipientUserIds.length === 0) return { sent: 0 };
 
   const notificationId = crypto.randomUUID();
   const extra = {
     ...(trainingDate ? { trainingDate } : {}),
     ...(trainingTime ? { trainingTime } : {}),
+    ...(clubId ? { clubId } : {}),
   };
   const updates: Record<string, unknown> = {};
   for (const uid of recipientUserIds) {
@@ -65,6 +68,34 @@ async function notifyUsers(
   });
   const data = result.data as { sentCount?: number };
   return { sent: data.sentCount ?? 0 };
+}
+
+/**
+ * Aviso de la dirección del club (2026-09-28) a varios equipos: un aviso por
+ * equipo (cada uno con su teamName, que comprueban las reglas y la función).
+ * Devuelve a cuántos llegó en total y cuántos lo recibieron en el móvil.
+ */
+export async function sendClubMessage(
+  opts: Sender & { clubId: string; clubName: string; title: string; message: string; groups: Record<string, string[]> },
+): Promise<{ recipients: number; sent: number }> {
+  let recipients = 0;
+  let sent = 0;
+  for (const [teamName, recipientUserIds] of Object.entries(opts.groups)) {
+    if (recipientUserIds.length === 0) continue;
+    const r = await notifyUsers({
+      senderUserId: opts.senderUserId,
+      senderUsername: opts.senderUsername,
+      type: "club",
+      title: opts.title.trim() || `Aviso de ${opts.clubName}`,
+      message: opts.message.trim(),
+      teamName,
+      clubId: opts.clubId,
+      recipientUserIds,
+    });
+    recipients += recipientUserIds.length;
+    sent += r.sent;
+  }
+  return { recipients, sent };
 }
 
 export async function sendAttendanceNotification(

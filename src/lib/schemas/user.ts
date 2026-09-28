@@ -67,10 +67,13 @@ export const PublicProfileSchema = z.object({
 
 export const NotificationSchema = z.object({
   id: z.string(),
-  type: z.enum(["attendance", "reminder", "general", "training_update"]).catch("general"),
+  // "club" (2026-09-28): aviso de la dirección del club; Android lo muestra como genérico.
+  type: z.enum(["attendance", "reminder", "general", "training_update", "club"]).catch("general"),
   title: z.string().catch(""),
   message: z.string().catch(""),
   teamName: z.string().nullish(),
+  /** Aviso del club (type "club"): club que lo envía; las reglas lo comprueban. */
+  clubId: z.string().nullish(),
   trainingDate: z.string().nullish(),
   trainingTime: z.string().nullish(),
   senderUserId: z.string().nullish(),

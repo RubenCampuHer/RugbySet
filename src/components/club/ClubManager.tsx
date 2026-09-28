@@ -440,7 +440,16 @@ function AddTeamDialog({ club }: { club: Club }) {
  * añade el badge y evita que las acciones de "soy fundador"/"soy director"
  * (que comparan contra mi propio uid) bloqueen a un admin que no lo es.
  */
-export function ClubManager({ club, viewingAsAdmin = false }: { club: Club; viewingAsAdmin?: boolean }) {
+export function ClubManager({
+  club,
+  viewingAsAdmin = false,
+  tools,
+}: {
+  club: Club;
+  viewingAsAdmin?: boolean;
+  /** Herramientas del club (lecciones, calendario…) justo bajo la cabecera (2026-09-28). */
+  tools?: React.ReactNode;
+}) {
   const { firebaseUser, profile } = useAuth();
   const [busy, setBusy] = useState<string | null>(null);
   const teamsPreview = useTeamsPreview(club.teams);
@@ -612,6 +621,8 @@ export function ClubManager({ club, viewingAsAdmin = false }: { club: Club; view
           </div>
         </div>
       </div>
+
+      {tools}
 
       <DirectorsSection club={club} myUid={myUid} canRemoveDirector={canDeleteClub} />
 

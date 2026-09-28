@@ -1,12 +1,11 @@
 "use client";
 
-import { CalendarDays, Megaphone, Shield, TriangleAlert } from "lucide-react";
+import { Shield, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { ClubManager } from "@/components/club/ClubManager";
 import { ClubMembershipCard } from "@/components/club/ClubMembershipCard";
-import { ClubStatsLink, ClubToolLink } from "@/components/club/ClubToolLink";
-import { ClubLessonsCard } from "@/components/lessons/ClubLessonsCard";
+import { ClubTools } from "@/components/club/ClubTools";
 import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/PageHeader";
 import { TeamSkeleton } from "@/components/skeletons";
@@ -47,51 +46,43 @@ export default function ClubPage() {
   // 2026-09-07: un jugador cuyo equipo está en un club también ve aquí la
   // tarjeta informativa "tu equipo forma parte del club X" (antes: estado
   // vacío engañoso). Sin club, solo el coach tiene algo que hacer (unirse/crear).
-  const showMembership = Boolean(hasTeam && team && (isCoachOfOwnTeam || team.clubId));
+  // 2026-09-28 (rediseño): si ya dirijo ESE club, la tarjeta sería un duplicado.
+  const showMembership = Boolean(
+    hasTeam && team && (isCoachOfOwnTeam || team.clubId) && !(club && team.clubId === club.clubId),
+  );
 
+  // Orden (2026-09-28): identidad del club → herramientas en rejilla → gestión.
   return (
     <div className="mx-auto max-w-2xl space-y-4">
-      <PageHeader title="Club" />
-
-      <ClubLessonsCard />
-
-      <ClubStatsLink />
-
-      {club && (
-        <ClubToolLink
-          href="/club/calendar"
-          icon={CalendarDays}
-          title="Calendario del club"
-          hint="Los eventos de todos los equipos y eventos del club."
-        />
+      {club ? (
+        <ClubManager club={club} tools={<ClubTools />} />
+      ) : (
+        showMembership && team && (
+          <>
+            <ClubMembershipCard team={team} uid={profile.userId!} isCoach={isCoachOfOwnTeam} />
+            <ClubTools />
+          </>
+        )
       )}
 
-      {club && (
-        <ClubToolLink
-          href="/club/notify"
-          icon={Megaphone}
-          title="Avisos del club"
-          hint="Escribe a todo el club o a equipos concretos."
-        />
-      )}
-
-      {club && <ClubManager club={club} />}
-
-      {showMembership && team && (
+      {club && showMembership && team && (
         <ClubMembershipCard team={team} uid={profile.userId!} isCoach={isCoachOfOwnTeam} />
       )}
 
       {!club && !showMembership && (
-        <EmptyState
-          icon={Shield}
-          title="Nada que ver aquí todavía"
-          hint="Tu equipo no forma parte de ningún club. Unirse a uno o crearlo es cosa del entrenador del equipo."
-          action={
-            <Link href="/team" className={buttonVariants({ variant: "outline" })}>
-              Ir a mi equipo
-            </Link>
-          }
-        />
+        <>
+          <PageHeader title="Club" />
+          <EmptyState
+            icon={Shield}
+            title="Nada que ver aquí todavía"
+            hint="Tu equipo no forma parte de ningún club. Unirse a uno o crearlo es cosa del entrenador del equipo."
+            action={
+              <Link href="/team" className={buttonVariants({ variant: "outline" })}>
+                Ir a mi equipo
+              </Link>
+            }
+          />
+        </>
       )}
     </div>
   );

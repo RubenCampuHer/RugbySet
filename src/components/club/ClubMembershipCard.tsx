@@ -58,18 +58,16 @@ function AlreadyInClub({ team, canLeave }: { team: Team; canLeave: boolean }) {
     }
   };
 
+  // Cabecera de identidad del club para sus miembros (2026-09-28, rediseño de /club).
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="text-lg">Tu equipo forma parte de un club</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="flex items-center gap-3">
-          <AvatarInitials name={club?.clubname ?? "Club"} src={club?.clubicon} />
+      <CardContent className="space-y-3 pt-6">
+        <div className="flex items-center gap-4">
+          <AvatarInitials name={club?.clubname ?? "Club"} src={club?.clubicon} className="size-14" fallbackClassName="text-lg" />
           <div className="min-w-0">
-            <p className="font-medium">{club?.clubname ?? "Cargando…"}</p>
+            <h1 className="truncate text-2xl font-bold">{club?.clubname ?? "Cargando…"}</h1>
             <p className="text-sm text-muted-foreground">
-              {team.teamname} pertenece a este club
+              Tu equipo {team.teamname} forma parte de este club
               {club?.clubcode ? ` · Código: ${club.clubcode}` : ""}
             </p>
           </div>

@@ -15,6 +15,9 @@ export const PATHS = {
   // Nodo raíz aparte porque Clubs se puede leer sin ser del club.
   CLUB_LESSONS: "ClubLessons",
   EXERCISES: "Exercises",
+  // Vídeo y niveles de cada ejercicio (2026-09-29, solo web): ExerciseExtras/{nombre}.
+  // Aparte porque las versiones publicadas de Android reescriben Exercises/{n} entero.
+  EXERCISE_EXTRAS: "ExerciseExtras",
   TRAININGS: "Trainings",
   NOTIFICATIONS: "notifications", // hijo de Users/{uid}
   TRAINING_DAYS: "trainingdays", // hijo de Teams/{t} (FirebasePaths.TRAINING_DAYS)

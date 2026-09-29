@@ -1,6 +1,6 @@
 "use client";
 
-import { Dumbbell } from "lucide-react";
+import { Dumbbell, Layers, Video } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -12,9 +12,10 @@ import { deleteExercise, duplicateExercise } from "@/lib/actions/exercises";
 import { gradientFor } from "@/lib/brand";
 import { canDeleteExercise, canEditExercise } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
+import type { ExtrasSummary } from "@/hooks/useExerciseExtras";
 import type { Exercise } from "@/lib/types";
 
-export function ExerciseCard({ exercise }: { exercise: Exercise }) {
+export function ExerciseCard({ exercise, extras }: { exercise: Exercise; extras?: ExtrasSummary }) {
   const name = exercise.name ?? "(sin nombre)";
   const { profile } = useAuth();
   const canManage = canEditExercise(profile, exercise) || canDeleteExercise(profile, exercise);
@@ -58,6 +59,16 @@ export function ExerciseCard({ exercise }: { exercise: Exercise }) {
           <div className="flex flex-wrap gap-1">
             <PrivacyBadge privacy={exercise.privacy} />
             <ApprovalBadge status={exercise.approvalStatus} />
+            {extras && extras.levels > 0 && (
+              <Badge variant="outline">
+                <Layers /> {extras.levels} {extras.levels === 1 ? "nivel" : "niveles"}
+              </Badge>
+            )}
+            {extras?.video && (
+              <Badge variant="outline" aria-label="Con vídeo">
+                <Video />
+              </Badge>
+            )}
             {exercise.etiquetas.slice(0, 3).map((tag) => (
               <Badge key={tag} variant="secondary">
                 {tag}

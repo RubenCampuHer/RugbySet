@@ -15,12 +15,14 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useMyClubId } from "@/hooks/useMyClubId";
 import { matchesLibraryTab, type LibraryTab } from "@/lib/library";
 import { useExercises } from "@/hooks/useExercises";
+import { useExtrasSummary } from "@/hooks/useExerciseExtras";
 import { canCreateContent } from "@/lib/permissions";
 
 type Tab = LibraryTab;
 
 export default function ExercisesPage() {
   const { exercises, loading } = useExercises();
+  const extrasSummary = useExtrasSummary();
   const { profile } = useAuth();
   const { clubId: myClubId } = useMyClubId();
   const [search, setSearch] = useState("");
@@ -145,7 +147,7 @@ export default function ExercisesPage() {
       ) : (
         <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
           {filtered.map((e) => (
-            <ExerciseCard key={e.name} exercise={e} />
+            <ExerciseCard key={e.name} exercise={e} extras={e.name ? extrasSummary[e.name] : undefined} />
           ))}
         </div>
       )}

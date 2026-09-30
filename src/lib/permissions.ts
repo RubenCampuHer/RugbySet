@@ -25,6 +25,21 @@ export function isTeamCoach(team: Team, uid: string | null | undefined): boolean
   return team.usercoach === uid || team.coaches[uid] === true;
 }
 
+/**
+ * Cuerpo técnico a efectos de navegación: quien crea contenido (COACH/ADMIN),
+ * dirige un club o entrena el equipo activo. El resto (jugadores y delegados)
+ * ve la navegación de jugador y no los listados de la biblioteca (2026-09-30:
+ * los entrenos y ejercicios los ven desde el Calendario).
+ */
+export function isStaffUser(profile: User | null, activeTeam: Team | null | undefined, uid: string | null | undefined): boolean {
+  return (
+    isCoach(profile) ||
+    isAdmin(profile) ||
+    Boolean(profile?.directorOfClubId) ||
+    (activeTeam != null && isTeamCoach(activeTeam, uid))
+  );
+}
+
 /** Delegado del equipo (2026-09-25): no es jugador ni entrenador. */
 export function isTeamDelegate(team: Team, uid: string | null | undefined): boolean {
   return Boolean(uid) && team.delegates[uid!] === true;

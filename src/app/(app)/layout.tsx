@@ -38,7 +38,7 @@ import { useNotifications } from "@/hooks/useNotifications";
 import { useTeam } from "@/hooks/useTeam";
 import { nextSuffix } from "@/lib/invite-links";
 import { isOnboardingDone } from "@/lib/onboarding-flag";
-import { isAdmin, isCoach, isTeamCoach } from "@/lib/permissions";
+import { isAdmin, isCoach, isStaffUser } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 
 // 5 destinos como la bottom navigation Material de la app Android. Desde
@@ -53,11 +53,12 @@ const STAFF_NAV = [
   { href: "/exercises", label: "Ejercicios", icon: Dumbbell },
 ] as const;
 
+// Sin "Entrenos" (2026-09-30): el jugador ve los entrenos y ejercicios de su
+// equipo desde el Calendario, no la biblioteca entera.
 const PLAYER_NAV = [
   { href: "/home", label: "Inicio", icon: Home },
   { href: "/calendar", label: "Calendario", icon: CalendarDays },
   { href: "/team", label: "Equipo", icon: Users },
-  { href: "/trainings", label: "Entrenos", icon: ClipboardList },
   { href: "/profile", label: "Perfil", icon: User },
 ] as const;
 
@@ -86,11 +87,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   // Cuerpo técnico = quien crea contenido (COACH/ADMIN), dirige un club o
   // entrena el equipo activo; el resto ve la navegación de jugador.
-  const isStaff =
-    isCoach(profile) ||
-    isAdmin(profile) ||
-    Boolean(profile?.directorOfClubId) ||
-    (activeTeam != null && isTeamCoach(activeTeam, firebaseUser?.uid));
+  const isStaff = isStaffUser(profile, activeTeam, firebaseUser?.uid);
   const NAV = isStaff ? STAFF_NAV : PLAYER_NAV;
 
   useEffect(() => {

@@ -4,7 +4,12 @@
 // canDeleteExercise ANTES de escribir, cerrando ese hueco en el único punto
 // donde podemos hacerlo sin tocar las reglas.
 import { get, ref, set, update } from "firebase/database";
-import { deleteUnusedVideos, extrasCopyPaths, getExerciseExtras } from "@/lib/actions/exercise-extras";
+import {
+  deleteUnusedVideos,
+  extrasCopyPaths,
+  getExerciseExtras,
+  renameLevelRefs,
+} from "@/lib/actions/exercise-extras";
 import type { Audience } from "@/lib/audience";
 import { PATHS } from "@/lib/constants";
 import { extrasFiles } from "@/lib/exercise-extras";
@@ -116,6 +121,7 @@ export async function updateExercise(
       [`${PATHS.EXERCISES}/${originalName}`]: null,
       ...extras,
     });
+    await renameLevelRefs(originalName, input.name);
   }
 }
 

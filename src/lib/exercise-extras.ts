@@ -73,7 +73,9 @@ export function cleanExtrasDraft(
   const levels: Record<string, ExerciseLevel> = {};
   let order = 0;
   for (const { id, level } of draft.levels) {
-    const name = level.name.trim();
+    const ref = level.ref?.trim() || null;
+    // Un nivel enlazado sin nombre propio toma el del ejercicio enlazado.
+    const name = level.name.trim() || (ref ? ref.slice(0, LEVEL_NAME_MAX) : "");
     const desc = level.desc?.trim() ?? "";
     const v = cleanVideo(level.video ?? null, `del nivel "${name || order + 1}"`);
     if (typeof v === "string") return { ok: false, error: v };
@@ -82,7 +84,7 @@ export function cleanExtrasDraft(
       continue;
     }
     if (name.length > LEVEL_NAME_MAX) return { ok: false, error: `El nombre "${name}" es demasiado largo` };
-    levels[id] = { name, desc: desc.slice(0, LEVEL_DESC_MAX) || null, order, video: v };
+    levels[id] = { name, desc: desc.slice(0, LEVEL_DESC_MAX) || null, order, ref, video: v };
     order++;
   }
   return { ok: true, video, levels };
@@ -98,7 +100,10 @@ export function toRtdb(video: VideoRef | null, levels: Record<string, ExerciseLe
   const ls = Object.fromEntries(
     Object.entries(levels).map(([id, l]) => {
       const lv = stripVideo(l.video);
-      return [id, { name: l.name, order: l.order, ...(l.desc ? { desc: l.desc } : {}), ...(lv ? { video: lv } : {}) }];
+      return [
+        id,
+        { name: l.name, order: l.order, ...(l.desc ? { desc: l.desc } : {}), ...(l.ref ? { ref: l.ref } : {}), ...(lv ? { video: lv } : {}) },
+      ];
     }),
   );
   if (Object.keys(ls).length) out.levels = ls;

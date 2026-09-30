@@ -113,3 +113,22 @@ export async function extrasCopyPaths(from: string, to: string): Promise<Record<
   if (isEmptyExtras(src.video ?? null, levels)) return {};
   return { [`${PATHS.EXERCISE_EXTRAS}/${to}`]: toRtdb(src.video ?? null, levels, uid, Date.now()) };
 }
+
+/**
+ * Tras renombrar un ejercicio, los niveles de otros ejercicios que lo enlazan
+ * (ref) pasan al nombre nuevo. Solo se puede donde las reglas dejan escribir
+ * (extras de mis ejercicios, o todos si soy ADMIN); el resto queda "ya no existe".
+ */
+export async function renameLevelRefs(oldName: string, newName: string): Promise<void> {
+  const all = await getAllExtras();
+  await Promise.all(
+    Object.entries(all).map(async ([base, x]) => {
+      if (!x) return;
+      const paths: Record<string, unknown> = {};
+      for (const [id, level] of Object.entries(x.levels)) {
+        if (level?.ref === oldName) paths[`${PATHS.EXERCISE_EXTRAS}/${base}/levels/${id}/ref`] = newName;
+      }
+      if (Object.keys(paths).length) await update(ref(db), paths).catch(() => {});
+    }),
+  );
+}

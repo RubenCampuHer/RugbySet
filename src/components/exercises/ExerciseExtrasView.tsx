@@ -1,6 +1,7 @@
 "use client";
 
 import { Layers } from "lucide-react";
+import { LibraryRefCard } from "@/components/lessons/LibraryRefCard";
 import { VideoRefView } from "@/components/media/VideoRefView";
 import { Card, CardContent } from "@/components/ui/card";
 import { sortedLevels } from "@/lib/exercise-extras";
@@ -29,6 +30,7 @@ export function ExerciseExtrasView({ extras }: { extras: ExerciseExtras }) {
                       {level.name}
                     </p>
                     {level.desc && <p className="whitespace-pre-wrap text-sm text-muted-foreground">{level.desc}</p>}
+                    {level.ref && <LibraryRefCard kind="exercise" refName={level.ref} />}
                     {level.video && <VideoRefView video={level.video} />}
                   </CardContent>
                 </Card>

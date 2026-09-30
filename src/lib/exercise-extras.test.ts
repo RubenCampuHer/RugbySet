@@ -70,8 +70,13 @@ describe("cleanExtrasDraft", () => {
     expect(r).toEqual({
       ok: true,
       video: null,
-      levels: { a: { name: "2v1", desc: null, order: 0, video: null }, c: { name: "2v2", desc: "más", order: 1, video: null } },
+      levels: { a: { name: "2v1", desc: null, order: 0, ref: null, video: null }, c: { name: "2v2", desc: "más", order: 1, ref: null, video: null } },
     });
+  });
+  it("un nivel enlazado sin nombre toma el del ejercicio", () => {
+    const r = cleanExtrasDraft({ video: null, levels: [lv("a", "", { ref: " Tocata con duelo " })] });
+    expect(r).toMatchObject({ ok: true, levels: { a: { name: "Tocata con duelo", ref: "Tocata con duelo", order: 0 } } });
+    if (r.ok) expect(toRtdb(null, r.levels, "u", 1).levels).toEqual({ a: { name: "Tocata con duelo", order: 0, ref: "Tocata con duelo" } });
   });
   it("un nivel con texto pero sin nombre es un error", () => {
     const r = cleanExtrasDraft({ video: null, levels: [lv("a", "", { desc: "algo" })] });

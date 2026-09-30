@@ -21,6 +21,8 @@ export const ExerciseLevelSchema = z.object({
   /** Qué cambia respecto al anterior. */
   desc: z.string().nullish(),
   order: z.number(),
+  /** Nivel que es otro ejercicio de la biblioteca (su nombre = clave de Exercises). */
+  ref: z.string().nullish(),
   video: VideoRefSchema.nullish().catch(null),
 });
 export type ExerciseLevel = z.infer<typeof ExerciseLevelSchema>;

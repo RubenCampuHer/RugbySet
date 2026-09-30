@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDown, ArrowUp, Layers, Lock, Plus, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Dumbbell, Layers, Lock, Plus, Trash2 } from "lucide-react";
 import { get, ref } from "firebase/database";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
@@ -9,6 +9,8 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { BackLink } from "@/components/BackLink";
 import { EmptyState } from "@/components/EmptyState";
 import { VideoField } from "@/components/exercises/VideoField";
+import { LibraryRefCard } from "@/components/lessons/LibraryRefCard";
+import { ExercisePickerSheet } from "@/components/trainings/ExercisePickerSheet";
 import { DetailSkeleton } from "@/components/skeletons";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -44,6 +46,8 @@ function LevelsEditor() {
   const [uploaded, setUploaded] = useState<string[]>([]);
   const [busy, setBusy] = useState(0);
   const [saving, setSaving] = useState(false);
+  const [picking, setPicking] = useState(false);
+  const [pickSelection, setPickSelection] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!name) return;
@@ -148,9 +152,19 @@ function LevelsEditor() {
                 <Trash2 />
               </Button>
             </div>
+            {level.ref && (
+              <div className="flex items-start gap-1">
+                <div className="min-w-0 flex-1">
+                  <LibraryRefCard kind="exercise" refName={level.ref} showPrivacyHint />
+                </div>
+                <Button variant="ghost" size="icon-lg" aria-label="Quitar enlace" onClick={() => patch(id, { ref: null })}>
+                  <Trash2 />
+                </Button>
+              </div>
+            )}
             <Input
               aria-label={`Nombre del nivel ${i + 1}`}
-              placeholder="Nombre corto: 2v1, con oposición…"
+              placeholder={level.ref ? "Nombre del nivel (si no, el del ejercicio)" : "Nombre corto: 2v1, con oposición…"}
               value={level.name}
               maxLength={LEVEL_NAME_MAX}
               onChange={(e) => patch(id, { name: e.target.value })}
@@ -180,6 +194,17 @@ function LevelsEditor() {
       >
         <Plus /> Añadir nivel
       </Button>
+      <Button
+        variant="outline"
+        size="xl"
+        className="w-full"
+        onClick={() => {
+          setPickSelection(new Set());
+          setPicking(true);
+        }}
+      >
+        <Dumbbell /> Enlazar ejercicios de la biblioteca como niveles
+      </Button>
 
       <div className="fixed inset-x-0 bottom-0 z-10 border-t bg-background/95 px-4 py-3 backdrop-blur md:static md:border-0 md:bg-transparent md:p-0">
         <div className="mx-auto flex max-w-2xl justify-end gap-2">
@@ -191,6 +216,29 @@ function LevelsEditor() {
           </Button>
         </div>
       </div>
+      <ExercisePickerSheet
+        open={picking}
+        onOpenChange={setPicking}
+        selection={pickSelection}
+        confirmLabel="Añadir como niveles"
+        onToggle={(n) =>
+          setPickSelection((prev) => {
+            const next = new Set(prev);
+            if (next.has(n)) next.delete(n);
+            else next.add(n);
+            return next;
+          })
+        }
+        onConfirm={() => {
+          const refs = [...pickSelection].filter((n) => n !== name);
+          setLevels((l) => [
+            // El nivel vacío inicial sobra si solo se enlaza.
+            ...l.filter((e) => e.level.name.trim() || e.level.desc?.trim() || e.level.ref || e.level.video),
+            ...refs.map((ref) => ({ id: levelId(), level: { name: "", desc: "", order: 0, ref, video: null } })),
+          ]);
+          setPicking(false);
+        }}
+      />
     </div>
   );
 }

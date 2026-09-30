@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useMyClubId } from "@/hooks/useMyClubId";
+import { useStaffOnly } from "@/hooks/useStaffOnly";
 import { matchesLibraryTab, type LibraryTab } from "@/lib/library";
 import { useTrainings } from "@/hooks/useTrainings";
 import { canCreateContent } from "@/lib/permissions";
@@ -20,6 +21,8 @@ import { TrainingCard } from "@/components/trainings/TrainingCard";
 type Tab = LibraryTab;
 
 export default function TrainingsPage() {
+  // Solo cuerpo técnico: el jugador ve lo de su equipo desde el Calendario.
+  const isStaff = useStaffOnly();
   const { trainings, loading } = useTrainings();
   const { profile } = useAuth();
   const { clubId: myClubId } = useMyClubId();
@@ -68,7 +71,7 @@ export default function TrainingsPage() {
       prev.includes(tag) ? prev.filter((tg) => tg !== tag) : [...prev, tag],
     );
 
-  if (loading) {
+  if (loading || !isStaff) {
     return <ListSkeleton columns={2} />;
   }
 

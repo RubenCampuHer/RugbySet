@@ -22,9 +22,11 @@ import { useAudienceViewer } from "@/hooks/useAudienceViewer";
 import { useExerciseExtras } from "@/hooks/useExerciseExtras";
 import { useClub } from "@/hooks/useClub";
 import { useMyClubId } from "@/hooks/useMyClubId";
+import { useTeam } from "@/hooks/useTeam";
 import { copyExerciseToMine, deleteExercise, duplicateExercise } from "@/lib/actions/exercises";
 import { PATHS } from "@/lib/constants";
 import { db } from "@/lib/firebase";
+import { dayExercise, dayTrainingHref } from "@/lib/day-training";
 import { extractLinks, isVideoSite } from "@/lib/linkify";
 import {
   canCreateContent,
@@ -47,6 +49,8 @@ function ExerciseDetail() {
   const { club: adminClub, loading: loadingAdminClub } = useClub();
   const audienceViewer = useAudienceViewer();
   const extras = useExerciseExtras(name);
+  const fecha = params.get("fecha");
+  const { team: dayTeam, loading: loadingDayTeam } = useTeam(params.get("team") ?? undefined);
   const [result, setResult] = useState<
     { name: string; exercise: Exercise | null } | undefined
   >(undefined);
@@ -67,24 +71,35 @@ function ExerciseDetail() {
 
   // Derivado: sin ?name no hay nada que cargar; un result de otro name
   // (navegación entre detalles) cuenta como "cargando".
-  const exercise = !name
+  const libExercise = !name
     ? null
     : result?.name === name
       ? result.exercise
       : undefined;
 
-  if (exercise === undefined || profile === null || loadingMyClub || loadingAdminClub) {
+  if (libExercise === undefined || profile === null || loadingMyClub || loadingAdminClub) {
     return <DetailSkeleton />;
   }
-  if (
-    exercise === null ||
-    !canViewExercise(profile, exercise, { myClubId, myAdminClubId: adminClub?.clubId, audienceViewer })
-  ) {
+  const libVisible =
+    libExercise !== null &&
+    canViewExercise(profile, libExercise, { myClubId, myAdminClubId: adminClub?.clubId, audienceViewer });
+  // Abierto desde el entreno de un día (?team=&fecha=, 2026-09-30): si la ficha
+  // de la biblioteca no es visible (p. ej. privada del entrenador), la copia
+  // que va dentro de ese entreno.
+  if (!libVisible && fecha && loadingDayTeam) return <DetailSkeleton />;
+  const dayCopy = !libVisible && fecha ? dayExercise(dayTeam, fecha, name) : null;
+  const fromDay = !libVisible && dayCopy !== null;
+  const exercise = libVisible ? libExercise : dayCopy;
+  const back =
+    fecha && dayTeam?.teamname
+      ? { href: dayTrainingHref(dayTeam.teamname, fecha), label: "Entreno del día" }
+      : { href: "/exercises", label: "Ejercicios" };
+  if (!exercise) {
     return (
       <div className="space-y-4 py-12 text-center">
         <p className="text-muted-foreground">Ejercicio no encontrado.</p>
-        <Link href="/exercises" className="underline underline-offset-4">
-          Volver a ejercicios
+        <Link href={back.href} className="underline underline-offset-4">
+          Volver
         </Link>
       </div>
     );
@@ -98,11 +113,12 @@ function ExerciseDetail() {
 
   return (
     <article className="mx-auto max-w-2xl space-y-4">
-      <BackLink href="/exercises" label="Ejercicios" />
+      <BackLink href={back.href} label={back.label} />
       <div className="flex items-start justify-between gap-2">
         <h1 className="text-3xl font-bold">{exercise.name}</h1>
         <div className="flex shrink-0 gap-1">
           {exercise.name &&
+            !fromDay &&
             (canEditExercise(profile, exercise) || canDeleteExercise(profile, exercise)) && (
               <CardActionsMenu
                 editHref={`/exercises/edit?name=${encodeURIComponent(exercise.name)}`}
@@ -120,12 +136,12 @@ function ExerciseDetail() {
                 deleteDescription={`Se eliminará "${exercise.name}" permanentemente.`}
               />
             )}
-          {exercise.name && <FavoriteButton kind="exercise" name={exercise.name} />}
+          {exercise.name && !fromDay && <FavoriteButton kind="exercise" name={exercise.name} />}
         </div>
       </div>
       <div className="flex flex-wrap gap-1">
-        <PrivacyBadge privacy={exercise.privacy} />
-        <ApprovalBadge status={exercise.approvalStatus} />
+        {!fromDay && <PrivacyBadge privacy={exercise.privacy} />}
+        {!fromDay && <ApprovalBadge status={exercise.approvalStatus} />}
         {exercise.etiquetas.map((tag) => (
           <Badge key={tag} variant="secondary">
             {tag}
@@ -169,7 +185,7 @@ function ExerciseDetail() {
         </section>
       )}
       {extras && <ExerciseExtrasView extras={extras} />}
-      {exercise.name && canEditExercise(profile, exercise) && extras !== undefined && (
+      {exercise.name && !fromDay && canEditExercise(profile, exercise) && extras !== undefined && (
         <Button
           variant="outline"
           className="print:hidden"
@@ -193,7 +209,7 @@ function ExerciseDetail() {
       {exercise.author && (
         <p className="text-sm text-muted-foreground">Autor: {exercise.author}</p>
       )}
-      {exercise.name && canCreateContent(profile) && exercise.author !== profile.username && (
+      {exercise.name && !fromDay && canCreateContent(profile) && exercise.author !== profile.username && (
         <div className="print:hidden">
           <CopyToMineDialog
             kind="exercise"

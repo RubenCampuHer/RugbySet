@@ -34,6 +34,7 @@ import { parseKey } from "@/lib/calendar";
 import { lineupVisibleToPlayers, squadOf } from "@/lib/squad";
 import { cn } from "@/lib/utils";
 import type { Team, TrainingDay } from "@/lib/types";
+import { dayTrainingHref } from "@/lib/day-training";
 
 const NO_LINEUP = "__none__";
 const CREATE_LINEUP = "__create__";
@@ -347,7 +348,7 @@ export function DayPanel({
             Entreno:{" "}
             <Link
               className="font-medium text-brand underline-offset-4 hover:underline"
-              href={`/trainings/detail?name=${encodeURIComponent(day.training.name)}`}
+              href={dayTrainingHref(team.teamname!, fecha)}
             >
               {day.training.name}
             </Link>{" "}

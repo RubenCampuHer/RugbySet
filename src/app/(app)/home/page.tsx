@@ -5,6 +5,7 @@ import {
   CalendarCheck,
   CalendarDays,
   ClipboardList,
+  FolderOpen,
   PartyPopper,
   Send,
   Trophy,
@@ -32,7 +33,7 @@ import { sendAttendanceNotification } from "@/lib/actions/notify";
 import { setAttendance } from "@/lib/actions/team";
 import { answerCounts, noAnswerUids, playerPending, relativeDayLabel, staffHome, type StaffTask } from "@/lib/agenda";
 import { keyToParam } from "@/lib/calendar";
-import { canManageEvents, isAdmin, isCoach, isTeamCoach, isTeamDelegate } from "@/lib/permissions";
+import { canManageEvents, isAdmin, isCoach, isStaffUser, isTeamCoach, isTeamDelegate } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 import type { Team, TrainingDay } from "@/lib/types";
 
@@ -310,9 +311,17 @@ export default function HomePage() {
             <Link href="/calendar" className={cn(buttonVariants({ variant: "outline", size: "xl" }), "w-full")}>
               <CalendarDays className="size-4" /> Calendario
             </Link>
-            <Link href="/trainings" className={cn(buttonVariants({ variant: "outline", size: "xl" }), "w-full")}>
-              <ClipboardList className="size-4" /> Entrenos
-            </Link>
+            {/* La biblioteca es del cuerpo técnico; el jugador ve sus entrenos en el
+                Calendario y aquí tiene los documentos del equipo (2026-09-30). */}
+            {isStaffUser(profile, team, uid) ? (
+              <Link href="/trainings" className={cn(buttonVariants({ variant: "outline", size: "xl" }), "w-full")}>
+                <ClipboardList className="size-4" /> Entrenos
+              </Link>
+            ) : (
+              <Link href="/team/docs" className={cn(buttonVariants({ variant: "outline", size: "xl" }), "w-full")}>
+                <FolderOpen className="size-4" /> Documentos
+              </Link>
+            )}
           </div>
         </>
       )}

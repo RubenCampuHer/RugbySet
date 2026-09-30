@@ -24,7 +24,9 @@ import { useExtrasSummary } from "@/hooks/useExerciseExtras";
 import { useMyClubId } from "@/hooks/useMyClubId";
 import { useTeam } from "@/hooks/useTeam";
 import { copyTrainingToMine, deleteTraining, duplicateTraining } from "@/lib/actions/trainings";
+import { keyToParam } from "@/lib/calendar";
 import { PATHS } from "@/lib/constants";
+import { dayExerciseHref, dayTraining } from "@/lib/day-training";
 import { db } from "@/lib/firebase";
 import {
   canCreateContent,
@@ -38,12 +40,90 @@ import { parseOr } from "@/lib/schemas/common";
 import { TrainingSchema } from "@/lib/schemas/training";
 import type { Training } from "@/lib/types";
 
+/** Secciones del entreno con sus ejercicios (copias embebidas), con marca de niveles. */
+function TrainingSections({ training, exerciseHref }: { training: Training; exerciseHref: (name: string) => string }) {
+  const extrasSummary = useExtrasSummary();
+  return (
+    <>
+      {training.sections.map((section, i) => (
+        <Card key={section.uid ?? i} className="break-inside-avoid">
+          <CardHeader>
+            <CardTitle className="flex items-baseline justify-between text-lg">
+              <span>{section.sectionName || `Sección ${i + 1}`}</span>
+              <span className="text-sm font-normal text-muted-foreground">
+                {section.tiempoSeccion} min
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {/* El ejercicio viene EMBEBIDO (copia completa) — sin fetch extra */}
+            {[...section.exercises]
+              .sort((a, b) => a.order - b.order)
+              .map((et, j) => {
+                const name = et.exercise?.name;
+                const row = (
+                  <div className="flex items-start gap-2">
+                    {et.exercise?.image && (
+                      // eslint-disable-next-line @next/next/no-img-element -- URL de Storage con token, sin optimizador (output: export)
+                      <img
+                        src={et.exercise.image}
+                        alt=""
+                        className="size-14 shrink-0 rounded-md bg-muted object-contain print:size-36"
+                      />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium">{name ?? "(ejercicio)"}</p>
+                      {et.exercise?.descCorta && (
+                        <p className="line-clamp-2 text-sm text-muted-foreground print:line-clamp-none">
+                          {et.exercise.descCorta}
+                        </p>
+                      )}
+                    </div>
+                    <span className="flex shrink-0 items-center gap-1">
+                      {name && (extrasSummary[name]?.levels ?? 0) > 0 && (
+                        <Badge variant="secondary" className="print:hidden">
+                          <Layers /> {extrasSummary[name].levels}
+                          {extrasSummary[name].levels === 1 ? " nivel" : " niveles"}
+                        </Badge>
+                      )}
+                      <Badge variant="outline">{et.tiempoExercise} min</Badge>
+                      {name && (
+                        <ChevronRight className="size-4 text-muted-foreground print:hidden" />
+                      )}
+                    </span>
+                  </div>
+                );
+                return (
+                  <div key={j} className="break-inside-avoid">
+                    {j > 0 && <Separator className="mb-3" />}
+                    {name ? (
+                      <Link
+                        href={exerciseHref(name)}
+                        className="-m-2 block rounded-lg p-2 transition-colors hover:bg-muted/50 active:bg-muted print:pointer-events-none print:m-0 print:p-0"
+                      >
+                        {row}
+                      </Link>
+                    ) : (
+                      row
+                    )}
+                  </div>
+                );
+              })}
+            {section.exercises.length === 0 && (
+              <p className="text-sm text-muted-foreground">Sin ejercicios.</p>
+            )}
+          </CardContent>
+        </Card>
+      ))}
+    </>
+  );
+}
+
 function TrainingDetail() {
   const params = useSearchParams();
   const name = params.get("name");
   const router = useRouter();
   const { profile, firebaseUser } = useAuth();
-  const extrasSummary = useExtrasSummary();
   const { team } = useTeam();
   const { clubId: myClubId, loading: loadingMyClub } = useMyClubId();
   const { club: adminClub, loading: loadingAdminClub } = useClub();
@@ -175,76 +255,7 @@ function TrainingDetail() {
           </div>
         )}
 
-      {training.sections.map((section, i) => (
-        <Card key={section.uid ?? i} className="break-inside-avoid">
-          <CardHeader>
-            <CardTitle className="flex items-baseline justify-between text-lg">
-              <span>{section.sectionName || `Sección ${i + 1}`}</span>
-              <span className="text-sm font-normal text-muted-foreground">
-                {section.tiempoSeccion} min
-              </span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {/* El ejercicio viene EMBEBIDO (copia completa) — sin fetch extra */}
-            {[...section.exercises]
-              .sort((a, b) => a.order - b.order)
-              .map((et, j) => {
-                const name = et.exercise?.name;
-                const row = (
-                  <div className="flex items-start gap-2">
-                    {et.exercise?.image && (
-                      // eslint-disable-next-line @next/next/no-img-element -- URL de Storage con token, sin optimizador (output: export)
-                      <img
-                        src={et.exercise.image}
-                        alt=""
-                        className="size-14 shrink-0 rounded-md bg-muted object-contain print:size-36"
-                      />
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <p className="font-medium">{name ?? "(ejercicio)"}</p>
-                      {et.exercise?.descCorta && (
-                        <p className="line-clamp-2 text-sm text-muted-foreground print:line-clamp-none">
-                          {et.exercise.descCorta}
-                        </p>
-                      )}
-                    </div>
-                    <span className="flex shrink-0 items-center gap-1">
-                      {name && (extrasSummary[name]?.levels ?? 0) > 0 && (
-                        <Badge variant="secondary" className="print:hidden">
-                          <Layers /> {extrasSummary[name].levels}
-                          {extrasSummary[name].levels === 1 ? " nivel" : " niveles"}
-                        </Badge>
-                      )}
-                      <Badge variant="outline">{et.tiempoExercise} min</Badge>
-                      {name && (
-                        <ChevronRight className="size-4 text-muted-foreground print:hidden" />
-                      )}
-                    </span>
-                  </div>
-                );
-                return (
-                  <div key={j} className="break-inside-avoid">
-                    {j > 0 && <Separator className="mb-3" />}
-                    {name ? (
-                      <Link
-                        href={`/exercises/detail?name=${encodeURIComponent(name)}`}
-                        className="-m-2 block rounded-lg p-2 transition-colors hover:bg-muted/50 active:bg-muted print:pointer-events-none print:m-0 print:p-0"
-                      >
-                        {row}
-                      </Link>
-                    ) : (
-                      row
-                    )}
-                  </div>
-                );
-              })}
-            {section.exercises.length === 0 && (
-              <p className="text-sm text-muted-foreground">Sin ejercicios.</p>
-            )}
-          </CardContent>
-        </Card>
-      ))}
+      <TrainingSections training={training} exerciseHref={(n) => `/exercises/detail?name=${encodeURIComponent(n)}`} />
 
       {training.author && (
         <p className="text-sm text-muted-foreground">Autor: {training.author}</p>
@@ -253,10 +264,72 @@ function TrainingDetail() {
   );
 }
 
+/**
+ * El entreno de un día del calendario tal como está guardado en ese día
+ * (2026-09-30, ?team=&fecha=): lo ven los miembros del equipo aunque el de la
+ * biblioteca sea privado del entrenador o haya cambiado después.
+ */
+function DayTrainingDetail({ teamParam, fecha }: { teamParam: string | null; fecha: string }) {
+  const { team, loading } = useTeam(teamParam ?? undefined);
+  if (loading) return <DetailSkeleton />;
+  const found = dayTraining(team, fecha);
+  const calendar = `/calendar?date=${keyToParam(fecha)}`;
+  if (!team?.teamname || !found) {
+    return (
+      <div className="space-y-4 py-12 text-center">
+        <p className="text-muted-foreground">Ese día no tiene entreno.</p>
+        <Link href={calendar} className="underline underline-offset-4">
+          Volver al calendario
+        </Link>
+      </div>
+    );
+  }
+  const { training, day } = found;
+  const teamname = team.teamname;
+  return (
+    <article className="mx-auto max-w-2xl space-y-4">
+      <div className="print:hidden">
+        <BackLink href={calendar} label="Calendario" />
+      </div>
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <h1 className="text-3xl font-bold">{training.name || day.nameTrainingDay || "Entreno"}</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {teamname} · {fecha}
+            {day.horaInicio ? ` · ${day.horaInicio}${day.horaFin ? `–${day.horaFin}` : ""}` : ""}
+          </p>
+        </div>
+        <Button variant="outline" size="icon" aria-label="Exportar a PDF" className="shrink-0 print:hidden" onClick={() => window.print()}>
+          <Printer />
+        </Button>
+      </div>
+      <div className="flex flex-wrap gap-1">
+        <Badge variant="secondary" className="gap-1">
+          <Clock className="size-3" /> {training.tiempoTotal ?? "?"} min
+        </Badge>
+        {training.etiquetas.map((tag) => (
+          <Badge key={tag} variant="secondary">
+            {tag}
+          </Badge>
+        ))}
+      </div>
+      {training.descCorta && <p>{training.descCorta}</p>}
+      <TrainingSections training={training} exerciseHref={(n) => dayExerciseHref(teamname, fecha, n)} />
+    </article>
+  );
+}
+
+function TrainingDetailRoute() {
+  const params = useSearchParams();
+  const fecha = params.get("fecha");
+  if (fecha) return <DayTrainingDetail teamParam={params.get("team")} fecha={fecha} />;
+  return <TrainingDetail />;
+}
+
 export default function TrainingDetailPage() {
   return (
     <Suspense fallback={<DetailSkeleton />}>
-      <TrainingDetail />
+      <TrainingDetailRoute />
     </Suspense>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { get, ref } from "firebase/database";
-import { Download } from "lucide-react";
+import { Download, Layers } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
@@ -15,7 +15,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DetailSkeleton } from "@/components/skeletons";
 import { CopyToMineDialog } from "@/components/library/CopyToMineDialog";
+import { ExerciseExtrasView } from "@/components/exercises/ExerciseExtrasView";
 import { useAudienceViewer } from "@/hooks/useAudienceViewer";
+import { useExerciseExtras } from "@/hooks/useExerciseExtras";
 import { useClub } from "@/hooks/useClub";
 import { useMyClubId } from "@/hooks/useMyClubId";
 import { copyExerciseToMine, deleteExercise, duplicateExercise } from "@/lib/actions/exercises";
@@ -41,6 +43,7 @@ function ExerciseDetail() {
   const { clubId: myClubId, loading: loadingMyClub } = useMyClubId();
   const { club: adminClub, loading: loadingAdminClub } = useClub();
   const audienceViewer = useAudienceViewer();
+  const extras = useExerciseExtras(name);
   const [result, setResult] = useState<
     { name: string; exercise: Exercise | null } | undefined
   >(undefined);
@@ -153,6 +156,16 @@ function ExerciseDetail() {
         <p className="whitespace-pre-wrap text-muted-foreground">
           {exercise.descLarga}
         </p>
+      )}
+      {extras && <ExerciseExtrasView extras={extras} />}
+      {exercise.name && canEditExercise(profile, exercise) && extras !== undefined && (
+        <Button
+          variant="outline"
+          className="print:hidden"
+          render={<Link href={`/exercises/levels?name=${encodeURIComponent(exercise.name)}`} />}
+        >
+          <Layers /> {extras ? "Editar vídeo y niveles" : "Añadir vídeo o niveles"}
+        </Button>
       )}
       {exercise.copiedFrom?.name && (
         <p className="text-sm text-muted-foreground">

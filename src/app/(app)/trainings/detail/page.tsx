@@ -1,7 +1,7 @@
 "use client";
 
 import { get, ref } from "firebase/database";
-import { ChevronRight, Clock, Printer } from "lucide-react";
+import { ChevronRight, Clock, Layers, Printer } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
@@ -20,6 +20,7 @@ import { AssignToDaySheet } from "@/components/library/AssignToDaySheet";
 import { CopyToMineDialog } from "@/components/library/CopyToMineDialog";
 import { useAudienceViewer } from "@/hooks/useAudienceViewer";
 import { useClub } from "@/hooks/useClub";
+import { useExtrasSummary } from "@/hooks/useExerciseExtras";
 import { useMyClubId } from "@/hooks/useMyClubId";
 import { useTeam } from "@/hooks/useTeam";
 import { copyTrainingToMine, deleteTraining, duplicateTraining } from "@/lib/actions/trainings";
@@ -42,6 +43,7 @@ function TrainingDetail() {
   const name = params.get("name");
   const router = useRouter();
   const { profile, firebaseUser } = useAuth();
+  const extrasSummary = useExtrasSummary();
   const { team } = useTeam();
   const { clubId: myClubId, loading: loadingMyClub } = useMyClubId();
   const { club: adminClub, loading: loadingAdminClub } = useClub();
@@ -208,6 +210,12 @@ function TrainingDetail() {
                       )}
                     </div>
                     <span className="flex shrink-0 items-center gap-1">
+                      {name && (extrasSummary[name]?.levels ?? 0) > 0 && (
+                        <Badge variant="secondary" className="print:hidden">
+                          <Layers /> {extrasSummary[name].levels}
+                          {extrasSummary[name].levels === 1 ? " nivel" : " niveles"}
+                        </Badge>
+                      )}
                       <Badge variant="outline">{et.tiempoExercise} min</Badge>
                       {name && (
                         <ChevronRight className="size-4 text-muted-foreground print:hidden" />

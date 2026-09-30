@@ -3,9 +3,16 @@
 // rol (COACH/ADMIN), no autoría: aquí se valida canEditExercise/
 // canDeleteExercise ANTES de escribir, cerrando ese hueco en el único punto
 // donde podemos hacerlo sin tocar las reglas.
-import { get, ref, remove, set, update } from "firebase/database";
+import { get, ref, set, update } from "firebase/database";
+import {
+  deleteUnusedVideos,
+  extrasCopyPaths,
+  getExerciseExtras,
+  renameLevelRefs,
+} from "@/lib/actions/exercise-extras";
 import type { Audience } from "@/lib/audience";
 import { PATHS } from "@/lib/constants";
+import { extrasFiles } from "@/lib/exercise-extras";
 import { auth, db } from "@/lib/firebase";
 import { canCreateContent, canDeleteExercise, canEditExercise } from "@/lib/permissions";
 import { mergeNode } from "@/lib/rtdb";
@@ -96,11 +103,25 @@ export async function updateExercise(
   if (input.name === originalName) {
     await set(ref(db, `${PATHS.EXERCISES}/${input.name}`), merged);
   } else {
-    // Renombrar = una sola escritura multi-path (alta nueva + baja vieja).
+    // Renombrar = una sola escritura multi-path (alta nueva + baja vieja),
+    // moviendo también su vídeo y niveles (ExerciseExtras, misma clave).
+    const extrasSnap = await get(ref(db, `${PATHS.EXERCISE_EXTRAS}/${originalName}`));
+    const extras = extrasSnap.exists()
+      ? {
+          [`${PATHS.EXERCISE_EXTRAS}/${input.name}`]: {
+            ...(extrasSnap.val() as object),
+            updatedAt: Date.now(),
+            updatedBy: auth.currentUser?.uid ?? null,
+          },
+          [`${PATHS.EXERCISE_EXTRAS}/${originalName}`]: null,
+        }
+      : {};
     await update(ref(db), {
       [`${PATHS.EXERCISES}/${input.name}`]: merged,
       [`${PATHS.EXERCISES}/${originalName}`]: null,
+      ...extras,
     });
+    await renameLevelRefs(originalName, input.name);
   }
 }
 
@@ -115,11 +136,19 @@ export async function deleteExercise(exercise: Exercise, currentUser: User): Pro
   if (!canDeleteExercise(currentUser, exercise)) {
     throw new Error("Sin permiso para eliminar este ejercicio");
   }
-  await remove(ref(db, `${PATHS.EXERCISES}/${exercise.name}`));
-
   const uid = auth.currentUser?.uid;
   const name = exercise.name;
-  if (!uid || !name) return;
+  if (!name) return;
+  // Con su vídeo y niveles en la misma escritura; luego los vídeos subidos que
+  // no comparta ninguna copia.
+  const extras = await getExerciseExtras(name);
+  await update(ref(db), {
+    [`${PATHS.EXERCISES}/${name}`]: null,
+    ...(extras ? { [`${PATHS.EXERCISE_EXTRAS}/${name}`]: null } : {}),
+  });
+  await deleteUnusedVideos(extrasFiles(extras), null, name).catch(() => {});
+
+  if (!uid) return;
   const favSnap = await get(ref(db, `${PATHS.USERS}/${uid}/favExercises`));
   const v = favSnap.val();
   const list = (v == null ? [] : Array.isArray(v) ? v : Object.values(v)).filter(
@@ -165,7 +194,11 @@ export async function duplicateExercise(
     },
     currentUser.username!,
   );
-  await set(ref(db, `${PATHS.EXERCISES}/${name}`), duplicate);
+  // Con su vídeo y niveles (las reglas de ExerciseExtras miran el autor nuevo).
+  await update(ref(db), {
+    [`${PATHS.EXERCISES}/${name}`]: duplicate,
+    ...(exercise.name ? await extrasCopyPaths(exercise.name, name) : {}),
+  });
   return name;
 }
 
@@ -198,6 +231,9 @@ export async function copyExerciseToMine(
     },
     currentUser.username!,
   );
-  await set(ref(db, `${PATHS.EXERCISES}/${name}`), copy);
+  await update(ref(db), {
+    [`${PATHS.EXERCISES}/${name}`]: copy,
+    ...(exercise.name ? await extrasCopyPaths(exercise.name, name) : {}),
+  });
   return name;
 }

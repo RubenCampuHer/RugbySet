@@ -10,7 +10,7 @@ import { PATHS } from "@/lib/constants";
 import { db, functions } from "@/lib/firebase";
 import { parseOr } from "@/lib/schemas/common";
 import { UserTeamsSchema } from "@/lib/schemas/user";
-import { nextActiveTeam } from "@/lib/teams";
+import { nextActiveTeam, rosterStatus } from "@/lib/teams";
 import {
   findRawDay,
   patchRawDay,
@@ -37,12 +37,29 @@ import type { Team, Training } from "@/lib/types";
  *   (regla: solo dueño/ADMIN), así que esta recolocación tiene que hacerla
  *   el propio usuario al volver a cargar el perfil.
  *
- * Idempotente y barata: un get y, como mucho, una escritura.
+ * - Con activo del que ya NO es miembro (2026-09-30): salió o le expulsaron,
+ *   pero algo dejó teamname apuntando al equipo (una lectura de caché
+ *   desfasada justo después de salir, o un cliente con datos viejos). Antes se
+ *   le volvía a apuntar en UserTeams y seguía "dentro", también para las
+ *   reglas de lectura de Teams. Ahora se mira la plantilla real: si no está,
+ *   se le quita ese equipo como activo y como pertenencia.
+ *
+ * Idempotente y barata: dos lecturas y, como mucho, una escritura.
  */
 export async function reconcileActiveTeam(uid: string, teamname: string | null): Promise<void> {
   if (teamname) {
     const membershipRef = ref(db, `${PATHS.USER_TEAMS}/${uid}/${teamname}`);
-    const snap = await get(membershipRef);
+    const [teamSnap, snap] = await Promise.all([get(ref(db, `${PATHS.TEAMS}/${teamname}`)), get(membershipRef)]);
+    const roster = teamSnap.exists() ? (teamSnap.val() as Parameters<typeof rosterStatus>[0]) : null;
+    if (rosterStatus(roster, uid) === "none") {
+      const all = await get(ref(db, `${PATHS.USER_TEAMS}/${uid}`));
+      const memberships = parseOr(UserTeamsSchema, all.val(), `UserTeams/${uid}`) ?? {};
+      await update(ref(db), {
+        [`${PATHS.USERS}/${uid}/teamname`]: nextActiveTeam(Object.keys(memberships), teamname),
+        [`${PATHS.USER_TEAMS}/${uid}/${teamname}`]: null,
+      });
+      return;
+    }
     if (snap.val() === true) return;
     await set(membershipRef, true);
     return;
@@ -50,8 +67,27 @@ export async function reconcileActiveTeam(uid: string, teamname: string | null):
   const snap = await get(ref(db, `${PATHS.USER_TEAMS}/${uid}`));
   if (!snap.exists()) return;
   const memberships = parseOr(UserTeamsSchema, snap.val(), `UserTeams/${uid}`) ?? {};
-  const next = nextActiveTeam(Object.keys(memberships));
-  if (next) await setActiveTeam(uid, next);
+  // El siguiente equipo del que siga siendo miembro de verdad: justo tras
+  // salir, esta lectura puede venir de la caché con el equipo que se acaba de
+  // dejar (y reactivarlo). Los que ya no le tienen en la plantilla se quitan.
+  let candidates = Object.keys(memberships);
+  const stale: string[] = [];
+  for (let next = nextActiveTeam(candidates); next; next = nextActiveTeam(candidates)) {
+    const teamSnap = await get(ref(db, `${PATHS.TEAMS}/${next}`)).catch(() => null);
+    const roster = teamSnap?.exists() ? (teamSnap.val() as Parameters<typeof rosterStatus>[0]) : null;
+    if (rosterStatus(roster, uid) !== "none") {
+      await update(ref(db), {
+        [`${PATHS.USERS}/${uid}/teamname`]: next,
+        ...Object.fromEntries(stale.map((t) => [`${PATHS.USER_TEAMS}/${uid}/${t}`, null])),
+      });
+      return;
+    }
+    stale.push(next);
+    candidates = candidates.filter((t) => t !== next);
+  }
+  if (stale.length) {
+    await update(ref(db), Object.fromEntries(stale.map((t) => [`${PATHS.USER_TEAMS}/${uid}/${t}`, null])));
+  }
 }
 
 /**

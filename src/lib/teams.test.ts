@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { nextActiveTeam } from "./teams";
+import { nextActiveTeam, rosterStatus } from "./teams";
 
 describe("nextActiveTeam", () => {
   it("sin equipos → null", () => {
@@ -22,5 +22,25 @@ describe("nextActiveTeam", () => {
     const teams = ["Spartans", "Buc B"];
     nextActiveTeam(teams);
     expect(teams).toEqual(["Spartans", "Buc B"]);
+  });
+});
+
+describe("rosterStatus", () => {
+  const team = {
+    usercoach: "c",
+    coaches: { co: true },
+    userplayers: { p: true },
+    delegates: { d: true },
+    pendingplayers: { w: true },
+  };
+  it("fundador, co-entrenador, jugador y delegado son miembros", () => {
+    for (const uid of ["c", "co", "p", "d"]) expect(rosterStatus(team, uid)).toBe("member");
+  });
+  it("pendiente de aceptar", () => {
+    expect(rosterStatus(team, "w")).toBe("pending");
+  });
+  it("quien ya salió o el equipo que no existe", () => {
+    expect(rosterStatus(team, "ex")).toBe("none");
+    expect(rosterStatus(null, "p")).toBe("none");
   });
 });

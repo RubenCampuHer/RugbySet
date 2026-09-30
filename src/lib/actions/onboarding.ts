@@ -131,11 +131,8 @@ export async function createStandaloneTeam(opts: {
   if (error) throw new Error(error);
 
   const team = buildTeam(opts);
-  await update(ref(db), {
-    [`${PATHS.TEAMS}/${opts.teamName}`]: team,
-    [`${PATHS.USERS}/${opts.uid}/teamname`]: opts.teamName,
-  });
-  await linkFounder(opts.uid, opts.teamName);
+  await update(ref(db), { [`${PATHS.TEAMS}/${opts.teamName}`]: team });
+  await linkFounder(opts.uid, opts.teamName, true);
 }
 
 /**
@@ -146,8 +143,13 @@ export async function createStandaloneTeam(opts: {
  * En una sola escritura daba PERMISSION_DENIED al crear equipo (QA
  * 2026-09-25). Mismo orden que Android (TeamRepository.createTeam).
  */
-async function linkFounder(uid: string, teamName: string): Promise<void> {
-  await update(ref(db), { [`${PATHS.USER_TEAMS}/${uid}/${teamName}`]: true });
+async function linkFounder(uid: string, teamName: string, setActive: boolean): Promise<void> {
+  await update(ref(db), {
+    [`${PATHS.USER_TEAMS}/${uid}/${teamName}`]: true,
+    // El equipo activo también aquí (2026-09-30): Users/{uid}/teamname solo
+    // admite un equipo del que ya sea miembro, y así la regla lo ve creado.
+    ...(setActive ? { [`${PATHS.USERS}/${uid}/teamname`]: teamName } : {}),
+  });
 }
 
 /**
@@ -190,9 +192,8 @@ export async function createAdditionalTeam(opts: {
   const updates: Record<string, unknown> = {
     [`${PATHS.TEAMS}/${opts.teamName}`]: team,
   };
-  if (opts.setActive) updates[`${PATHS.USERS}/${opts.uid}/teamname`] = opts.teamName;
   await update(ref(db), updates);
-  await linkFounder(opts.uid, opts.teamName);
+  await linkFounder(opts.uid, opts.teamName, opts.setActive);
 
   if (opts.club?.clubId) {
     // Ya existe el equipo con usercoach = yo: ahora sí pasa la .validate de clubId.
@@ -262,11 +263,8 @@ export async function createClubAndTeam(opts: {
   });
 
   await update(ref(db, `${PATHS.CLUBS}/${clubId}`), club);
-  await update(ref(db), {
-    [`${PATHS.TEAMS}/${opts.teamName}`]: team,
-    [`${PATHS.USERS}/${opts.uid}/teamname`]: opts.teamName,
-  });
-  await linkFounder(opts.uid, opts.teamName);
+  await update(ref(db), { [`${PATHS.TEAMS}/${opts.teamName}`]: team });
+  await linkFounder(opts.uid, opts.teamName, true);
   // Puntero de descubrimiento del club que dirijo (rediseño multi-director
   // 2026-09-03) — mismo criterio que createClub en actions/club.ts.
   await update(ref(db, `${PATHS.USERS}/${opts.uid}`), { directorOfClubId: clubId });

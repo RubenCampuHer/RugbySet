@@ -16,6 +16,8 @@ import { Button } from "@/components/ui/button";
 import { DetailSkeleton } from "@/components/skeletons";
 import { CopyToMineDialog } from "@/components/library/CopyToMineDialog";
 import { ExerciseExtrasView } from "@/components/exercises/ExerciseExtrasView";
+import { LinkifiedText } from "@/components/LinkifiedText";
+import { VideoLinkCard } from "@/components/media/VideoLinkCard";
 import { useAudienceViewer } from "@/hooks/useAudienceViewer";
 import { useExerciseExtras } from "@/hooks/useExerciseExtras";
 import { useClub } from "@/hooks/useClub";
@@ -23,6 +25,7 @@ import { useMyClubId } from "@/hooks/useMyClubId";
 import { copyExerciseToMine, deleteExercise, duplicateExercise } from "@/lib/actions/exercises";
 import { PATHS } from "@/lib/constants";
 import { db } from "@/lib/firebase";
+import { extractLinks, isVideoSite } from "@/lib/linkify";
 import {
   canCreateContent,
   canDeleteExercise,
@@ -87,6 +90,12 @@ function ExerciseDetail() {
     );
   }
 
+  // Enlaces de vídeo escritos en el texto ("Referencias: https://…"), sin
+  // repetir el vídeo propio del ejercicio.
+  const referenceVideos = extractLinks(`${exercise.descCorta ?? ""}\n${exercise.descLarga ?? ""}`).filter(
+    (url) => isVideoSite(url) && url !== extras?.video?.url,
+  );
+
   return (
     <article className="mx-auto max-w-2xl space-y-4">
       <BackLink href="/exercises" label="Ejercicios" />
@@ -149,13 +158,15 @@ function ExerciseDetail() {
           </Button>
         </div>
       )}
-      {exercise.descCorta && (
-        <p className="font-medium">{exercise.descCorta}</p>
-      )}
-      {exercise.descLarga && (
-        <p className="whitespace-pre-wrap text-muted-foreground">
-          {exercise.descLarga}
-        </p>
+      {exercise.descCorta && <LinkifiedText text={exercise.descCorta} className="font-medium" />}
+      {exercise.descLarga && <LinkifiedText text={exercise.descLarga} className="text-muted-foreground" />}
+      {referenceVideos.length > 0 && (
+        <section className="space-y-2 print:hidden">
+          <h2 className="text-sm font-medium text-muted-foreground">Vídeos de referencia</h2>
+          {referenceVideos.map((url) => (
+            <VideoLinkCard key={url} url={url} />
+          ))}
+        </section>
       )}
       {extras && <ExerciseExtrasView extras={extras} />}
       {exercise.name && canEditExercise(profile, exercise) && extras !== undefined && (

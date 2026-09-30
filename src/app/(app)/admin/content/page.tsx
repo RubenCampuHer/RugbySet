@@ -18,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { LinkifiedText } from "@/components/LinkifiedText";
 import { useAllContent } from "@/hooks/useAllContent";
 import { isAdmin } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
@@ -59,7 +60,7 @@ function ExerciseDetailBody({ exercise }: { exercise: Exercise }) {
         />
       )}
       {exercise.descLarga && (
-        <p className="text-sm whitespace-pre-wrap text-muted-foreground">{exercise.descLarga}</p>
+        <LinkifiedText text={exercise.descLarga} className="text-sm text-muted-foreground" />
       )}
       {exercise.etiquetas.length > 0 && (
         <div className="flex flex-wrap gap-1">

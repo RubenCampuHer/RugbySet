@@ -2,6 +2,7 @@
 
 import { FileText } from "lucide-react";
 import { LibraryRefCard } from "@/components/lessons/LibraryRefCard";
+import { LinkifiedText } from "@/components/LinkifiedText";
 import { VideoLinkCard } from "@/components/media/VideoLinkCard";
 import { BoardSvg } from "@/components/whiteboard/BoardSvg";
 import { parseBoardData } from "@/components/whiteboard/types";
@@ -17,7 +18,7 @@ function formatSize(bytes: number | null | undefined): string {
 export function LessonBlockView({ block }: { block: LessonBlock }) {
   switch (block.type) {
     case "text":
-      return <p className="whitespace-pre-wrap text-sm leading-relaxed">{block.text}</p>;
+      return <LinkifiedText text={block.text} className="text-sm leading-relaxed" />;
     case "pdf":
       return (
         <a

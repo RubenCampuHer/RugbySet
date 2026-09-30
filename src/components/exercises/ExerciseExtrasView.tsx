@@ -2,6 +2,7 @@
 
 import { Layers } from "lucide-react";
 import { LibraryRefCard } from "@/components/lessons/LibraryRefCard";
+import { LinkifiedText } from "@/components/LinkifiedText";
 import { VideoRefView } from "@/components/media/VideoRefView";
 import { Card, CardContent } from "@/components/ui/card";
 import { sortedLevels } from "@/lib/exercise-extras";
@@ -29,7 +30,7 @@ export function ExerciseExtrasView({ extras }: { extras: ExerciseExtras }) {
                       </span>
                       {level.name}
                     </p>
-                    {level.desc && <p className="whitespace-pre-wrap text-sm text-muted-foreground">{level.desc}</p>}
+                    {level.desc && <LinkifiedText text={level.desc} className="text-sm text-muted-foreground" />}
                     {level.ref && <LibraryRefCard kind="exercise" refName={level.ref} />}
                     {level.video && <VideoRefView video={level.video} />}
                   </CardContent>

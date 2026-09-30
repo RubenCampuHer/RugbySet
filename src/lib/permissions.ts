@@ -210,3 +210,31 @@ export function canWriteClubLessons(opts: {
 export function canEditClubItem(item: { createdBy: string }, uid: string | null | undefined, isDirector: boolean, canWrite: boolean): boolean {
   return isDirector || (canWrite && Boolean(uid) && item.createdBy === uid);
 }
+
+// ── Documentos del equipo (2026-09-30, solo web) ──
+// Mismo criterio que el bloque TeamDocs de database.rules.json (repo Android).
+
+/** Crear, editar y borrar: fundador, co-entrenadores, delegados y ADMIN. */
+export function canEditTeamDocs(team: Team, uid: string | null | undefined, profile: User | null): boolean {
+  return isAdmin(profile) || canManageEvents(team, uid);
+}
+
+/** Lo del cuerpo técnico: quien edita y la dirección del club del equipo. */
+export function canReadStaffDocs(
+  team: Team,
+  uid: string | null | undefined,
+  profile: User | null,
+  isDirectorOfTeamClub: boolean,
+): boolean {
+  return canEditTeamDocs(team, uid, profile) || isDirectorOfTeamClub;
+}
+
+/** Lo de todo el equipo: además, los jugadores del equipo. */
+export function canReadTeamDocs(
+  team: Team,
+  uid: string | null | undefined,
+  profile: User | null,
+  isDirectorOfTeamClub: boolean,
+): boolean {
+  return canReadStaffDocs(team, uid, profile, isDirectorOfTeamClub) || (Boolean(uid) && team.userplayers[uid!] === true);
+}

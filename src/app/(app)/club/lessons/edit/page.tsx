@@ -1,71 +1,32 @@
 "use client";
 
-import {
-  ArrowDown,
-  ArrowUp,
-  ClipboardList,
-  Dumbbell,
-  FileText,
-  Folder,
-  Link2,
-  Lock,
-  PenTool,
-  Trash2,
-  Type,
-  Upload,
-} from "lucide-react";
+import { FileText, Folder, Lock } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useRef, useState } from "react";
+import { Suspense, useState } from "react";
 import { toast } from "sonner";
 import { BackLink } from "@/components/BackLink";
 import { EmptyState } from "@/components/EmptyState";
+import { BlocksEditor } from "@/components/blocks/BlocksEditor";
 import { AudiencePicker } from "@/components/audience/AudiencePicker";
-import { TrainingPickerSheet } from "@/components/calendar/TrainingPickerSheet";
 import { FolderPickerDialog } from "@/components/lessons/LessonDialogs";
-import { LibraryRefCard } from "@/components/lessons/LibraryRefCard";
-import { ExercisePickerSheet } from "@/components/trainings/ExercisePickerSheet";
-import { LessonBlockView } from "@/components/lessons/LessonBlocksView";
-import { VideoLinkCard } from "@/components/media/VideoLinkCard";
 import { DetailSkeleton } from "@/components/skeletons";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { BoardSvg } from "@/components/whiteboard/BoardSvg";
-import { parseBoardData } from "@/components/whiteboard/types";
-import { WhiteboardDialog } from "@/components/whiteboard/WhiteboardDialog";
 import { useClubLessons, useLessonsClub, usePendingLessons } from "@/hooks/useClubLessons";
 import { discardUploads, newLessonId, saveLesson, uploadLessonFile } from "@/lib/actions/lessons";
 import { type Audience, normalizeAudience } from "@/lib/audience";
 import {
   breadcrumb,
   lessonFiles,
-  moveBlock,
   parentAudience,
   sortedBlocks,
   toBlocksRecord,
-  validateLessonFile,
   type BlockEntry,
 } from "@/lib/lessons";
 import { normalizeVideoUrl } from "@/lib/match";
 import { canEditClubItem } from "@/lib/permissions";
-import type { LessonBlock } from "@/lib/schemas/lesson";
-
-let localSeq = 0;
-/** Id local de bloque (clave RTDB válida, sin push para no depender de la red). */
-const blockId = () => `b${Date.now().toString(36)}${(localSeq++).toString(36)}`;
-
-const BLOCK_LABEL: Record<LessonBlock["type"], string> = {
-  text: "Texto",
-  pdf: "PDF",
-  video: "Vídeo",
-  board: "Jugada",
-  exercise: "Ejercicio",
-  training: "Entreno",
-};
-
-type UploadState = { kind: "pdf" | "video"; name: string; progress: number };
 
 function LessonEditor() {
   const params = useSearchParams();
@@ -85,16 +46,10 @@ function LessonEditor() {
   const [ownAudience, setOwnAudience] = useState<Audience | null>(null);
   /** Ficheros subidos en esta sesión del editor (para borrarlos si no se guardan). */
   const [uploaded, setUploaded] = useState<string[]>([]);
-  const [uploading, setUploading] = useState<UploadState | null>(null);
-  const [board, setBoard] = useState<{ id: string | null; data: string | null } | null>(null);
   const [pickFolder, setPickFolder] = useState(false);
-  // Selectores de la biblioteca (2026-09-28): varios ejercicios o un entreno.
-  const [pickExercises, setPickExercises] = useState(false);
-  const [exerciseSelection, setExerciseSelection] = useState<Set<string>>(new Set());
-  const [pickTraining, setPickTraining] = useState(false);
   const [saving, setSaving] = useState(false);
-  const pdfInput = useRef<HTMLInputElement>(null);
-  const videoInput = useRef<HTMLInputElement>(null);
+  /** Subidas en curso (bloquean guardar). */
+  const [busy, setBusy] = useState(0);
 
   const approved = editingId ? (lessons[editingId] ?? null) : null;
   const pending = editingId ? (pendingMap[editingId] ?? null) : null;
@@ -128,36 +83,6 @@ function LessonEditor() {
   }
 
   const path = breadcrumb(folders, folderId);
-  const update = (id: string, patch: Partial<LessonBlock>) =>
-    setBlocks((list) => list.map((e) => (e.id === id ? { ...e, block: { ...e.block, ...patch } as LessonBlock } : e)));
-  const add = (block: LessonBlock) => setBlocks((list) => [...list, { id: blockId(), block }]);
-  const remove = (id: string) => setBlocks((list) => list.filter((e) => e.id !== id));
-
-  const onFile = async (kind: "pdf" | "video", file: File | undefined) => {
-    if (!file || !clubId || !lessonId) return;
-    const error = validateLessonFile(kind, file);
-    if (error) {
-      toast.error(error);
-      return;
-    }
-    setUploading({ kind, name: file.name, progress: 0 });
-    try {
-      const up = await uploadLessonFile(clubId, lessonId, kind, file, (progress) =>
-        setUploading((u) => (u ? { ...u, progress } : u)),
-      );
-      setUploaded((list) => [...list, up.path]);
-      add(
-        kind === "pdf"
-          ? { type: "pdf", order: 0, url: up.url, path: up.path, name: up.name, size: up.size }
-          : { type: "video", order: 0, source: "file", url: up.url, path: up.path, title: file.name.replace(/\.[^.]+$/, "").slice(0, 120) },
-      );
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "No se pudo subir el fichero");
-    } finally {
-      setUploading(null);
-    }
-  };
-
   const save = async () => {
     if (!clubId || !lessonId || !uid) return;
     if (!title.trim()) {
@@ -240,203 +165,27 @@ function LessonEditor() {
         </CardContent>
       </Card>
 
-      {blocks.map((entry, i) => {
-        const b = entry.block;
-        return (
-          <Card key={entry.id}>
-            <CardContent className="space-y-3 py-3">
-              <div className="flex items-center gap-1">
-                <span className="flex-1 text-xs font-medium text-muted-foreground">{BLOCK_LABEL[b.type]}</span>
-                <Button variant="ghost" size="icon-lg" aria-label="Subir bloque" disabled={i === 0} onClick={() => setBlocks((l) => moveBlock(l, i, -1))}>
-                  <ArrowUp />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon-lg"
-                  aria-label="Bajar bloque"
-                  disabled={i === blocks.length - 1}
-                  onClick={() => setBlocks((l) => moveBlock(l, i, 1))}
-                >
-                  <ArrowDown />
-                </Button>
-                <Button variant="ghost" size="icon-lg" aria-label="Quitar bloque" onClick={() => remove(entry.id)}>
-                  <Trash2 />
-                </Button>
-              </div>
-
-              {b.type === "text" && (
-                <Textarea
-                  aria-label="Texto"
-                  value={b.text}
-                  rows={5}
-                  maxLength={20000}
-                  onChange={(e) => update(entry.id, { text: e.target.value })}
-                />
-              )}
-              {b.type === "pdf" && <LessonBlockView block={b} />}
-              {b.type === "video" && b.source === "link" && (
-                <div className="space-y-2">
-                  <Input
-                    aria-label="Enlace del vídeo"
-                    placeholder="https://www.youtube.com/watch?v=…"
-                    value={b.url}
-                    onChange={(e) => update(entry.id, { url: e.target.value })}
-                  />
-                  <Input
-                    aria-label="Título del vídeo"
-                    placeholder="Título (opcional)"
-                    value={b.title ?? ""}
-                    maxLength={120}
-                    onChange={(e) => update(entry.id, { title: e.target.value })}
-                  />
-                  {normalizeVideoUrl(b.url) && <VideoLinkCard url={b.url} title={b.title} />}
-                </div>
-              )}
-              {b.type === "video" && b.source === "file" && (
-                <div className="space-y-2">
-                  <LessonBlockView block={{ ...b, title: null }} />
-                  <Input
-                    aria-label="Título del vídeo"
-                    placeholder="Título (opcional)"
-                    value={b.title ?? ""}
-                    maxLength={120}
-                    onChange={(e) => update(entry.id, { title: e.target.value })}
-                  />
-                </div>
-              )}
-              {(b.type === "exercise" || b.type === "training") && (
-                <LibraryRefCard kind={b.type} refName={b.ref} showPrivacyHint />
-              )}
-              {b.type === "board" && (
-                <div className="space-y-2">
-                  <button
-                    type="button"
-                    className="block w-full overflow-hidden rounded-lg border"
-                    aria-label="Editar jugada"
-                    onClick={() => setBoard({ id: entry.id, data: b.boardData })}
-                  >
-                    <BoardSvg objects={parseBoardData(b.boardData).objects} interactive={false} className="block h-auto w-full" />
-                  </button>
-                  <Input
-                    aria-label="Título de la jugada"
-                    placeholder="Título (opcional)"
-                    value={b.title ?? ""}
-                    maxLength={120}
-                    onChange={(e) => update(entry.id, { title: e.target.value })}
-                  />
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        );
-      })}
-
-      {uploading && (
-        <Card>
-          <CardContent className="space-y-2 py-3 text-sm">
-            <p className="truncate">
-              Subiendo {uploading.kind === "pdf" ? "PDF" : "vídeo"}: {uploading.name}
-            </p>
-            <div className="h-2 overflow-hidden rounded-full bg-muted" role="progressbar" aria-valuenow={Math.round(uploading.progress * 100)}>
-              <div className="h-full bg-primary transition-[width]" style={{ width: `${Math.round(uploading.progress * 100)}%` }} />
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      <div className="space-y-2">
-        <p className="text-xs font-medium text-muted-foreground">Añadir a la lección</p>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-          <Button variant="outline" size="xl" onClick={() => add({ type: "text", order: 0, text: "" })}>
-            <Type /> Texto
-          </Button>
-          <Button variant="outline" size="xl" disabled={Boolean(uploading)} onClick={() => pdfInput.current?.click()}>
-            <FileText /> PDF
-          </Button>
-          <Button variant="outline" size="xl" onClick={() => add({ type: "video", order: 0, source: "link", url: "", title: null })}>
-            <Link2 /> Enlace de vídeo
-          </Button>
-          <Button variant="outline" size="xl" disabled={Boolean(uploading)} onClick={() => videoInput.current?.click()}>
-            <Upload /> Subir vídeo
-          </Button>
-          <Button variant="outline" size="xl" onClick={() => setBoard({ id: null, data: null })}>
-            <PenTool /> Jugada
-          </Button>
-          <Button
-            variant="outline"
-            size="xl"
-            onClick={() => {
-              setExerciseSelection(new Set());
-              setPickExercises(true);
-            }}
-          >
-            <Dumbbell /> Ejercicio
-          </Button>
-          <Button variant="outline" size="xl" onClick={() => setPickTraining(true)}>
-            <ClipboardList /> Entreno
-          </Button>
-        </div>
-        <p className="text-xs text-muted-foreground">PDF hasta 20 MB · vídeo hasta 200 MB.</p>
-        <input
-          ref={pdfInput}
-          type="file"
-          accept="application/pdf"
-          hidden
-          onChange={(e) => {
-            void onFile("pdf", e.target.files?.[0]);
-            e.target.value = "";
-          }}
-        />
-        <input
-          ref={videoInput}
-          type="file"
-          accept="video/*"
-          hidden
-          onChange={(e) => {
-            void onFile("video", e.target.files?.[0]);
-            e.target.value = "";
-          }}
-        />
-      </div>
+      <BlocksEditor
+        blocks={blocks}
+        setBlocks={setBlocks}
+        addLabel="Añadir a la lección"
+        showPrivacyHint
+        upload={(kind, file, onProgress) => uploadLessonFile(clubId!, lessonId!, kind, file, onProgress)}
+        onUploaded={(path) => setUploaded((list) => [...list, path])}
+        onBusyChange={(b) => setBusy((n) => n + (b ? 1 : -1))}
+      />
 
       <div className="fixed inset-x-0 bottom-0 z-10 border-t bg-background/95 px-4 py-3 backdrop-blur md:static md:border-0 md:bg-transparent md:p-0">
         <div className="mx-auto flex max-w-2xl justify-end gap-2">
           <Button variant="outline" size="xl" disabled={saving} onClick={() => void cancel()}>
             Cancelar
           </Button>
-          <Button size="xl" disabled={saving || Boolean(uploading)} onClick={() => void save()}>
+          <Button size="xl" disabled={saving || busy > 0} onClick={() => void save()}>
             {saving ? "Guardando…" : isDirector ? "Publicar" : "Enviar para aprobar"}
           </Button>
         </div>
       </div>
 
-      <ExercisePickerSheet
-        open={pickExercises}
-        onOpenChange={setPickExercises}
-        selection={exerciseSelection}
-        confirmLabel="Añadir a la lección"
-        onToggle={(name) =>
-          setExerciseSelection((prev) => {
-            const next = new Set(prev);
-            if (next.has(name)) next.delete(name);
-            else next.add(name);
-            return next;
-          })
-        }
-        onConfirm={() => {
-          for (const ref of exerciseSelection) add({ type: "exercise", order: 0, ref });
-          setPickExercises(false);
-        }}
-      />
-      <TrainingPickerSheet
-        open={pickTraining}
-        onOpenChange={setPickTraining}
-        value=""
-        onConfirm={(ref) => {
-          if (ref) add({ type: "training", order: 0, ref });
-          setPickTraining(false);
-        }}
-      />
       <FolderPickerDialog
         open={pickFolder}
         onOpenChange={setPickFolder}
@@ -445,20 +194,6 @@ function LessonEditor() {
         current={folderId}
         onPick={(id) => setFolderId(id)}
       />
-      {board && (
-        <WhiteboardDialog
-          key={board.id ?? "new"}
-          open
-          onOpenChange={(open) => !open && setBoard(null)}
-          initialBoardData={board.data}
-          onSave={({ boardData, previewUrl }) => {
-            URL.revokeObjectURL(previewUrl);
-            if (board.id) update(board.id, { boardData });
-            else add({ type: "board", order: 0, boardData, title: null });
-            setBoard(null);
-          }}
-        />
-      )}
     </div>
   );
 }

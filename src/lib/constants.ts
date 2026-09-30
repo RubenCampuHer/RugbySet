@@ -14,6 +14,9 @@ export const PATHS = {
   // Lecciones del club (2026-09-28, solo web): ClubLessons/{clubId}/{folders,lessons,pending,pendingBy}.
   // Nodo raíz aparte porque Clubs se puede leer sin ser del club.
   CLUB_LESSONS: "ClubLessons",
+  // Documentos del equipo (2026-09-30, solo web): TeamDocs/{teamname}/{team|staff}/{folders,docs,files}.
+  // Aparte de Teams (Android no lo conoce); renameTeam y adminDeleteTeam lo mueven/borran.
+  TEAM_DOCS: "TeamDocs",
   EXERCISES: "Exercises",
   // Vídeo y niveles de cada ejercicio (2026-09-29, solo web): ExerciseExtras/{nombre}.
   // Aparte porque las versiones publicadas de Android reescriben Exercises/{n} entero.

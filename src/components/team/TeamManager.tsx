@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDownCircle, ArrowUpCircle, Building2, ClipboardCheck, Camera, Check, ClipboardList, Copy, Crown, Flame, LogOut, Megaphone, Pencil, ShieldCheck, Trash2, TriangleAlert, Trophy, UserPlus, Users, X } from "lucide-react";
+import { ArrowDownCircle, ArrowUpCircle, Building2, ClipboardCheck, Camera, Check, ClipboardList, Copy, Crown, Flame, FolderOpen, LogOut, Megaphone, Pencil, ShieldCheck, Trash2, TriangleAlert, Trophy, UserPlus, Users, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useRef, useState } from "react";
@@ -1075,6 +1075,16 @@ export function TeamManager({ teamname }: { teamname: string | null }) {
           className={cn(buttonVariants({ variant: "outline", size: "xl" }), "w-full")}
         >
           <Trophy className="size-4" /> Ver alineaciones
+        </Link>
+      )}
+
+      {/* Documentos del equipo (2026-09-30): miembros, cuerpo técnico y dirección del club. */}
+      {(isMemberHere || canManage) && (
+        <Link
+          href={`/team/docs${teamQuery}`}
+          className={cn(buttonVariants({ variant: "outline", size: "xl" }), "w-full")}
+        >
+          <FolderOpen className="size-4" /> Documentos
         </Link>
       )}
 

@@ -109,6 +109,7 @@ export function FolderPickerDialog({
   current,
   disabled,
   onPick,
+  rootLabel = "Lecciones (inicio)",
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -117,6 +118,8 @@ export function FolderPickerDialog({
   current: string | null;
   disabled?: (folderId: string) => boolean;
   onPick: (folderId: string | null) => Promise<void> | void;
+  /** Nombre de la raíz en la lista. */
+  rootLabel?: string;
 }) {
   const [busy, setBusy] = useState(false);
   const options = folderOptions(folders);
@@ -163,7 +166,7 @@ export function FolderPickerDialog({
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
         <ul className="max-h-[60dvh] overflow-y-auto">
-          {row(null, "Lecciones (inicio)", 0)}
+          {row(null, rootLabel, 0)}
           {options.map((o) => row(o.id, o.label, o.depth + 1))}
         </ul>
       </DialogContent>

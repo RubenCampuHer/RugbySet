@@ -51,7 +51,9 @@ export async function reconcileActiveTeam(uid: string, teamname: string | null):
     const membershipRef = ref(db, `${PATHS.USER_TEAMS}/${uid}/${teamname}`);
     const [teamSnap, snap] = await Promise.all([get(ref(db, `${PATHS.TEAMS}/${teamname}`)), get(membershipRef)]);
     const roster = teamSnap.exists() ? (teamSnap.val() as Parameters<typeof rosterStatus>[0]) : null;
-    if (rosterStatus(roster, uid) === "none") {
+    // Pendiente no cuenta (2026-09-30): las reglas solo dejan tener como activo
+    // (y en UserTeams) un equipo del que ya se es miembro.
+    if (rosterStatus(roster, uid) !== "member") {
       const all = await get(ref(db, `${PATHS.USER_TEAMS}/${uid}`));
       const memberships = parseOr(UserTeamsSchema, all.val(), `UserTeams/${uid}`) ?? {};
       await update(ref(db), {
@@ -75,7 +77,7 @@ export async function reconcileActiveTeam(uid: string, teamname: string | null):
   for (let next = nextActiveTeam(candidates); next; next = nextActiveTeam(candidates)) {
     const teamSnap = await get(ref(db, `${PATHS.TEAMS}/${next}`)).catch(() => null);
     const roster = teamSnap?.exists() ? (teamSnap.val() as Parameters<typeof rosterStatus>[0]) : null;
-    if (rosterStatus(roster, uid) !== "none") {
+    if (rosterStatus(roster, uid) === "member") {
       await update(ref(db), {
         [`${PATHS.USERS}/${uid}/teamname`]: next,
         ...Object.fromEntries(stale.map((t) => [`${PATHS.USER_TEAMS}/${uid}/${t}`, null])),

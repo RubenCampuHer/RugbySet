@@ -15,6 +15,7 @@ import {
   removeMatchVideo,
   saveMatchResult,
   uploadMatchReport,
+  uploadMatchVideo,
 } from "@/lib/actions/match";
 import { sendMatchResultNotification } from "@/lib/actions/notify";
 import {
@@ -29,6 +30,7 @@ import {
   matchOutcome,
   parseScore,
   scoreline,
+  validateMatchVideo,
 } from "@/lib/match";
 import type { Match, Team, TrainingDay } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -149,7 +151,29 @@ function VideoList({
     <ul className="grid gap-2 sm:grid-cols-2">
       {videos.map(([id, v]) => (
         <li key={id}>
-          <VideoLinkCard url={v.url} title={v.title} onRemove={onRemove ? () => onRemove(id) : undefined} />
+          {v.source === "file" ? (
+            <figure className="space-y-1">
+              <video controls preload="metadata" src={v.url} className="w-full rounded-lg bg-black">
+                <track kind="captions" />
+              </video>
+              <figcaption className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span className="min-w-0 flex-1 truncate">{v.title || "Vídeo del partido"}</span>
+                {onRemove && (
+                  <Button
+                    type="button"
+                    size="icon-sm"
+                    variant="ghost"
+                    aria-label="Quitar vídeo"
+                    onClick={() => onRemove(id)}
+                  >
+                    <Trash2 className="size-3.5" />
+                  </Button>
+                )}
+              </figcaption>
+            </figure>
+          ) : (
+            <VideoLinkCard url={v.url} title={v.title} onRemove={onRemove ? () => onRemove(id) : undefined} />
+          )}
         </li>
       ))}
     </ul>
@@ -237,6 +261,10 @@ export function MatchResultEditor({ team, day }: { team: Team; day: TrainingDay 
   const fileInput = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
 
+  const videoInput = useRef<HTMLInputElement>(null);
+  /** Progreso de la subida del vídeo (0-1), null si no se está subiendo. */
+  const [videoProgress, setVideoProgress] = useState<number | null>(null);
+
   const save = async () => {
     const scores = [pf, pa, tf, ta].map(parseScore);
     if (scores.includes("invalid")) {
@@ -294,6 +322,25 @@ export function MatchResultEditor({ team, day }: { team: Team; day: TrainingDay 
       toast.error(e instanceof Error ? e.message : "No se pudo añadir el vídeo");
     } finally {
       setAddingVideo(false);
+    }
+  };
+
+  const onVideoFile = async (file: File | undefined) => {
+    if (videoInput.current) videoInput.current.value = "";
+    if (!file) return;
+    const error = validateMatchVideo(file);
+    if (error) {
+      toast.error(error);
+      return;
+    }
+    setVideoProgress(0);
+    try {
+      await uploadMatchVideo(teamname, fecha, file, setVideoProgress);
+      toast.success("Vídeo subido");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo subir el vídeo");
+    } finally {
+      setVideoProgress(null);
     }
   };
 
@@ -409,6 +456,25 @@ export function MatchResultEditor({ team, day }: { team: Team; day: TrainingDay 
           <Button variant="outline" disabled={addingVideo || !videoUrl.trim()} onClick={() => void addVideo()}>
             Añadir
           </Button>
+        </div>
+        <input
+          ref={videoInput}
+          type="file"
+          accept="video/*"
+          className="hidden"
+          onChange={(e) => void onVideoFile(e.target.files?.[0])}
+        />
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={videoProgress != null}
+            onClick={() => videoInput.current?.click()}
+          >
+            <Upload className="size-3.5" />
+            {videoProgress != null ? `Subiendo… ${Math.round(videoProgress * 100)}%` : "Subir vídeo"}
+          </Button>
+          <p className="text-xs text-muted-foreground">O sube el archivo (máx. 200 MB). Lo verá todo el equipo.</p>
         </div>
       </section>
 

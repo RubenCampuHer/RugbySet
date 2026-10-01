@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { matchOutcome, normalizeVideoUrl, parseScore, scoreline, youtubeId } from "./match";
+import { matchOutcome, MATCH_VIDEO_MAX_BYTES, normalizeVideoUrl, parseScore, scoreline, validateMatchVideo, youtubeId } from "./match";
 import type { Match } from "./types";
 
 const played = (f: number | null, a: number | null, home: boolean | null = true): Match =>
@@ -46,5 +46,15 @@ describe("match", () => {
     expect(normalizeVideoUrl(" https://vimeo.com/1 ")).toBe("https://vimeo.com/1");
     expect(normalizeVideoUrl("javascript:alert(1)")).toBeNull();
     expect(normalizeVideoUrl("vimeo.com/1")).toBeNull();
+  });
+});
+
+describe("vídeo subido del partido", () => {
+  it("solo vídeos de menos de 200 MB", () => {
+    expect(validateMatchVideo({ type: "video/mp4", size: 1000 })).toBeNull();
+    expect(validateMatchVideo({ type: "application/pdf", size: 1000 })).toBe("Tiene que ser un vídeo.");
+    expect(validateMatchVideo({ type: "video/mp4", size: MATCH_VIDEO_MAX_BYTES })).toBe(
+      "El vídeo no puede pasar de 200 MB.",
+    );
   });
 });

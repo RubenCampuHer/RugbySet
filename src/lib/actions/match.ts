@@ -1,14 +1,15 @@
 // Resultado del partido, vídeos y acta (2026-09-25, solo web):
 // Teams/{t}/eventData/{yyyy-MM-dd}/match. Todo lo escribe el cuerpo técnico con
 // el .write del equipo — sin reglas RTDB nuevas. El acta (PDF) va a Storage en
-// match_reports/{equipo}/ (ver storage.rules del repo Android).
+// match_reports/{equipo}/ y los vídeos subidos (2026-10-01) en
+// match_videos/{equipo}/ (ver storage.rules del repo Android).
 import { get, push, ref, set, update } from "firebase/database";
-import { getDownloadURL, ref as storageRef, uploadBytes } from "firebase/storage";
+import { getDownloadURL, ref as storageRef, uploadBytes, uploadBytesResumable } from "firebase/storage";
 import { eventDataKey } from "@/lib/attendance";
 import { PATHS } from "@/lib/constants";
 import { db, storage } from "@/lib/firebase";
 import { deleteFileQuietly } from "@/lib/storage";
-import { MATCH_REPORT_MAX_BYTES, type MatchStatus, normalizeVideoUrl } from "@/lib/match";
+import { MATCH_REPORT_MAX_BYTES, type MatchStatus, normalizeVideoUrl, validateMatchVideo } from "@/lib/match";
 
 function matchPath(teamname: string, fecha: string): string {
   const key = eventDataKey(fecha);
@@ -54,8 +55,54 @@ export async function addMatchVideo(
   });
 }
 
+/**
+ * Sube un vídeo del partido (< 200 MB) con progreso (0-1) y lo añade a la
+ * lista. Si falla al apuntarlo en RTDB, borra el fichero recién subido.
+ */
+export async function uploadMatchVideo(
+  teamname: string,
+  fecha: string,
+  file: File,
+  onProgress?: (fraction: number) => void,
+): Promise<void> {
+  const error = validateMatchVideo(file);
+  if (error) throw new Error(error);
+  const key = eventDataKey(fecha);
+  if (!key) throw new Error("Fecha no válida");
+
+  const safeName = file.name.replace(/[^\w.\-]+/g, "_").slice(-80) || "video";
+  const path = `match_videos/${teamname}/${key}-${Date.now()}-${safeName}`;
+  const fileRef = storageRef(storage, path);
+  const task = uploadBytesResumable(fileRef, file, { contentType: file.type });
+  await new Promise<void>((resolve, reject) => {
+    task.on(
+      "state_changed",
+      (snap) => onProgress?.(snap.totalBytes ? snap.bytesTransferred / snap.totalBytes : 0),
+      reject,
+      () => resolve(),
+    );
+  });
+  try {
+    const url = await getDownloadURL(fileRef);
+    await push(ref(db, `${matchPath(teamname, fecha)}/videos`), {
+      url,
+      title: file.name.replace(/\.[^.]+$/, "").slice(0, 80) || null,
+      source: "file",
+      path,
+      addedAt: Date.now(),
+    });
+  } catch (e) {
+    await deleteFileQuietly(path);
+    throw e;
+  }
+}
+
+/** Quita el vídeo de la lista y, si era un fichero subido, lo borra de Storage. */
 export async function removeMatchVideo(teamname: string, fecha: string, videoId: string): Promise<void> {
-  await set(ref(db, `${matchPath(teamname, fecha)}/videos/${videoId}`), null);
+  const videoRef = ref(db, `${matchPath(teamname, fecha)}/videos/${videoId}`);
+  const path = (await get(ref(db, `${matchPath(teamname, fecha)}/videos/${videoId}/path`))).val();
+  await set(videoRef, null);
+  await deleteFileQuietly(typeof path === "string" ? path : null);
 }
 
 /**
@@ -89,15 +136,22 @@ export async function removeMatchReport(teamname: string, fecha: string): Promis
 
 /**
  * Al borrar un día: fuera sus datos de eventData (asistencia real, motivos,
- * partido) y el acta, para que un evento nuevo en esa fecha empiece limpio.
+ * partido), el acta y los vídeos subidos, para que un evento nuevo en esa
+ * fecha empiece limpio.
  */
 export async function clearEventData(teamname: string, fecha: string): Promise<void> {
   const key = eventDataKey(fecha);
   if (!key) return;
   const dataRef = ref(db, `${PATHS.TEAMS}/${teamname}/eventData/${key}`);
-  const reportPath = (await get(ref(db, `${PATHS.TEAMS}/${teamname}/eventData/${key}/match/report/path`))).val();
+  const match = (await get(ref(db, `${PATHS.TEAMS}/${teamname}/eventData/${key}/match`))).val() as {
+    report?: { path?: unknown };
+    videos?: Record<string, { path?: unknown } | null>;
+  } | null;
+  const paths = [match?.report?.path, ...Object.values(match?.videos ?? {}).map((v) => v?.path)].filter(
+    (p): p is string => typeof p === "string",
+  );
   await set(dataRef, null);
-  await deleteFileQuietly(typeof reportPath === "string" ? reportPath : null);
+  await Promise.all(paths.map((p) => deleteFileQuietly(p)));
 }
 
 /**

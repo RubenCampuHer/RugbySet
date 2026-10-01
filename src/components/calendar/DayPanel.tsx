@@ -389,7 +389,7 @@ export function DayPanel({
 
         {!isCoach && isMatch && !cancelled && <SquadCard team={team} day={day} myUid={myUid} />}
 
-        {isMatch && <MatchResultCard team={team} day={day} />}
+        {isMatch && <MatchResultCard team={team} day={day} media={!isCoach} />}
 
         {!isCoach && isMatch && day.lineupId && team.lineups[day.lineupId] && lineupVisibleToPlayers(team, day) && (
           <LineupSummary lineup={team.lineups[day.lineupId]} />

@@ -182,16 +182,19 @@ function VideoList({
 
 /**
  * Resultado para todos (jugadores y cuerpo técnico): marcador con V/E/D,
- * ensayos, vídeos y acta. Nada si todavía no hay datos del partido.
+ * ensayos, vídeos y acta. Nada si todavía no hay datos del partido. El cuerpo
+ * técnico ya tiene vídeos y acta en el editor (pestaña "Resultado"): con
+ * `media={false}` la tarjeta enseña solo el marcador, sin repetirlos.
  */
-export function MatchResultCard({ team, day }: { team: Team; day: TrainingDay }) {
+export function MatchResultCard({ team, day, media = true }: { team: Team; day: TrainingDay; media?: boolean }) {
   const match = matchOf(team, day);
   if (!match) return null;
   const outcome = matchOutcome(match);
   const score = match.status === "played" ? scoreline(match) : null;
   const hasTries = match.triesFor != null && match.triesAgainst != null;
-  const hasVideos = Object.values(match.videos).some(Boolean);
-  if (!match.opponent && !score && match.status !== "abandoned" && !hasVideos && !match.report) return null;
+  const hasVideos = media && Object.values(match.videos).some(Boolean);
+  const report = media ? match.report : null;
+  if (!match.opponent && !score && match.status !== "abandoned" && !hasVideos && !report) return null;
 
   const us = team.teamname || "Nosotros";
   const them = match.opponent || "Rival";
@@ -216,10 +219,10 @@ export function MatchResultCard({ team, day }: { team: Team; day: TrainingDay })
           Ensayos: {match.home === false ? `${match.triesAgainst} – ${match.triesFor}` : `${match.triesFor} – ${match.triesAgainst}`}
         </p>
       )}
-      <VideoList match={match} />
-      {match.report && (
+      {media && <VideoList match={match} />}
+      {report && (
         <a
-          href={match.report.url}
+          href={report.url}
           target="_blank"
           rel="noopener noreferrer"
           className="flex items-center gap-2 text-sm font-medium text-brand hover:underline"

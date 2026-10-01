@@ -62,7 +62,18 @@ export const MatchSchema = z.object({
   videos: z
     .record(
       z.string(),
-      z.object({ url: z.string(), title: z.string().nullish(), addedAt: z.number().nullish() }).nullable().catch(null),
+      z
+        .object({
+          url: z.string(),
+          title: z.string().nullish(),
+          addedAt: z.number().nullish(),
+          // Vídeo subido (2026-10-01): source "file" + ruta en Storage
+          // (match_videos/{equipo}/) para borrarlo. Sin source = enlace.
+          source: z.enum(["link", "file"]).nullish().catch(null),
+          path: z.string().nullish().catch(null),
+        })
+        .nullable()
+        .catch(null),
     )
     .default({})
     .catch({}),

@@ -96,3 +96,13 @@ export function videoSiteLabel(url: string): string {
 }
 
 export const MATCH_REPORT_MAX_BYTES = 10 * 1024 * 1024;
+
+/** Vídeo subido del partido (2026-10-01): mismos límites que storage.rules (match_videos/). */
+export const MATCH_VIDEO_MAX_BYTES = 200 * 1024 * 1024;
+
+/** Mensaje de error si el fichero no vale como vídeo del partido. */
+export function validateMatchVideo(file: { type: string; size: number }): string | null {
+  if (!file.type.startsWith("video/")) return "Tiene que ser un vídeo.";
+  if (file.size >= MATCH_VIDEO_MAX_BYTES) return "El vídeo no puede pasar de 200 MB.";
+  return null;
+}

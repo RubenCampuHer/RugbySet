@@ -7,10 +7,12 @@ import { AvatarInitials } from "@/components/AvatarInitials";
 import { BackLink } from "@/components/BackLink";
 import { EmptyState } from "@/components/EmptyState";
 import { ListRowsSkeleton } from "@/components/skeletons";
+import { MatchStatsCard } from "@/components/stats/MatchStatsCard";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useClub } from "@/hooks/useClub";
 import { useProfilesByUid } from "@/hooks/useProfilesByUid";
+import { useTeam } from "@/hooks/useTeam";
 import { getRoleDisplayName } from "@/lib/permissions";
 
 const TEAM_ROLE_LABEL: Record<"player" | "coach" | "delegate", string> = {
@@ -36,6 +38,9 @@ function PersonDetail() {
   const profiles = useProfilesByUid(uid ? [uid] : []);
   const profile = uid ? profiles[uid] : null;
   const { club } = useClub(profile?.directorOfClubId ?? null);
+  // Partidos solo del equipo activo de quien mira (el único que la web tiene
+  // leído) y solo si esa persona juega en él.
+  const { team } = useTeam();
 
   if (!uid) {
     return <EmptyState icon={Lock} title="Persona no encontrada" />;
@@ -98,6 +103,10 @@ function PersonDetail() {
           )}
         </CardContent>
       </Card>
+
+      {team && team.userplayers[uid] === true && (
+        <MatchStatsCard team={team} uid={uid} title={`Partidos en ${team.teamname}`} />
+      )}
     </div>
   );
 }
